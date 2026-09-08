@@ -12,7 +12,7 @@ export function SelectionLayer() {
     .filter((object) => object !== undefined);
 
   if (selectedObjects.length < 2) return null;
-  const bounds = getCombinedBounds(selectedObjects);
+  const bounds = getCombinedBounds(selectedObjects, objects);
   if (!bounds) return null;
 
   return (
@@ -21,7 +21,8 @@ export function SelectionLayer() {
       style={{
         width: bounds.right - bounds.left,
         height: bounds.bottom - bounds.top,
-        transform: `translate3d(${bounds.left}px, ${bounds.top}px, 0)`,
+        left: bounds.left,
+        top: bounds.top,
       }}
       aria-hidden="true"
     >

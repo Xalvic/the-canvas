@@ -1,28 +1,85 @@
 import { create } from "zustand";
-import type { CanvasObject } from "../canvas/objects/types";
+import {
+  isCanvasNodeObject,
+  isConnectorObject,
+  type CanvasObject,
+} from "../canvas/objects/types";
 import type { Point } from "../canvas/viewport/viewportMath";
 
+export type DocumentSnapshot = Record<string, CanvasObject>;
+
+export type HistoryEntry = {
+  objects: DocumentSnapshot;
+  label: string;
+};
+
 type DocumentState = {
-  objects: Record<string, CanvasObject>;
-  addObject: (object: CanvasObject) => void;
-  updateObject: (id: string, updates: Partial<CanvasObject>) => void;
-  updateObjectPositions: (positions: Record<string, Point>) => void;
-  deleteObjects: (ids: Iterable<string>) => void;
+  objects: DocumentSnapshot;
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+  addObject: (object: CanvasObject, label?: string) => void;
+  addObjects: (objects: CanvasObject[], label?: string) => void;
+  updateObject: (
+    id: string,
+    updates: Partial<CanvasObject>,
+    label?: string,
+  ) => void;
+  updateObjectPositions: (
+    positions: Record<string, Point>,
+    label?: string,
+  ) => void;
+  deleteObjects: (ids: Iterable<string>, label?: string) => void;
+  undo: () => void;
+  redo: () => void;
+  clearHistory: () => void;
   getNextZIndex: () => number;
 };
 
+export const MAX_HISTORY_ENTRIES = 100;
+
+function pushHistory(
+  history: HistoryEntry[],
+  entry: HistoryEntry,
+): HistoryEntry[] {
+  return [...history, entry].slice(-MAX_HISTORY_ENTRIES);
+}
+
+function creationLabel(object: CanvasObject): string {
+  if (object.type === "card") return "Create note";
+  if (object.type === "text") return "Create text";
+  return "Create connector";
+}
+
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   objects: {},
+  past: [],
+  future: [],
 
-  addObject: (object) =>
-    set((state) => ({
-      objects: { ...state.objects, [object.id]: object },
-    })),
+  addObject: (object, label) =>
+    get().addObjects([object], label ?? creationLabel(object)),
 
-  updateObject: (id, updates) =>
+  addObjects: (objects, label = "Add objects") =>
+    set((state) => {
+      if (objects.length === 0) return state;
+      const nextObjects = { ...state.objects };
+      for (const object of objects) nextObjects[object.id] = object;
+
+      return {
+        objects: nextObjects,
+        past: pushHistory(state.past, { objects: state.objects, label }),
+        future: [],
+      };
+    }),
+
+  updateObject: (id, updates, label = "Edit object") =>
     set((state) => {
       const object = state.objects[id];
       if (!object) return state;
+      const changed = Object.entries(updates).some(
+        ([key, value]) =>
+          (object as unknown as Record<string, unknown>)[key] !== value,
+      );
+      if (!changed) return state;
 
       return {
         objects: {
@@ -33,10 +90,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             updatedAt: Date.now(),
           } as CanvasObject,
         },
+        past: pushHistory(state.past, { objects: state.objects, label }),
+        future: [],
       };
     }),
 
-  updateObjectPositions: (positions) =>
+  updateObjectPositions: (positions, label = "Move selection") =>
     set((state) => {
       const nextObjects = { ...state.objects };
       const updatedAt = Date.now();
@@ -44,28 +103,86 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       for (const [id, position] of Object.entries(positions)) {
         const object = nextObjects[id];
-        if (!object) continue;
+        if (
+          !object ||
+          !isCanvasNodeObject(object) ||
+          (object.x === position.x && object.y === position.y)
+        ) {
+          continue;
+        }
         nextObjects[id] = { ...object, ...position, updatedAt };
         changed = true;
       }
 
-      return changed ? { objects: nextObjects } : state;
+      if (!changed) return state;
+      return {
+        objects: nextObjects,
+        past: pushHistory(state.past, { objects: state.objects, label }),
+        future: [],
+      };
     }),
 
-  deleteObjects: (ids) =>
+  deleteObjects: (ids, label = "Delete selection") =>
     set((state) => {
       const nextObjects = { ...state.objects };
+      const deletedIds = new Set(ids);
+      for (const object of Object.values(state.objects)) {
+        if (
+          isConnectorObject(object) &&
+          (deletedIds.has(object.from.objectId) ||
+            deletedIds.has(object.to.objectId))
+        ) {
+          deletedIds.add(object.id);
+        }
+      }
       let changed = false;
 
-      for (const id of ids) {
+      for (const id of deletedIds) {
         if (id in nextObjects) {
           delete nextObjects[id];
           changed = true;
         }
       }
 
-      return changed ? { objects: nextObjects } : state;
+      if (!changed) return state;
+      return {
+        objects: nextObjects,
+        past: pushHistory(state.past, { objects: state.objects, label }),
+        future: [],
+      };
     }),
+
+  undo: () =>
+    set((state) => {
+      const entry = state.past.at(-1);
+      if (!entry) return state;
+
+      return {
+        objects: entry.objects,
+        past: state.past.slice(0, -1),
+        future: pushHistory(state.future, {
+          objects: state.objects,
+          label: entry.label,
+        }),
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      const entry = state.future.at(-1);
+      if (!entry) return state;
+
+      return {
+        objects: entry.objects,
+        past: pushHistory(state.past, {
+          objects: state.objects,
+          label: entry.label,
+        }),
+        future: state.future.slice(0, -1),
+      };
+    }),
+
+  clearHistory: () => set({ past: [], future: [] }),
 
   getNextZIndex: () => {
     const objects = Object.values(get().objects);

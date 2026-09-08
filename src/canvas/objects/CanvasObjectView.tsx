@@ -6,11 +6,13 @@ import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
 import { CardObject } from "./CardObject";
 import { TextObject } from "./TextObject";
-import type { CanvasObject } from "./types";
+import { isCanvasNodeObject, type CanvasNodeObject } from "./types";
 import type { Point } from "../viewport/viewportMath";
+import { ConnectionAnchors } from "../connectors/ConnectionAnchors";
+import { refreshConnectorGeometryFromDom } from "../connectors/connectorDom";
 
 type CanvasObjectViewProps = {
-  object: CanvasObject;
+  object: CanvasNodeObject;
 };
 
 type DragInteraction = {
@@ -62,6 +64,12 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   const endInteraction = useInteractionStore((state) => state.endInteraction);
 
   const beginDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-connection-anchor]")
+    ) {
+      return;
+    }
     const isSpacePressed =
       event.currentTarget.closest<HTMLElement>(".canvas-viewport")?.dataset
         .spacePressed === "true";
@@ -84,7 +92,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     const startPositions: Record<string, Point> = {};
     for (const id of movingIds) {
       const movingObject = documentObjects[id];
-      if (movingObject) {
+      if (movingObject && isCanvasNodeObject(movingObject)) {
         startPositions[id] = { x: movingObject.x, y: movingObject.y };
       }
     }
@@ -121,9 +129,11 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
         drag.nextPositions[id] = next;
         const element = drag.elements.get(id);
         if (element) {
-          element.style.transform = `translate3d(${next.x}px, ${next.y}px, 0)`;
+          element.style.left = `${next.x}px`;
+          element.style.top = `${next.y}px`;
         }
       }
+      refreshConnectorGeometryFromDom(useDocumentStore.getState().objects);
       return;
     }
 
@@ -144,6 +154,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
             );
       elementRef.current.style.width = `${resize.nextWidth}px`;
       elementRef.current.style.height = `${resize.nextHeight}px`;
+      refreshConnectorGeometryFromDom(useDocumentStore.getState().objects);
     }
   };
 
@@ -171,7 +182,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
       updateObject(object.id, {
         width: resize.nextWidth,
         height: resize.nextHeight,
-      });
+      }, `Resize ${object.type === "card" ? "note" : "text"}`);
     }
     endInteraction();
   };
@@ -221,7 +232,8 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
         width: object.width,
         height: object.height,
         zIndex: object.zIndex,
-        transform: `translate3d(${object.x}px, ${object.y}px, 0)`,
+        left: object.x,
+        top: object.y,
       }}
       data-object-id={object.id}
       onPointerDown={beginDrag}
@@ -236,6 +248,8 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
       ) : (
         <CardObject object={object} isEditing={isEditing} />
       )}
+
+      <ConnectionAnchors objectId={object.id} />
 
       {isSoleSelection && !isEditing && (
         <button

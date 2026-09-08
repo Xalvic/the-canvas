@@ -8,13 +8,32 @@ import {
 } from "react";
 import { ObjectLayer } from "../layers/ObjectLayer";
 import { SelectionLayer } from "../layers/SelectionLayer";
+import { ConnectorLayer } from "../layers/ConnectorLayer";
+import { createConnectorObject } from "../connectors/connectorFactories";
+import {
+  buildConnectorPath,
+  getAnchorPoint,
+  getEndpointPoint,
+  inferAnchorToward,
+} from "../connectors/connectorGeometry";
 import {
   createCardObject,
   createTextObject,
 } from "../objects/objectFactories";
-import type { CanvasObjectType } from "../objects/types";
+import {
+  isConnectorObject,
+  type ConnectionAnchor,
+  type ConnectionEndpoint,
+} from "../objects/types";
 import { Toolbar } from "../../components/Toolbar/Toolbar";
 import { ZoomControls } from "../../components/ZoomControls/ZoomControls";
+import { HistoryControls } from "../../components/HistoryControls/HistoryControls";
+import {
+  copySelection,
+  duplicateSelection,
+  pasteClipboard,
+} from "../../clipboard/clipboardCommands";
+import { performRedo, performUndo } from "../../history/historyCommands";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
@@ -22,12 +41,14 @@ import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
 import {
   boundsIntersect,
+  getNodeObjects,
   getObjectBounds,
   type Bounds,
 } from "../../utils/geometry";
 import {
   panViewport,
   screenToWorld,
+  worldToScreen,
   zoomViewportAtPoint,
   type Point,
   type Viewport,
@@ -48,8 +69,23 @@ type MarqueeInteraction = {
   moved: boolean;
 };
 
+type ConnectorInteraction = {
+  pointerId: number;
+  connectorId: string | null;
+  movingEnd: "from" | "to";
+  fixedEndpoint: ConnectionEndpoint;
+  currentPoint: Point;
+  candidate: ConnectionEndpoint | null;
+};
+
 const GRID_SIZE = 24;
 const ZOOM_STEP = 1.2;
+const CONNECTION_ANCHORS: ConnectionAnchor[] = [
+  "top",
+  "right",
+  "bottom",
+  "left",
+];
 
 function isTypingTarget(target: EventTarget | null): boolean {
   return (
@@ -77,25 +113,45 @@ export function CanvasViewport() {
   const worldRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const marqueeOverlayRef = useRef<HTMLDivElement>(null);
+  const connectorDraftRef = useRef<SVGPathElement>(null);
   const viewportRef = useRef<Viewport>(useViewportStore.getState().viewport);
   const frameRef = useRef<number | null>(null);
   const panRef = useRef<PanInteraction | null>(null);
   const marqueeRef = useRef<MarqueeInteraction | null>(null);
+  const connectorRef = useRef<ConnectorInteraction | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const spacePressedRef = useRef(false);
   const suppressDoubleClickUntilRef = useRef(0);
   const [displayZoom, setDisplayZoom] = useState(viewportRef.current.zoom);
   const [isPanning, setIsPanning] = useState(false);
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const activeTool = useUiStore((state) => state.activeTool);
-  const objectCount = useDocumentStore(
-    (state) => Object.keys(state.objects).length,
-  );
+  const objects = useDocumentStore((state) => state.objects);
+  const selectedIds = useSelectionStore((state) => state.selectedIds);
+  const objectCount = Object.keys(objects).length;
+  const selectedCount = selectedIds.size;
+  const selectedConnectorIds = [...selectedIds].filter((id) => {
+    const object = objects[id];
+    return object !== undefined && isConnectorObject(object);
+  });
+
+  const clearConnectorPreview = useCallback(() => {
+    connectorRef.current = null;
+    if (connectorDraftRef.current) {
+      connectorDraftRef.current.style.display = "none";
+      connectorDraftRef.current.removeAttribute("d");
+    }
+    surfaceRef.current
+      ?.querySelectorAll(".connection-anchor.is-target")
+      .forEach((element) => element.classList.remove("is-target"));
+    setIsConnecting(false);
+  }, []);
 
   const paintViewport = useCallback((viewport: Viewport) => {
     if (worldRef.current) {
-      worldRef.current.style.transform = `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`;
+      worldRef.current.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`;
     }
 
     if (gridRef.current) {
@@ -227,19 +283,79 @@ export function CanvasViewport() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
 
+      const commandKey = event.ctrlKey || event.metaKey;
+      const shortcut = event.key.toLowerCase();
+      if (commandKey && !event.altKey) {
+        if (shortcut === "z") {
+          event.preventDefault();
+          if (event.shiftKey) performRedo();
+          else performUndo();
+          return;
+        }
+        if (shortcut === "y") {
+          event.preventDefault();
+          performRedo();
+          return;
+        }
+        if (shortcut === "c") {
+          event.preventDefault();
+          copySelection();
+          return;
+        }
+        if (shortcut === "v") {
+          event.preventDefault();
+          pasteClipboard();
+          return;
+        }
+        if (shortcut === "d") {
+          event.preventDefault();
+          duplicateSelection();
+          return;
+        }
+      }
+
       if (event.code === "Space") {
         event.preventDefault();
         spacePressedRef.current = true;
         setIsSpacePressed(true);
       }
 
-      const shortcut = event.key.toLowerCase();
-      if (shortcut === "v") useUiStore.getState().setActiveTool("select");
-      if (shortcut === "h") useUiStore.getState().setActiveTool("hand");
-      if (shortcut === "t") useUiStore.getState().setActiveTool("text");
-      if (shortcut === "n") useUiStore.getState().setActiveTool("card");
+      if (!commandKey && !event.altKey) {
+        if (shortcut === "a") {
+          const selection = useSelectionStore.getState().selectedIds;
+          const selectedConnectors = [...selection]
+            .map((id) => useDocumentStore.getState().objects[id])
+            .filter(
+              (object) => object !== undefined && isConnectorObject(object),
+            );
+          if (selectedConnectors.length === 1 && selection.size === 1) {
+            event.preventDefault();
+            const connector = selectedConnectors[0];
+            useDocumentStore.getState().updateObject(
+              connector.id,
+              { directed: !connector.directed },
+              connector.directed ? "Remove arrowhead" : "Add arrowhead",
+            );
+            return;
+          }
+        }
+        if (shortcut === "v") useUiStore.getState().setActiveTool("select");
+        if (shortcut === "h") useUiStore.getState().setActiveTool("hand");
+        if (shortcut === "t") useUiStore.getState().setActiveTool("text");
+        if (shortcut === "n") useUiStore.getState().setActiveTool("card");
+        if (shortcut === "c")
+          useUiStore.getState().setActiveTool("connector");
+      }
 
       if (event.key === "Escape") {
+        const connection = connectorRef.current;
+        if (
+          connection &&
+          surfaceRef.current?.hasPointerCapture(connection.pointerId)
+        ) {
+          surfaceRef.current.releasePointerCapture(connection.pointerId);
+        }
+        clearConnectorPreview();
         useUiStore.getState().setActiveTool("select");
         useSelectionStore.getState().clearSelection();
         useInteractionStore.getState().endInteraction();
@@ -291,7 +407,7 @@ export function CanvasViewport() {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [resetViewport, zoomAtCenter]);
+  }, [clearConnectorPreview, resetViewport, zoomAtCenter]);
 
   useEffect(
     () => () => {
@@ -301,7 +417,7 @@ export function CanvasViewport() {
   );
 
   const createObjectAt = (
-    type: CanvasObjectType,
+    type: "text" | "card",
     clientPoint: Point,
     suppressFollowingDoubleClick = false,
   ) => {
@@ -323,16 +439,165 @@ export function CanvasViewport() {
     useInteractionStore
       .getState()
       .beginInteraction("editingText", object.id);
-    useUiStore.getState().setActiveTool("select");
 
     if (suppressFollowingDoubleClick) {
       suppressDoubleClickUntilRef.current = performance.now() + 450;
     }
   };
 
+  const paintConnectorDraft = (interaction: ConnectorInteraction) => {
+    const objects = useDocumentStore.getState().objects;
+    const nodes = getNodeObjects(objects);
+    const fixedPoint = getEndpointPoint(interaction.fixedEndpoint, nodes);
+    if (!fixedPoint || !connectorDraftRef.current) return;
+
+    let from: Point;
+    let to: Point;
+    let fromAnchor: ConnectionAnchor;
+    let toAnchor: ConnectionAnchor;
+    if (interaction.movingEnd === "to") {
+      from = fixedPoint;
+      fromAnchor = interaction.fixedEndpoint.anchor;
+      to = interaction.candidate
+        ? getEndpointPoint(interaction.candidate, nodes) ?? interaction.currentPoint
+        : interaction.currentPoint;
+      toAnchor = interaction.candidate?.anchor ?? inferAnchorToward(to, from);
+    } else {
+      to = fixedPoint;
+      toAnchor = interaction.fixedEndpoint.anchor;
+      from = interaction.candidate
+        ? getEndpointPoint(interaction.candidate, nodes) ?? interaction.currentPoint
+        : interaction.currentPoint;
+      fromAnchor =
+        interaction.candidate?.anchor ?? inferAnchorToward(from, to);
+    }
+
+    connectorDraftRef.current.setAttribute(
+      "d",
+      buildConnectorPath(from, to, fromAnchor, toAnchor),
+    );
+    connectorDraftRef.current.style.display = "block";
+  };
+
+  const findConnectionCandidate = (
+    screenPoint: Point,
+    excludedObjectId: string,
+  ): ConnectionEndpoint | null => {
+    const nodes = getNodeObjects(useDocumentStore.getState().objects);
+    let nearest: { endpoint: ConnectionEndpoint; distance: number } | null =
+      null;
+
+    for (const node of Object.values(nodes)) {
+      if (node.id === excludedObjectId) continue;
+      for (const anchor of CONNECTION_ANCHORS) {
+        const anchorScreenPoint = worldToScreen(
+          getAnchorPoint(node, anchor),
+          viewportRef.current,
+        );
+        const distance = Math.hypot(
+          screenPoint.x - anchorScreenPoint.x,
+          screenPoint.y - anchorScreenPoint.y,
+        );
+        if (distance <= 20 && (!nearest || distance < nearest.distance)) {
+          nearest = {
+            endpoint: { objectId: node.id, anchor },
+            distance,
+          };
+        }
+      }
+    }
+
+    return nearest?.endpoint ?? null;
+  };
+
+  const highlightConnectionCandidate = (
+    candidate: ConnectionEndpoint | null,
+  ) => {
+    surfaceRef.current
+      ?.querySelectorAll<HTMLElement>("[data-connection-anchor]")
+      .forEach((element) => {
+        element.classList.toggle(
+          "is-target",
+          candidate !== null &&
+            element.dataset.connectionObject === candidate.objectId &&
+            element.dataset.connectionAnchor === candidate.anchor,
+        );
+      });
+  };
+
+  const beginConnectorInteraction = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ): boolean => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return false;
+    const target = event.target;
+    const endpointHandle = target.closest<SVGElement>(
+      "[data-connector-endpoint]",
+    );
+    const nodeAnchor = target.closest<HTMLElement>("[data-connection-anchor]");
+    const objects = useDocumentStore.getState().objects;
+    let interaction: ConnectorInteraction | null = null;
+
+    if (endpointHandle) {
+      const connectorId = endpointHandle.dataset.connectorId;
+      const movingEnd = endpointHandle.dataset.connectorEnd;
+      const connector = connectorId ? objects[connectorId] : undefined;
+      if (
+        connector &&
+        isConnectorObject(connector) &&
+        (movingEnd === "from" || movingEnd === "to")
+      ) {
+        interaction = {
+          pointerId: event.pointerId,
+          connectorId: connector.id,
+          movingEnd,
+          fixedEndpoint:
+            movingEnd === "from" ? connector.to : connector.from,
+          currentPoint: screenToWorld(
+            {
+              x: event.clientX - event.currentTarget.getBoundingClientRect().left,
+              y: event.clientY - event.currentTarget.getBoundingClientRect().top,
+            },
+            viewportRef.current,
+          ),
+          candidate: null,
+        };
+      }
+    } else if (nodeAnchor && activeTool === "connector") {
+      const objectId = nodeAnchor.dataset.connectionObject;
+      const anchor = nodeAnchor.dataset.connectionAnchor as
+        | ConnectionAnchor
+        | undefined;
+      const node = objectId ? getNodeObjects(objects)[objectId] : undefined;
+      if (objectId && anchor && node) {
+        interaction = {
+          pointerId: event.pointerId,
+          connectorId: null,
+          movingEnd: "to",
+          fixedEndpoint: { objectId, anchor },
+          currentPoint: getAnchorPoint(node, anchor),
+          candidate: null,
+        };
+      }
+    }
+
+    if (!interaction) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    connectorRef.current = interaction;
+    setIsConnecting(true);
+    useInteractionStore
+      .getState()
+      .beginInteraction("connecting", interaction.connectorId ?? undefined);
+    paintConnectorDraft(interaction);
+    return true;
+  };
+
   const clearTransientSelectionStyles = () => {
     surfaceRef.current
-      ?.querySelectorAll<HTMLElement>("[data-transient-selected]")
+      ?.querySelectorAll<HTMLElement | SVGGElement>(
+        "[data-transient-selected]",
+      )
       .forEach((element) => element.removeAttribute("data-transient-selected"));
   };
 
@@ -360,10 +625,12 @@ export function CanvasViewport() {
       right: bottomRight.x,
       bottom: bottomRight.y,
     };
-    const hitIds = Object.values(useDocumentStore.getState().objects)
-      .filter((object) =>
-        boundsIntersect(marqueeBounds, getObjectBounds(object)),
-      )
+    const objects = useDocumentStore.getState().objects;
+    const hitIds = Object.values(objects)
+      .filter((object) => {
+        const bounds = getObjectBounds(object, objects);
+        return bounds ? boundsIntersect(marqueeBounds, bounds) : false;
+      })
       .map((object) => object.id);
     const nextSelection = interaction.additive
       ? new Set([...interaction.initialSelectedIds, ...hitIds])
@@ -371,9 +638,12 @@ export function CanvasViewport() {
 
     interaction.liveSelectedIds = nextSelection;
     surfaceRef.current
-      ?.querySelectorAll<HTMLElement>("[data-object-id]")
+      ?.querySelectorAll<HTMLElement | SVGGElement>(
+        "[data-object-id], [data-connector-object-id]",
+      )
       .forEach((element) => {
-        const id = element.dataset.objectId;
+        const id =
+          element.dataset.objectId ?? element.dataset.connectorObjectId;
         element.dataset.transientSelected = String(
           id !== undefined && nextSelection.has(id),
         );
@@ -409,10 +679,17 @@ export function CanvasViewport() {
     const isMiddleButton = event.button === 1;
     if (!isPrimaryButton && !isMiddleButton) return;
 
+    if (isPrimaryButton && beginConnectorInteraction(event)) return;
+
     if (
       isPrimaryButton &&
       useInteractionStore.getState().mode === "editingText"
     ) {
+      if (activeTool === "text" || activeTool === "card") {
+        (document.activeElement as HTMLElement | null)?.blur();
+        createObjectAt(activeTool, { x: event.clientX, y: event.clientY }, true);
+        return;
+      }
       useSelectionStore.getState().clearSelection();
       return;
     }
@@ -450,6 +727,25 @@ export function CanvasViewport() {
   const continueSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const connection = connectorRef.current;
+    if (connection?.pointerId === event.pointerId) {
+      const element = surfaceRef.current;
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      const screenPoint = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      connection.currentPoint = screenToWorld(screenPoint, viewportRef.current);
+      connection.candidate = findConnectionCandidate(
+        screenPoint,
+        connection.fixedEndpoint.objectId,
+      );
+      highlightConnectionCandidate(connection.candidate);
+      paintConnectorDraft(connection);
+      return;
+    }
+
     const marquee = marqueeRef.current;
     if (marquee?.pointerId === event.pointerId) {
       const element = surfaceRef.current;
@@ -485,6 +781,41 @@ export function CanvasViewport() {
   const endSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const connection = connectorRef.current;
+    if (connection?.pointerId === event.pointerId) {
+      const wasCancelled = event.type === "pointercancel";
+      if (!wasCancelled && connection.candidate) {
+        const documentStore = useDocumentStore.getState();
+        if (connection.connectorId) {
+          documentStore.updateObject(
+            connection.connectorId,
+            connection.movingEnd === "from"
+              ? { from: connection.candidate }
+              : { to: connection.candidate },
+            "Reconnect connector",
+          );
+          useSelectionStore.getState().selectOnly(connection.connectorId);
+        } else {
+          const connector = createConnectorObject(
+            connection.fixedEndpoint,
+            connection.candidate,
+            documentStore.getNextZIndex(),
+            !event.shiftKey,
+          );
+          documentStore.addObject(connector);
+          useSelectionStore.getState().selectOnly(connector.id);
+        }
+        suppressDoubleClickUntilRef.current = performance.now() + 450;
+      }
+
+      clearConnectorPreview();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      useInteractionStore.getState().endInteraction();
+      return;
+    }
+
     const marquee = marqueeRef.current;
     if (marquee?.pointerId === event.pointerId) {
       marqueeRef.current = null;
@@ -525,6 +856,12 @@ export function CanvasViewport() {
   const handleLostPointerCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    if (connectorRef.current?.pointerId === event.pointerId) {
+      clearConnectorPreview();
+      useInteractionStore.getState().endInteraction();
+      return;
+    }
+
     const marquee = marqueeRef.current;
     if (marquee?.pointerId === event.pointerId) {
       marqueeRef.current = null;
@@ -559,6 +896,7 @@ export function CanvasViewport() {
       data-panning={isPanning ? "true" : "false"}
       data-space-pressed={isSpacePressed ? "true" : "false"}
       data-marquee-selecting={isMarqueeSelecting ? "true" : "false"}
+      data-connecting={isConnecting ? "true" : "false"}
       data-active-tool={activeTool}
       aria-label="Infinite canvas"
       onPointerDown={beginSurfaceInteraction}
@@ -573,8 +911,12 @@ export function CanvasViewport() {
 
       <div ref={worldRef} className="world-layer">
         <span className="world-origin-dot" aria-hidden="true" />
+        <ConnectorLayer />
         <ObjectLayer />
         <SelectionLayer />
+        <svg className="connector-draft-layer" aria-hidden="true">
+          <path ref={connectorDraftRef} className="connector-draft-path" />
+        </svg>
       </div>
 
       <div
@@ -607,12 +949,73 @@ export function CanvasViewport() {
         <Toolbar />
       </div>
 
+      <div
+        className="history-dock"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <HistoryControls />
+      </div>
+
       <aside className="canvas-hint" aria-label="Canvas navigation help">
-        <span><strong>Drag empty space</strong> to select</span>
-        <i aria-hidden="true" />
-        <span><strong>Shift-click</strong> to add or remove</span>
-        <i aria-hidden="true" />
-        <span><strong>Space-drag</strong> to pan</span>
+        {activeTool === "select" && (
+          <>
+            {selectedCount === 1 && selectedConnectorIds.length === 1 ? (
+              <>
+                <span><strong>Drag an endpoint</strong> to reconnect</span>
+                <i aria-hidden="true" />
+                <span><strong>A</strong> toggle arrow</span>
+                <i aria-hidden="true" />
+                <span><strong>Delete</strong> remove</span>
+              </>
+            ) : selectedCount > 0 ? (
+              <>
+                <span><strong>Ctrl/⌘ D</strong> duplicate</span>
+                <i aria-hidden="true" />
+                <span><strong>Ctrl/⌘ C · V</strong> copy and paste</span>
+                <i aria-hidden="true" />
+                <span><strong>Delete</strong> remove</span>
+              </>
+            ) : (
+              <>
+                <span><strong>Drag empty space</strong> to select</span>
+                <i aria-hidden="true" />
+                <span><strong>Shift-click</strong> to add or remove</span>
+                <i aria-hidden="true" />
+                <span><strong>Space-drag</strong> to pan</span>
+              </>
+            )}
+          </>
+        )}
+        {activeTool === "hand" && (
+          <>
+            <span><strong>Drag</strong> to pan</span>
+            <i aria-hidden="true" />
+            <span><strong>Scroll</strong> to move around</span>
+          </>
+        )}
+        {activeTool === "card" && (
+          <>
+            <span><strong>Click empty space</strong> to add a note</span>
+            <i aria-hidden="true" />
+            <span><strong>Esc</strong> to return to Select</span>
+          </>
+        )}
+        {activeTool === "text" && (
+          <>
+            <span><strong>Click empty space</strong> to add text</span>
+            <i aria-hidden="true" />
+            <span><strong>Esc</strong> to return to Select</span>
+          </>
+        )}
+        {activeTool === "connector" && (
+          <>
+            <span><strong>Drag from an anchor</strong> to connect</span>
+            <i aria-hidden="true" />
+            <span><strong>Shift-drag</strong> for no arrow</span>
+            <i aria-hidden="true" />
+            <span><strong>Esc</strong> to Select</span>
+          </>
+        )}
       </aside>
 
       <div

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
+import { useUiStore } from "../../store/uiStore";
 import type { TextCanvasObject } from "./types";
 
 type TextObjectProps = {
@@ -30,15 +31,19 @@ export function TextObject({ object, isEditing }: TextObjectProps) {
     updateObject(object.id, {
       text,
       height: Math.max(52, measuredHeight),
-    });
+    }, "Edit text");
     endInteraction();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (
-      event.key === "Escape" ||
-      (event.key === "Enter" && (event.metaKey || event.ctrlKey))
-    ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      commit();
+      useUiStore.getState().setActiveTool("select");
+      return;
+    }
+
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       commit();
     }

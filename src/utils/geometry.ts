@@ -1,4 +1,9 @@
-import type { CanvasObject } from "../canvas/objects/types";
+import { getAnchorPoint } from "../canvas/connectors/connectorGeometry";
+import {
+  isCanvasNodeObject,
+  type CanvasObject,
+  type CanvasNodeObject,
+} from "../canvas/objects/types";
 
 export type Bounds = {
   left: number;
@@ -7,12 +12,37 @@ export type Bounds = {
   bottom: number;
 };
 
-export function getObjectBounds(object: CanvasObject): Bounds {
+export function getObjectBounds(
+  object: CanvasObject,
+  allObjects: Record<string, CanvasObject> = {},
+): Bounds | null {
+  if (isCanvasNodeObject(object)) {
+    return {
+      left: object.x,
+      top: object.y,
+      right: object.x + object.width,
+      bottom: object.y + object.height,
+    };
+  }
+
+  const fromObject = allObjects[object.from.objectId];
+  const toObject = allObjects[object.to.objectId];
+  if (
+    !fromObject ||
+    !toObject ||
+    !isCanvasNodeObject(fromObject) ||
+    !isCanvasNodeObject(toObject)
+  ) {
+    return null;
+  }
+
+  const from = getAnchorPoint(fromObject, object.from.anchor);
+  const to = getAnchorPoint(toObject, object.to.anchor);
   return {
-    left: object.x,
-    top: object.y,
-    right: object.x + object.width,
-    bottom: object.y + object.height,
+    left: Math.min(from.x, to.x),
+    top: Math.min(from.y, to.y),
+    right: Math.max(from.x, to.x),
+    bottom: Math.max(from.y, to.y),
   };
 }
 
@@ -27,17 +57,20 @@ export function boundsIntersect(a: Bounds, b: Bounds): boolean {
 
 export function getCombinedBounds(
   objects: CanvasObject[],
+  allObjects: Record<string, CanvasObject> = {},
 ): Bounds | null {
-  if (objects.length === 0) return null;
+  const bounds = objects
+    .map((object) => getObjectBounds(object, allObjects))
+    .filter((value): value is Bounds => value !== null);
+  if (bounds.length === 0) return null;
 
-  return objects.reduce<Bounds>(
-    (combined, object) => {
-      const bounds = getObjectBounds(object);
+  return bounds.reduce<Bounds>(
+    (combined, objectBounds) => {
       return {
-        left: Math.min(combined.left, bounds.left),
-        top: Math.min(combined.top, bounds.top),
-        right: Math.max(combined.right, bounds.right),
-        bottom: Math.max(combined.bottom, bounds.bottom),
+        left: Math.min(combined.left, objectBounds.left),
+        top: Math.min(combined.top, objectBounds.top),
+        right: Math.max(combined.right, objectBounds.right),
+        bottom: Math.max(combined.bottom, objectBounds.bottom),
       };
     },
     {
@@ -46,5 +79,15 @@ export function getCombinedBounds(
       right: Number.NEGATIVE_INFINITY,
       bottom: Number.NEGATIVE_INFINITY,
     },
+  );
+}
+
+export function getNodeObjects(
+  objects: Record<string, CanvasObject>,
+): Record<string, CanvasNodeObject> {
+  return Object.fromEntries(
+    Object.entries(objects).filter((entry): entry is [string, CanvasNodeObject] =>
+      isCanvasNodeObject(entry[1]),
+    ),
   );
 }

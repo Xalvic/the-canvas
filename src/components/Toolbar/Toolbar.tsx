@@ -1,4 +1,10 @@
-import { HandIcon, NoteIcon, SelectIcon, TextIcon } from "../icons";
+import {
+  ConnectorIcon,
+  HandIcon,
+  NoteIcon,
+  SelectIcon,
+  TextIcon,
+} from "../icons";
 import { useUiStore, type ActiveTool } from "../../store/uiStore";
 
 const tools: Array<{
@@ -11,6 +17,12 @@ const tools: Array<{
   { id: "hand", label: "Hand", shortcut: "H", icon: HandIcon },
   { id: "card", label: "Note", shortcut: "N", icon: NoteIcon },
   { id: "text", label: "Text", shortcut: "T", icon: TextIcon },
+  {
+    id: "connector",
+    label: "Connect",
+    shortcut: "C",
+    icon: ConnectorIcon,
+  },
 ];
 
 export function Toolbar() {

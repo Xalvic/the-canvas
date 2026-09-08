@@ -58,7 +58,8 @@ button {
 }
 
 .canvas-viewport[data-active-tool="text"],
-.canvas-viewport[data-active-tool="card"] {
+.canvas-viewport[data-active-tool="card"],
+.canvas-viewport[data-active-tool="connector"] {
   cursor: crosshair;
 }
 
@@ -94,7 +95,6 @@ button {
   height: 1px;
   z-index: 1;
   transform-origin: 0 0;
-  will-change: transform;
 }
 
 .world-origin-dot {
@@ -113,13 +113,94 @@ button {
   inset: 0;
   width: 1px;
   height: 1px;
+  z-index: 1;
+}
+
+.connector-layer,
+.connector-handle-layer,
+.connector-draft-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.connector-layer {
+  z-index: 0;
+}
+
+.connector-handle-layer {
+  z-index: 3;
+}
+
+.connector-draft-layer {
+  z-index: 2147483645;
+}
+
+.connector-path,
+.connector-draft-path,
+.connector-hit-area {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.connector-path {
+  stroke: #7d7e78;
+  stroke-width: 1.8px;
+  pointer-events: none;
+}
+
+.connector-hit-area {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.connector.is-selected .connector-path,
+.connector[data-transient-selected="true"] .connector-path {
+  stroke: var(--accent);
+  stroke-width: 2.2px;
+}
+
+.connector[data-transient-selected="false"] .connector-path {
+  stroke: #7d7e78;
+  stroke-width: 1.8px;
+}
+
+.connector.is-reconnecting .connector-path {
+  opacity: 0.28;
+}
+
+.connector-arrow {
+  fill: #7d7e78;
+}
+
+.connector-arrow-selected {
+  fill: var(--accent);
+}
+
+.connector-draft-path {
+  display: none;
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-dasharray: 6 5;
+}
+
+.connector-endpoint-handle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: crosshair;
 }
 
 .canvas-object {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
   cursor: move;
   touch-action: none;
 }
@@ -155,6 +236,62 @@ button {
 
 .canvas-object.is-editing::after {
   border-color: rgb(99 91 255 / 0.55);
+}
+
+.connection-anchor {
+  position: absolute;
+  z-index: 4;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(45 41 145 / 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 100ms ease,
+    transform 100ms ease,
+    background 100ms ease;
+}
+
+.connection-anchor--top {
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.connection-anchor--right {
+  top: 50%;
+  right: -7px;
+  transform: translateY(-50%);
+}
+
+.connection-anchor--bottom {
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.connection-anchor--left {
+  top: 50%;
+  left: -7px;
+  transform: translateY(-50%);
+}
+
+.canvas-viewport[data-active-tool="connector"] .connection-anchor,
+.canvas-viewport[data-connecting="true"] .connection-anchor {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.connection-anchor.is-target {
+  background: var(--accent);
+  box-shadow:
+    0 0 0 4px rgb(99 91 255 / 0.16),
+    0 1px 4px rgb(45 41 145 / 0.2);
 }
 
 .canvas-object--text {
@@ -405,7 +542,8 @@ button {
 }
 
 .tool-dock,
-.zoom-controls {
+.zoom-controls,
+.history-controls {
   display: flex;
   align-items: center;
   border: 1px solid rgb(36 37 34 / 0.1);
@@ -519,6 +657,18 @@ button {
   z-index: 3;
 }
 
+.history-dock {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  z-index: 3;
+}
+
+.history-controls {
+  height: 40px;
+  padding: 3px;
+}
+
 .zoom-controls {
   height: 40px;
   padding: 3px;
@@ -539,6 +689,16 @@ button {
 
 .icon-button:hover {
   background: #f1f1ee;
+}
+
+.icon-button:disabled {
+  color: #b9bab5;
+  cursor: default;
+  opacity: 0.65;
+}
+
+.icon-button:disabled:hover {
+  background: transparent;
 }
 
 .icon-button:focus-visible,
@@ -572,7 +732,7 @@ button {
 
   .tool-dock {
     top: auto;
-    bottom: 19px;
+    bottom: 70px;
     left: 18px;
     transform: none;
   }
@@ -595,6 +755,11 @@ button {
   .zoom-dock {
     right: 18px;
     bottom: 19px;
+  }
+
+  .history-dock {
+    top: 15px;
+    right: 18px;
   }
 }
 

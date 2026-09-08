@@ -50,6 +50,17 @@ export function TextIcon(props: IconProps) {
   );
 }
 
+export function ConnectorIcon(props: IconProps) {
+  return (
+    <svg {...sharedProps} {...props}>
+      <circle cx="5.5" cy="17.5" r="2.5" />
+      <circle cx="18.5" cy="6.5" r="2.5" />
+      <path d="M7.5 16 16.5 8" />
+      <path d="m13.8 7.8 3-.2-.2 3" />
+    </svg>
+  );
+}
+
 export function MinusIcon(props: IconProps) {
   return (
     <svg {...sharedProps} {...props}>
@@ -71,6 +82,24 @@ export function ResetIcon(props: IconProps) {
     <svg {...sharedProps} {...props}>
       <path d="M4.9 8.2A8 8 0 1 1 4 12" />
       <path d="M4 4v4.5h4.5" />
+    </svg>
+  );
+}
+
+export function UndoIcon(props: IconProps) {
+  return (
+    <svg {...sharedProps} {...props}>
+      <path d="M9 7 4 12l5 5" />
+      <path d="M5 12h8.5a5.5 5.5 0 0 1 5.5 5.5V19" />
+    </svg>
+  );
+}
+
+export function RedoIcon(props: IconProps) {
+  return (
+    <svg {...sharedProps} {...props}>
+      <path d="m15 7 5 5-5 5" />
+      <path d="M19 12h-8.5A5.5 5.5 0 0 0 5 17.5V19" />
     </svg>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
+import { useUiStore } from "../../store/uiStore";
 import type { CardCanvasObject } from "./types";
 
 type CardObjectProps = {
@@ -37,7 +38,7 @@ export function CardObject({ object, isEditing }: CardObjectProps) {
     updateObject(object.id, {
       title: draftTitle.trim() || "Untitled idea",
       body: draftBody.trim(),
-    });
+    }, "Edit note");
     endInteraction();
   };
 
@@ -47,10 +48,14 @@ export function CardObject({ object, isEditing }: CardObjectProps) {
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      event.key === "Escape" ||
-      (event.key === "Enter" && (event.metaKey || event.ctrlKey))
-    ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      commit();
+      useUiStore.getState().setActiveTool("select");
+      return;
+    }
+
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       commit();
     }

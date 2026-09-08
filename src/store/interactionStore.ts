@@ -6,6 +6,7 @@ export type InteractionMode =
   | "marquee"
   | "dragging"
   | "resizing"
+  | "connecting"
   | "editingText";
 
 type InteractionState = {
