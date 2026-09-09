@@ -70,7 +70,6 @@ export function FrameObject({ object, isEditing }: FrameObjectProps) {
         ) : (
           <>
             <strong>{object.title}</strong>
-            <span>{object.moveContents ? "Moves contents" : "Contents fixed"}</span>
           </>
         )}
       </header>

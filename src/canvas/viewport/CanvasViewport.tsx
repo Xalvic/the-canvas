@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -36,16 +37,22 @@ import {
   ungroupSelection,
 } from "../groups/groupCommands";
 import { expandIdsToGroups } from "../groups/grouping";
-import {
-  createStrokeObject,
-  DEFAULT_STROKE_WIDTH,
-} from "../strokes/strokeFactories";
-import { buildVariableWidthStrokePath } from "../strokes/strokeGeometry";
+import { createStrokeObject } from "../strokes/strokeFactories";
+import { buildSmoothedStrokePath, buildVariableWidthStrokePath } from "../strokes/strokeGeometry";
+import { createStrokeDynamics, sampleStrokeDynamics, type StrokeDynamics } from "../strokes/strokeDynamics";
+import { PEN_WIDTHS, type PenToolSettings } from "../../tools/toolSettings";
+import { useToolPreferencesStore } from "../../store/toolPreferencesStore";
 import type { StrokePoint } from "../objects/types";
 import { Toolbar } from "../../components/Toolbar/Toolbar";
 import { ZoomControls } from "../../components/ZoomControls/ZoomControls";
 import { HistoryControls } from "../../components/HistoryControls/HistoryControls";
 import { BoardIdentity } from "../../components/BoardIdentity/BoardIdentity";
+import {
+  createImportedImageObject,
+  getClipboardImageFiles,
+  getDroppedFiles,
+  prepareImageAsset,
+} from "../../assets/imageImport";
 import {
   copySelection,
   duplicateSelection,
@@ -58,6 +65,7 @@ import { useSelectionStore } from "../../store/selectionStore";
 import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
 import { useBoardStore } from "../../store/boardStore";
+import { useClipboardStore } from "../../store/clipboardStore";
 import {
   boundsIntersect,
   getNodeObjects,
@@ -107,12 +115,14 @@ type FrameCreationInteraction = {
 type StrokeInteraction = {
   pointerId: number;
   pointerType: string;
-  distance: number;
+  dynamics: StrokeDynamics;
+  settings: PenToolSettings;
   points: StrokePoint[];
 };
 
 const GRID_SIZE = 24;
 const ZOOM_STEP = 1.2;
+const MULTI_IMAGE_OFFSET = 24;
 const CONNECTION_ANCHORS: ConnectionAnchor[] = [
   "top",
   "right",
@@ -156,9 +166,16 @@ export function CanvasViewport() {
   const connectorRef = useRef<ConnectorInteraction | null>(null);
   const frameCreationRef = useRef<FrameCreationInteraction | null>(null);
   const strokeRef = useRef<StrokeInteraction | null>(null);
+  const strokePaintRef = useRef<number | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const spacePressedRef = useRef(false);
   const suppressDoubleClickUntilRef = useRef(0);
+  const pointerLocationRef = useRef<{
+    clientPoint: Point;
+    isOverCanvas: boolean;
+  } | null>(null);
+  const dragDepthRef = useRef(0);
+  const noticeTimerRef = useRef<number | null>(null);
   const [displayZoom, setDisplayZoom] = useState(viewportRef.current.zoom);
   const [isPanning, setIsPanning] = useState(false);
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
@@ -166,6 +183,8 @@ export function CanvasViewport() {
   const [isCreatingFrame, setIsCreatingFrame] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isImageDragOver, setIsImageDragOver] = useState(false);
+  const [canvasNotice, setCanvasNotice] = useState<string | null>(null);
   const activeTool = useUiStore((state) => state.activeTool);
   const isBoardHydrated = useBoardStore((state) => state.isHydrated);
   const objects = useDocumentStore((state) => state.objects);
@@ -182,6 +201,98 @@ export function CanvasViewport() {
   });
   const selectedStrokeIds = [...selectedIds].filter(
     (id) => objects[id]?.type === "stroke",
+  );
+
+  const showCanvasNotice = useCallback((message: string) => {
+    setCanvasNotice(message);
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = window.setTimeout(() => {
+      noticeTimerRef.current = null;
+      setCanvasNotice(null);
+    }, 4200);
+  }, []);
+
+  const getImageInsertionPoint = useCallback((clientPoint?: Point): Point | null => {
+    const element = surfaceRef.current;
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    const recentPointer = pointerLocationRef.current;
+    const target = clientPoint ?? (
+      recentPointer?.isOverCanvas
+        ? recentPointer.clientPoint
+        : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    );
+    return screenToWorld(
+      { x: target.x - rect.left, y: target.y - rect.top },
+      viewportRef.current,
+    );
+  }, []);
+
+  const insertImageFiles = useCallback(async (
+    files: File[],
+    source: "paste" | "drop",
+    clientPoint?: Point,
+  ) => {
+    if (files.length === 0) return;
+    const insertionPoint = getImageInsertionPoint(clientPoint);
+    if (!insertionPoint) return;
+
+    const results = await Promise.allSettled(files.map(prepareImageAsset));
+    const imported = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
+    const failures = results.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : [],
+    );
+
+    if (imported.length > 0) {
+      const documentStore = useDocumentStore.getState();
+      const firstZIndex = documentStore.getNextZIndex();
+      const imageObjects = imported.map((asset, index) =>
+        createImportedImageObject(
+          asset,
+          {
+            x: insertionPoint.x + index * MULTI_IMAGE_OFFSET,
+            y: insertionPoint.y + index * MULTI_IMAGE_OFFSET,
+          },
+          firstZIndex + index,
+        ),
+      );
+      documentStore.addObjects(
+        imageObjects,
+        source === "drop"
+          ? imported.length === 1 ? "Drop image" : "Drop images"
+          : imported.length === 1 ? "Paste image" : "Paste images",
+      );
+      useSelectionStore.getState().setSelection(
+        imageObjects.map((object) => object.id),
+      );
+      useInteractionStore.getState().endInteraction();
+      useUiStore.getState().setActiveTool("select");
+    }
+
+    if (failures.length > 0) {
+      const firstFailure = failures[0];
+      const message = firstFailure instanceof Error
+        ? firstFailure.message
+        : "One or more images could not be added";
+      showCanvasNotice(
+        failures.length === 1
+          ? message
+          : `${message} (${failures.length} files skipped)`,
+      );
+    }
+  }, [getImageInsertionPoint, showCanvasNotice]);
+
+  useEffect(
+    () => () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
+    },
+    [],
   );
   const selectedGroupIds = new Set(
     [...selectedIds]
@@ -208,6 +319,10 @@ export function CanvasViewport() {
   }, []);
 
   const clearStrokePreview = useCallback(() => {
+    if (strokePaintRef.current !== null) {
+      cancelAnimationFrame(strokePaintRef.current);
+      strokePaintRef.current = null;
+    }
     strokeRef.current = null;
     if (strokeDraftRef.current) {
       strokeDraftRef.current.style.display = "none";
@@ -360,10 +475,10 @@ export function CanvasViewport() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) return;
-
       const commandKey = event.ctrlKey || event.metaKey;
       const shortcut = event.key.toLowerCase();
+      if (isTypingTarget(event.target)) return;
+
       if (commandKey && !event.altKey) {
         if (shortcut === "g") {
           event.preventDefault();
@@ -383,13 +498,9 @@ export function CanvasViewport() {
           return;
         }
         if (shortcut === "c") {
-          event.preventDefault();
-          copySelection();
           return;
         }
         if (shortcut === "v") {
-          event.preventDefault();
-          pasteClipboard();
           return;
         }
         if (shortcut === "d") {
@@ -536,6 +647,7 @@ export function CanvasViewport() {
   useEffect(
     () => () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      if (strokePaintRef.current !== null) cancelAnimationFrame(strokePaintRef.current);
     },
     [],
   );
@@ -555,10 +667,11 @@ export function CanvasViewport() {
     const documentStore = useDocumentStore.getState();
     const object =
       type === "text"
-        ? createTextObject(worldPoint, documentStore.getNextZIndex())
+        ? createTextObject(worldPoint, documentStore.getNextZIndex(), useToolPreferencesStore.getState().text)
         : createCardObject(worldPoint, documentStore.getNextZIndex());
 
     documentStore.addObject(object);
+    useUiStore.getState().setActiveTool("select");
     useSelectionStore.getState().selectOnly(object.id);
     useInteractionStore
       .getState()
@@ -652,6 +765,7 @@ export function CanvasViewport() {
         documentStore.getNextZIndex(),
       );
       documentStore.addObject(frame);
+      useUiStore.getState().setActiveTool("select");
       useSelectionStore.getState().selectOnly(frame.id);
       suppressDoubleClickUntilRef.current = performance.now() + 450;
     }
@@ -664,12 +778,17 @@ export function CanvasViewport() {
 
   const paintStrokeDraft = (interaction: StrokeInteraction) => {
     if (!strokeDraftRef.current) return;
+    const { mode, color, size, opacity } = interaction.settings;
     strokeDraftRef.current.style.display = "block";
+    strokeDraftRef.current.setAttribute("fill", mode === "solid" ? "none" : color);
+    strokeDraftRef.current.setAttribute("stroke", mode === "solid" ? color : "none");
+    strokeDraftRef.current.setAttribute("stroke-width", String(PEN_WIDTHS[size]));
+    strokeDraftRef.current.setAttribute("opacity", String(opacity));
     strokeDraftRef.current.setAttribute(
       "d",
-      buildVariableWidthStrokePath(
+      mode === "solid" ? buildSmoothedStrokePath(interaction.points) : buildVariableWidthStrokePath(
         interaction.points,
-        DEFAULT_STROKE_WIDTH,
+        PEN_WIDTHS[size],
       ),
     );
   };
@@ -696,29 +815,35 @@ export function CanvasViewport() {
       ) {
         continue;
       }
-      interaction.distance += segmentDistance;
-      const rampProgress = Math.min(
-        1,
-        interaction.distance / (26 / viewportRef.current.zoom),
+      const dynamics = sampleStrokeDynamics(
+        interaction.dynamics,
+        { x: sample.clientX, y: sample.clientY },
+        sample.timeStamp,
+        // Releasing the pen reports zero pressure; keep the last contact force.
+        sample.type === "pointerup" ? (previous?.pressure ?? 0.5) : sample.pressure,
+        interaction.pointerType,
       );
-      const easedRamp = 1 - (1 - rampProgress) ** 3;
-      const reportedPressure = sample.pressure > 0 ? sample.pressure : 0.5;
-      const pressure = interaction.pointerType === "pen"
-        ? reportedPressure * (0.35 + easedRamp * 0.65)
-        : 0.08 + easedRamp * 0.92;
       interaction.points.push({
         ...point,
-        pressure: Math.min(1, Math.max(0.05, pressure)),
+        ...dynamics,
       });
     }
-    paintStrokeDraft(interaction);
+    // Coalesced input stays in refs. Rebuild the draft at most once per frame,
+    // without publishing pointer samples to React or the document store.
+    if (strokePaintRef.current === null) {
+      strokePaintRef.current = requestAnimationFrame(() => {
+        strokePaintRef.current = null;
+        if (strokeRef.current === interaction) paintStrokeDraft(interaction);
+      });
+    }
   };
 
   const beginStroke = (event: ReactPointerEvent<HTMLDivElement>) => {
     const interaction: StrokeInteraction = {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
-      distance: 0,
+      dynamics: createStrokeDynamics(),
+      settings: { ...useToolPreferencesStore.getState().pen },
       points: [],
     };
     event.preventDefault();
@@ -742,6 +867,7 @@ export function CanvasViewport() {
         createStrokeObject(
           [...interaction.points],
           documentStore.getNextZIndex(),
+          interaction.settings,
         ),
       );
       suppressDoubleClickUntilRef.current = performance.now() + 450;
@@ -988,6 +1114,10 @@ export function CanvasViewport() {
   const beginSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    pointerLocationRef.current = {
+      clientPoint: { x: event.clientX, y: event.clientY },
+      isOverCanvas: true,
+    };
     const isPrimaryButton = event.button === 0;
     const isMiddleButton = event.button === 1;
     if (!isPrimaryButton && !isMiddleButton) return;
@@ -1062,6 +1192,10 @@ export function CanvasViewport() {
   const continueSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    pointerLocationRef.current = {
+      clientPoint: { x: event.clientX, y: event.clientY },
+      isOverCanvas: true,
+    };
     const stroke = strokeRef.current;
     if (stroke?.pointerId === event.pointerId) {
       appendStrokeSamples(event, stroke);
@@ -1260,6 +1394,90 @@ export function CanvasViewport() {
     createObjectAt("card", { x: event.clientX, y: event.clientY });
   };
 
+  useEffect(() => {
+    const handleCopy = (event: ClipboardEvent) => {
+      if (
+        isTypingTarget(event.target) ||
+        useSelectionStore.getState().selectedIds.size === 0
+      ) {
+        return;
+      }
+      copySelection();
+      event.clipboardData?.setData("application/x-the-canvas-objects", "1");
+      event.preventDefault();
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const isEditingText = isTypingTarget(event.target);
+      const imageFiles = getClipboardImageFiles(event.clipboardData);
+      if (imageFiles.length > 0) {
+        event.preventDefault();
+        void insertImageFiles(imageFiles, "paste");
+        return;
+      }
+      if (isEditingText) return;
+
+      const internalClipboard = useClipboardStore.getState().objects;
+      if (internalClipboard.length > 0) {
+        event.preventDefault();
+        pasteClipboard();
+      }
+    };
+
+    window.addEventListener("copy", handleCopy);
+    window.addEventListener("paste", handlePaste);
+    return () => {
+      window.removeEventListener("copy", handleCopy);
+      window.removeEventListener("paste", handlePaste);
+    };
+  }, [insertImageFiles]);
+
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerLocationRef.current = {
+      clientPoint: { x: event.clientX, y: event.clientY },
+      isOverCanvas: true,
+    };
+  };
+
+  const handlePointerLeave = () => {
+    if (pointerLocationRef.current) {
+      pointerLocationRef.current.isOverCanvas = false;
+    }
+  };
+
+  const handleDragEnter = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsImageDragOver(true);
+  };
+
+  const handleDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    if (!isImageDragOver) setIsImageDragOver(true);
+  };
+
+  const handleDragLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsImageDragOver(false);
+  };
+
+  const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepthRef.current = 0;
+    setIsImageDragOver(false);
+    void insertImageFiles(
+      getDroppedFiles(event.dataTransfer),
+      "drop",
+      { x: event.clientX, y: event.clientY },
+    );
+  };
+
   return (
     <section
       ref={surfaceRef}
@@ -1270,15 +1488,28 @@ export function CanvasViewport() {
       data-connecting={isConnecting ? "true" : "false"}
       data-creating-frame={isCreatingFrame ? "true" : "false"}
       data-drawing={isDrawing ? "true" : "false"}
+      data-image-drag-over={isImageDragOver ? "true" : "false"}
       data-active-tool={activeTool}
       aria-label="Infinite canvas"
+      onPointerDownCapture={(event) => {
+        const target = event.target;
+        const focused = document.activeElement;
+        if (target instanceof Element && !target.closest(".toolbar-area, .tool-options") &&
+          focused instanceof HTMLElement && focused.closest(".toolbar-area, .tool-options")) focused.blur();
+      }}
       onPointerDown={beginSurfaceInteraction}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       onPointerMove={continueSurfaceInteraction}
       onPointerUp={endSurfaceInteraction}
       onPointerCancel={endSurfaceInteraction}
       onLostPointerCapture={handleLostPointerCapture}
       onDoubleClick={handleSurfaceDoubleClick}
       onContextMenu={(event) => event.preventDefault()}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div ref={gridRef} className="grid-layer" aria-hidden="true" />
 
@@ -1294,7 +1525,7 @@ export function CanvasViewport() {
           <path ref={connectorDraftRef} className="connector-draft-path" />
         </svg>
         <svg className="stroke-draft-layer" aria-hidden="true">
-          <path ref={strokeDraftRef} className="stroke-draft-path" />
+          <path ref={strokeDraftRef} className="stroke-draft-path" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
 
@@ -1325,6 +1556,18 @@ export function CanvasViewport() {
 
       {!isBoardHydrated && (
         <div className="board-loading-shield" aria-label="Opening local board" />
+      )}
+
+      {isImageDragOver && (
+        <div className="image-drop-indicator" aria-hidden="true">
+          <span>Drop images to add them</span>
+        </div>
+      )}
+
+      {canvasNotice && (
+        <div className="canvas-notice" role="status">
+          {canvasNotice}
+        </div>
       )}
 
       <div onPointerDown={(event) => event.stopPropagation()}>
@@ -1384,8 +1627,6 @@ export function CanvasViewport() {
             ) : (
               <>
                 <span><strong>Drag empty space</strong> to select</span>
-                <i aria-hidden="true" />
-                <span><strong>Shift-click</strong> to add or remove</span>
                 <i aria-hidden="true" />
                 <span><strong>Space-drag</strong> to pan</span>
               </>

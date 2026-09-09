@@ -1,9 +1,9 @@
 # The Canvas
 
-Milestone 08 of a focused collaborative whiteboard: a polished, desktop-first
+Milestone 8.5 of a focused collaborative whiteboard: a polished, desktop-first
 infinite viewport with editable objects, selection, history, clipboard tools,
 object-linked connectors, frames, grouping, freehand drawing, and reliable local
-persistence.
+persistence, including native image paste and drop.
 
 ## Run locally
 
@@ -17,14 +17,20 @@ npm run dev
 - Use `V`, `H`, `N`, `T`, `C`, `F`, and `P` to switch between Select, Hand,
   Note, Text, Connect, Frame, and Pen.
 - Double-click empty canvas to create a card, or choose Note/Text and click.
+- Paste PNG, JPEG, WEBP, or GIF data/files with `Ctrl`/`Cmd + V`, or drag image
+  files directly onto the canvas. Images are inserted at the pointer, capped at
+  480 × 360 canvas units, and support multiple-file insertion.
 - Edit the board title beside the logo. Board content, title, and viewport
   autosave locally after changes settle and reopen on the next visit.
-- Note and Text remain active for repeated placement; press `Escape` or `V` to return to Select.
+- Note, Text, and Frame return to Select after placing one object. Pen and Hand
+  stay active for repeated use.
 - Click to select and Shift-click to add or remove an object from selection.
 - Drag empty space with Select active to marquee-select intersecting objects.
 - Hold Shift while marquee-selecting to add objects to the current selection.
 - Drag any selected object to move the whole selection as one interaction.
 - Drag the visible handle on a single selection to resize.
+- Image corner resizing preserves aspect ratio; hold `Shift` for a freeform
+  container resize.
 - Double-click an object to edit its content inline.
 - Drag from any object's top, right, bottom, or left anchor with Connect active.
 - Connect creates a directional arrow; Shift-drag creates a plain line.
@@ -37,9 +43,20 @@ npm run dev
   fixed.
 - Select multiple spatial objects and use `Ctrl`/`Cmd + G` to create a flat
   group. Use `Ctrl`/`Cmd + Shift + G` to ungroup it.
-- Choose Pen and drag anywhere on the board to draw. Pointer samples are stored
-  in world coordinates and rendered as smooth, variable-width SVG paths. A
-  stylus uses real pressure; a mouse gets a subtle thin-to-full-width start.
+- Choose Pen and drag anywhere on the board. Draw mode uses smoothed velocity
+  and available pressure: slower movement and more force produce thicker lines.
+  Solid mode draws at a constant width. Both offer Small / Large / XL thickness,
+  a 16-color palette, and 0–100% opacity in a compact panel on the left, below
+  the logo and board name. Color swatches are circular; size and weight controls
+  use initials, and alignment uses icons with accessible labels.
+- Text offers the same palette and opacity controls, Small / Medium / Large / XL
+  sizes, Regular / Medium / Bold weight, and Left / Center / Right alignment.
+- Pen and Text preferences save locally, separately from the board. New objects
+  inherit them; existing objects keep their own appearance. Select one stroke or
+  text object and click **Edit appearance** in the toolbar to restyle it.
+  Style changes support undo/redo; opacity previews commit once on release.
+- Toolbar buttons show icons, with tool names and shortcuts on hover or keyboard
+  focus. Autosave is silent unless a persistence error occurs.
 - Switch to Select to select, move, group, duplicate, copy, or delete strokes.
 - Press `Delete`/`Backspace` to remove the selection. Removing a node also
   removes its attached connectors in the same undoable operation.
@@ -62,10 +79,17 @@ Frame movement and group movement commit once per drag. Copied groups receive a
 new group identity, so pasted and original groups remain independent.
 Each pen gesture commits as one history operation. Stroke points remain editable
 document data rather than being flattened into a bitmap.
+New Draw points preserve smoothed width ratios and velocity. Legacy pressure
+paths retain their rendering, and points without pressure render at their stored
+base width. Sampling uses refs and the SVG draft paints at most once per animation
+frame; document state changes only at the end of a gesture.
 The current board is stored in IndexedDB with schema metadata and created/updated
 timestamps. Saves are debounced, serialized, and triggered only by committed
 document changes, settled viewport changes, or title edits. Selection and undo
 history remain session-only.
+Image objects store lightweight asset references in the board document. Their
+original Blobs live separately in the IndexedDB asset store and are restored via
+temporary object URLs that are revoked when no longer needed.
 
 World/screen coordinate conversion is centralized in
 `src/canvas/viewport/viewportMath.ts` and covered by unit tests.
@@ -75,4 +99,11 @@ World/screen coordinate conversion is centralized in
 ```bash
 npm test
 npm run build
+npx playwright install chromium
+npm run test:e2e
 ```
+
+Browser coverage includes mouse lines/curves, native touch input, simulated
+stylus force, object creation, frame movement, appearance history, opacity
+preview grouping, local persistence, keyboard controls, and narrow viewports.
+Physical stylus hardware still needs a hands-on feel check.

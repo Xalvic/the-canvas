@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createCardObject } from "../canvas/objects/objectFactories";
+import {
+  createCardObject,
+  createImageObject,
+} from "../canvas/objects/objectFactories";
 import { createConnectorObject } from "../canvas/connectors/connectorFactories";
 import {
   isCanvasNodeObject,
@@ -180,5 +183,35 @@ describe("internal clipboard", () => {
       { x: 38, y: 48, pressure: 0.4 },
       { x: 58, y: 88, pressure: 0.6 },
     ]);
+  });
+
+  it("duplicates image objects while retaining their asset reference", () => {
+    const image = {
+      ...createImageObject({
+        assetId: "asset-1",
+        center: { x: 300, y: 200 },
+        width: 240,
+        height: 160,
+        originalWidth: 1200,
+        originalHeight: 800,
+        zIndex: 1,
+      }),
+      id: "image-1",
+    };
+    const clone = cloneCanvasObjects(
+      [image],
+      28,
+      2,
+      () => "image-clone",
+    )[0];
+
+    expect(clone).toMatchObject({
+      id: "image-clone",
+      type: "image",
+      assetId: "asset-1",
+      x: image.x + 28,
+      y: image.y + 28,
+      zIndex: 2,
+    });
   });
 });

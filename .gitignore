@@ -3,3 +3,5 @@ dist
 .vite
 *.local
 *.log
+test-results
+playwright-report

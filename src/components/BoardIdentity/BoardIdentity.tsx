@@ -4,13 +4,6 @@ import {
   useBoardStore,
 } from "../../store/boardStore";
 
-const STATUS_LABELS = {
-  loading: "Opening…",
-  saving: "Saving…",
-  saved: "Saved locally",
-  error: "Save failed",
-} as const;
-
 export function BoardIdentity() {
   const title = useBoardStore((state) => state.title);
   const isHydrated = useBoardStore((state) => state.isHydrated);
@@ -51,15 +44,15 @@ export function BoardIdentity() {
           }}
           onFocus={(event) => event.currentTarget.select()}
         />
-        <span
+        {saveStatus === "error" && <span
           className="board-save-status"
           data-status={saveStatus}
           title={saveError ?? undefined}
-          role="status"
+          role="alert"
         >
           <i aria-hidden="true" />
-          {STATUS_LABELS[saveStatus]}
-        </span>
+          Save failed
+        </span>}
       </div>
     </header>
   );

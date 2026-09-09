@@ -6,6 +6,7 @@ import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
 import { CardObject } from "./CardObject";
 import { FrameObject } from "./FrameObject";
+import { ImageObject } from "./ImageObject";
 import { TextObject } from "./TextObject";
 import {
   isCanvasSpatialObject,
@@ -30,6 +31,10 @@ import {
   paintMovementElements,
   type MovementElement,
 } from "./transientMovement";
+import {
+  getProportionalImageSize,
+  MIN_IMAGE_SIZE,
+} from "./imageGeometry";
 
 type CanvasObjectViewProps = {
   object: CanvasDomObject;
@@ -162,22 +167,45 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     const resize = resizeRef.current;
     if (resize?.pointerId === event.pointerId && elementRef.current) {
       const zoom = useViewportStore.getState().viewport.zoom;
+      const deltaX = (event.clientX - resize.startClientX) / zoom;
+      const deltaY = (event.clientY - resize.startClientY) / zoom;
+
+      if (object.type === "image" && !event.shiftKey) {
+        const size = getProportionalImageSize(
+          resize.startWidth,
+          resize.startHeight,
+          deltaX,
+          deltaY,
+        );
+        resize.nextWidth = size.width;
+        resize.nextHeight = size.height;
+        elementRef.current.style.width = `${resize.nextWidth}px`;
+        elementRef.current.style.height = `${resize.nextHeight}px`;
+        return;
+      }
+
       const minWidth =
         object.type === "text"
           ? MIN_TEXT_WIDTH
-          : object.type === "frame"
-            ? MIN_FRAME_WIDTH
-            : MIN_CARD_WIDTH;
+          : object.type === "image"
+            ? MIN_IMAGE_SIZE
+            : object.type === "frame"
+              ? MIN_FRAME_WIDTH
+              : MIN_CARD_WIDTH;
       resize.nextWidth = Math.max(
         minWidth,
-        resize.startWidth + (event.clientX - resize.startClientX) / zoom,
+        resize.startWidth + deltaX,
       );
       resize.nextHeight =
         object.type === "text"
           ? object.height
           : Math.max(
-              object.type === "frame" ? MIN_FRAME_HEIGHT : MIN_CARD_HEIGHT,
-              resize.startHeight + (event.clientY - resize.startClientY) / zoom,
+              object.type === "image"
+                ? MIN_IMAGE_SIZE
+                : object.type === "frame"
+                  ? MIN_FRAME_HEIGHT
+                  : MIN_CARD_HEIGHT,
+              resize.startHeight + deltaY,
             );
       elementRef.current.style.width = `${resize.nextWidth}px`;
       elementRef.current.style.height = `${resize.nextHeight}px`;
@@ -233,7 +261,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   };
 
   const beginEditing = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (activeTool !== "select") return;
+    if (activeTool !== "select" || object.type === "image") return;
     event.preventDefault();
     event.stopPropagation();
     const objects = useDocumentStore.getState().objects;
@@ -274,6 +302,8 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     >
       {object.type === "text" ? (
         <TextObject object={object} isEditing={isEditing} />
+      ) : object.type === "image" ? (
+        <ImageObject object={object} />
       ) : object.type === "frame" ? (
         <FrameObject object={object} isEditing={isEditing} />
       ) : (

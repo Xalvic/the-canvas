@@ -56,6 +56,7 @@ function creationLabel(object: CanvasObject): string {
   if (object.type === "text") return "Create text";
   if (object.type === "frame") return "Create frame";
   if (object.type === "stroke") return "Draw stroke";
+  if (object.type === "image") return "Insert image";
   return "Create connector";
 }
 

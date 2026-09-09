@@ -4,6 +4,7 @@ import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
 import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
+import { useObjectOpacity } from "../../store/appearancePreviewStore";
 import { refreshConnectorGeometryFromDom } from "../connectors/connectorDom";
 import {
   expandIdsToGroups,
@@ -40,6 +41,7 @@ type DragInteraction = {
 };
 
 export function StrokeObjectView({ object }: StrokeObjectViewProps) {
+  const opacity = useObjectOpacity(object.id, object.opacity);
   const dragRef = useRef<DragInteraction | null>(null);
   const activeTool = useUiStore((state) => state.activeTool);
   const isSelected = useSelectionStore((state) =>
@@ -138,7 +140,7 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
   };
 
   const centerlinePath = buildSmoothedStrokePath(object.points);
-  const strokePath = buildVariableWidthStrokePath(
+  const strokePath = object.mode === "solid" ? centerlinePath : buildVariableWidthStrokePath(
     object.points,
     object.strokeWidth,
   );
@@ -160,7 +162,12 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
       <path
         className="stroke-shape"
         d={strokePath}
-        fill={object.color}
+        fill={object.mode === "solid" ? "none" : object.color}
+        stroke={object.mode === "solid" ? object.color : "none"}
+        strokeWidth={object.strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={opacity}
       />
     </g>
   );

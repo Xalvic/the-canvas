@@ -1,6 +1,6 @@
 import {
-  isCanvasNodeObject,
-  isStrokeObject,
+  isCanvasSpatialObject,
+  isFrameObject,
   type CanvasObject,
   type FrameCanvasObject,
 } from "../objects/types";
@@ -10,7 +10,8 @@ export function frameContainsObject(
   object: CanvasObject,
 ): boolean {
   return (
-    (isCanvasNodeObject(object) || isStrokeObject(object)) &&
+    isCanvasSpatialObject(object) &&
+    !isFrameObject(object) &&
     object.x >= frame.x &&
     object.y >= frame.y &&
     object.x + object.width <= frame.x + frame.width &&

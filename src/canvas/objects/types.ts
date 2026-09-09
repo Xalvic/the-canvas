@@ -16,6 +16,11 @@ export type BaseSpatialObject = BaseDocumentObject & {
 export type TextCanvasObject = BaseSpatialObject & {
   type: "text";
   text: string;
+  color?: string;
+  fontSize?: number;
+  opacity?: number;
+  fontWeight?: number;
+  textAlign?: "left" | "center" | "right";
 };
 
 export type CardCanvasObject = BaseSpatialObject & {
@@ -30,10 +35,23 @@ export type FrameCanvasObject = BaseSpatialObject & {
   moveContents: boolean;
 };
 
+export type ImageCanvasObject = BaseSpatialObject & {
+  type: "image";
+  assetId: string;
+  originalWidth: number;
+  originalHeight: number;
+  name?: string;
+  mimeType?: string;
+};
+
 export type StrokePoint = {
   x: number;
   y: number;
-  pressure: number;
+  pressure?: number;
+  // New Draw strokes store the smoothed width as a fraction of strokeWidth.
+  // A ratio keeps thickness edits independent of captured expressive dynamics.
+  widthRatio?: number;
+  velocity?: number;
 };
 
 export type StrokeCanvasObject = BaseSpatialObject & {
@@ -41,6 +59,8 @@ export type StrokeCanvasObject = BaseSpatialObject & {
   points: StrokePoint[];
   strokeWidth: number;
   color: string;
+  mode?: "draw" | "solid";
+  opacity?: number;
 };
 
 export type ConnectionAnchor = "top" | "right" | "bottom" | "left";
@@ -58,7 +78,8 @@ export type ConnectorCanvasObject = BaseDocumentObject & {
 };
 
 export type CanvasNodeObject = TextCanvasObject | CardCanvasObject;
-export type CanvasDomObject = CanvasNodeObject | FrameCanvasObject;
+export type CanvasLayerObject = CanvasNodeObject | ImageCanvasObject;
+export type CanvasDomObject = CanvasLayerObject | FrameCanvasObject;
 export type CanvasSpatialObject = CanvasDomObject | StrokeCanvasObject;
 export type CanvasObject = CanvasSpatialObject | ConnectorCanvasObject;
 export type CanvasObjectType = CanvasObject["type"];
@@ -75,6 +96,18 @@ export function isFrameObject(
   return object.type === "frame";
 }
 
+export function isImageObject(
+  object: CanvasObject,
+): object is ImageCanvasObject {
+  return object.type === "image";
+}
+
+export function isCanvasLayerObject(
+  object: CanvasObject,
+): object is CanvasLayerObject {
+  return isCanvasNodeObject(object) || isImageObject(object);
+}
+
 export function isStrokeObject(
   object: CanvasObject,
 ): object is StrokeCanvasObject {
@@ -84,7 +117,12 @@ export function isStrokeObject(
 export function isCanvasSpatialObject(
   object: CanvasObject,
 ): object is CanvasSpatialObject {
-  return isCanvasNodeObject(object) || isFrameObject(object) || isStrokeObject(object);
+  return (
+    isCanvasNodeObject(object) ||
+    isFrameObject(object) ||
+    isImageObject(object) ||
+    isStrokeObject(object)
+  );
 }
 
 export function isConnectorObject(

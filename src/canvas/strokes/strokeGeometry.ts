@@ -45,14 +45,21 @@ function getStrokeTangent(points: StrokePoint[], index: number): Point {
   return { x: deltaX / length, y: deltaY / length };
 }
 
-function getSmoothedPressure(points: StrokePoint[], index: number): number {
+export function getPointWidthRatio(point: StrokePoint): number {
+  if (point.widthRatio !== undefined) return point.widthRatio;
+  // Old pressure paths keep their original appearance. Points-only paths use
+  // their stored base width, without inventing pressure or speed data.
+  return point.pressure === undefined ? 1 : getStrokeWidthAtPressure(point.pressure, 1);
+}
+
+function getSmoothedWidthRatio(points: StrokePoint[], index: number): number {
   if (index === 0 || index === points.length - 1) {
-    return points[index].pressure;
+    return getPointWidthRatio(points[index]);
   }
   return (
-    points[index - 1].pressure +
-    points[index].pressure * 2 +
-    points[index + 1].pressure
+    getPointWidthRatio(points[index - 1]) +
+    getPointWidthRatio(points[index]) * 2 +
+    getPointWidthRatio(points[index + 1])
   ) / 4;
 }
 
@@ -75,7 +82,7 @@ export function buildVariableWidthStrokePath(
   if (!first) return "";
 
   if (points.length === 1) {
-    const radius = getStrokeWidthAtPressure(first.pressure, maxWidth) / 2;
+    const radius = getPointWidthRatio(first) * maxWidth / 2;
     return `M ${first.x + radius} ${first.y} A ${radius} ${radius} 0 1 0 ${first.x - radius} ${first.y} A ${radius} ${radius} 0 1 0 ${first.x + radius} ${first.y} Z`;
   }
 
@@ -87,10 +94,7 @@ export function buildVariableWidthStrokePath(
   points.forEach((point, index) => {
     const tangent = getStrokeTangent(points, index);
     const radius =
-      getStrokeWidthAtPressure(
-        getSmoothedPressure(points, index),
-        maxWidth,
-      ) / 2;
+      getSmoothedWidthRatio(points, index) * maxWidth / 2;
     tangents.push(tangent);
     radii.push(radius);
     left.push({

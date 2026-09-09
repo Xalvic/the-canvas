@@ -1,10 +1,13 @@
 import type { CanvasObject } from "../canvas/objects/types";
 import type { Viewport } from "../canvas/viewport/viewportMath";
 import type { DocumentSnapshot } from "../store/documentStore";
+import { isOpacity } from "../tools/toolSettings";
+import {
+  BOARD_STORE_NAME,
+  openCanvasDatabase,
+  requestResult,
+} from "./database";
 
-const DATABASE_NAME = "the-canvas";
-const DATABASE_VERSION = 1;
-const BOARD_STORE_NAME = "boards";
 export const CURRENT_BOARD_ID = "current-board";
 export const LOCAL_BOARD_SCHEMA_VERSION = 1;
 
@@ -17,8 +20,6 @@ export type LocalBoardRecord = {
   createdAt: number;
   updatedAt: number;
 };
-
-let databasePromise: Promise<IDBDatabase> | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -57,7 +58,7 @@ function isCanvasObjectRecord(value: unknown): value is CanvasObject {
   }
 
   if (
-    !["card", "text", "frame", "stroke"].includes(String(value.type)) ||
+    !["card", "text", "frame", "stroke", "image"].includes(String(value.type)) ||
     !isFiniteNumber(value.x) ||
     !isFiniteNumber(value.y) ||
     !isFiniteNumber(value.width) ||
@@ -69,21 +70,44 @@ function isCanvasObjectRecord(value: unknown): value is CanvasObject {
   if (value.type === "card") {
     return typeof value.title === "string" && typeof value.body === "string";
   }
-  if (value.type === "text") return typeof value.text === "string";
+  if (value.type === "text") return (
+    typeof value.text === "string" &&
+    (value.color === undefined || typeof value.color === "string") &&
+    (value.fontSize === undefined || (isFiniteNumber(value.fontSize) && value.fontSize > 0)) &&
+    (value.fontWeight === undefined || (isFiniteNumber(value.fontWeight) && value.fontWeight >= 1 && value.fontWeight <= 1000)) &&
+    (value.textAlign === undefined || ["left", "center", "right"].includes(String(value.textAlign))) &&
+    (value.opacity === undefined || isOpacity(value.opacity))
+  );
   if (value.type === "frame") {
     return typeof value.title === "string" && typeof value.moveContents === "boolean";
+  }
+  if (value.type === "image") {
+    return (
+      typeof value.assetId === "string" &&
+      isFiniteNumber(value.originalWidth) &&
+      value.originalWidth > 0 &&
+      isFiniteNumber(value.originalHeight) &&
+      value.originalHeight > 0 &&
+      (value.name === undefined || typeof value.name === "string") &&
+      (value.mimeType === undefined || typeof value.mimeType === "string")
+    );
   }
   if (value.type !== "stroke") return false;
   return (
     typeof value.color === "string" &&
     isFiniteNumber(value.strokeWidth) &&
+    value.strokeWidth > 0 &&
+    (value.mode === undefined || value.mode === "draw" || value.mode === "solid") &&
+    (value.opacity === undefined || isOpacity(value.opacity)) &&
     Array.isArray(value.points) &&
     value.points.every(
       (point) =>
         isRecord(point) &&
         isFiniteNumber(point.x) &&
         isFiniteNumber(point.y) &&
-        isFiniteNumber(point.pressure),
+        (point.pressure === undefined || isOpacity(point.pressure)) &&
+        (point.widthRatio === undefined || (isOpacity(point.widthRatio) && point.widthRatio > 0)) &&
+        (point.velocity === undefined || (isFiniteNumber(point.velocity) && point.velocity >= 0)),
     )
   );
 }
@@ -118,43 +142,8 @@ export function parseLocalBoard(value: unknown): LocalBoardRecord | null {
   return value as LocalBoardRecord;
 }
 
-function requestResult<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
-  });
-}
-
-function openDatabase(): Promise<IDBDatabase> {
-  if (databasePromise) return databasePromise;
-  if (typeof indexedDB === "undefined") {
-    return Promise.reject(new Error("IndexedDB is not available"));
-  }
-
-  databasePromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(BOARD_STORE_NAME)) {
-        request.result.createObjectStore(BOARD_STORE_NAME, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => {
-      request.result.onversionchange = () => {
-        request.result.close();
-        databasePromise = null;
-      };
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      databasePromise = null;
-      reject(request.error ?? new Error("Could not open local board storage"));
-    };
-  });
-  return databasePromise;
-}
-
 export async function loadLocalBoard(): Promise<LocalBoardRecord | null> {
-  const database = await openDatabase();
+  const database = await openCanvasDatabase();
   const transaction = database.transaction(BOARD_STORE_NAME, "readonly");
   const rawBoard = await requestResult(
     transaction.objectStore(BOARD_STORE_NAME).get(CURRENT_BOARD_ID),
@@ -166,7 +155,7 @@ export async function loadLocalBoard(): Promise<LocalBoardRecord | null> {
 }
 
 export async function saveLocalBoard(board: LocalBoardRecord): Promise<void> {
-  const database = await openDatabase();
+  const database = await openCanvasDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(BOARD_STORE_NAME, "readwrite");
     transaction.objectStore(BOARD_STORE_NAME).put(board);

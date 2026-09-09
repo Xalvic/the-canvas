@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createCardObject,
   createFrameObject,
+  createImageObject,
   createTextObject,
 } from "./objectFactories";
 
@@ -49,6 +50,32 @@ describe("canvas object factories", () => {
       title: "Untitled section",
       moveContents: true,
       zIndex: 3,
+    });
+  });
+
+  it("creates an image centered at a world-space point", () => {
+    const object = createImageObject({
+      assetId: "asset-1",
+      center: { x: 400, y: 260 },
+      width: 320,
+      height: 180,
+      originalWidth: 1920,
+      originalHeight: 1080,
+      name: "photo.jpg",
+      mimeType: "image/jpeg",
+      zIndex: 7,
+    });
+
+    expect(object).toMatchObject({
+      type: "image",
+      assetId: "asset-1",
+      x: 240,
+      y: 170,
+      width: 320,
+      height: 180,
+      originalWidth: 1920,
+      originalHeight: 1080,
+      zIndex: 7,
     });
   });
 });
