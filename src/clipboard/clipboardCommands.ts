@@ -1,8 +1,10 @@
 import {
-  isCanvasNodeObject,
+  isCanvasSpatialObject,
   isConnectorObject,
+  isStrokeObject,
   type CanvasObject,
 } from "../canvas/objects/types";
+import { expandIdsToGroups } from "../canvas/groups/grouping";
 import { useClipboardStore } from "../store/clipboardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useInteractionStore } from "../store/interactionStore";
@@ -13,7 +15,10 @@ const PASTE_OFFSET = 28;
 
 function selectedObjects(): CanvasObject[] {
   const objects = useDocumentStore.getState().objects;
-  const selectedIds = useSelectionStore.getState().selectedIds;
+  const selectedIds = expandIdsToGroups(
+    useSelectionStore.getState().selectedIds,
+    objects,
+  );
   const explicitObjects = [...selectedIds]
     .map((id) => objects[id])
     .filter((object) => object !== undefined);
@@ -38,6 +43,12 @@ export function cloneCanvasObjects(
   timestamp = Date.now(),
 ): CanvasObject[] {
   const idMap = new Map(source.map((object) => [object.id, createId()]));
+  const groupIdMap = new Map<string, string>();
+  for (const object of source) {
+    if (object.groupId && !groupIdMap.has(object.groupId)) {
+      groupIdMap.set(object.groupId, createId());
+    }
+  }
 
   return source.map((object, index) => {
     const base = {
@@ -46,9 +57,25 @@ export function cloneCanvasObjects(
       zIndex: firstZIndex + index,
       createdAt: timestamp,
       updatedAt: timestamp,
+      groupId: object.groupId
+        ? groupIdMap.get(object.groupId)
+        : undefined,
     };
 
-    if (isCanvasNodeObject(object)) {
+    if (isStrokeObject(object)) {
+      return {
+        ...base,
+        x: object.x + offset,
+        y: object.y + offset,
+        points: object.points.map((point) => ({
+          ...point,
+          x: point.x + offset,
+          y: point.y + offset,
+        })),
+      };
+    }
+
+    if (isCanvasSpatialObject(object)) {
       return { ...base, x: object.x + offset, y: object.y + offset };
     }
 

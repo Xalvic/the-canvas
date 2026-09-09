@@ -1,5 +1,6 @@
 import { getAnchorPoint } from "../canvas/connectors/connectorGeometry";
 import {
+  isCanvasSpatialObject,
   isCanvasNodeObject,
   type CanvasObject,
   type CanvasNodeObject,
@@ -16,7 +17,7 @@ export function getObjectBounds(
   object: CanvasObject,
   allObjects: Record<string, CanvasObject> = {},
 ): Bounds | null {
-  if (isCanvasNodeObject(object)) {
+  if (isCanvasSpatialObject(object)) {
     return {
       left: object.x,
       top: object.y,

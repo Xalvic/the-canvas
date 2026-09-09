@@ -45,10 +45,10 @@ export function ConnectorLayer() {
       event.currentTarget.closest<HTMLElement>(".canvas-viewport")?.dataset
         .spacePressed === "true";
     if (event.button !== 0 || activeTool === "hand" || isSpacePressed) return;
+    if (activeTool !== "select") return;
 
     event.preventDefault();
     event.stopPropagation();
-    if (activeTool !== "select") return;
     if (event.shiftKey) {
       useSelectionStore.getState().toggleSelection(connectorId);
     } else {

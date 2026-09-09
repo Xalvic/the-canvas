@@ -5,14 +5,34 @@ import { useSelectionStore } from "../../store/selectionStore";
 import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
 import { CardObject } from "./CardObject";
+import { FrameObject } from "./FrameObject";
 import { TextObject } from "./TextObject";
-import { isCanvasNodeObject, type CanvasNodeObject } from "./types";
+import {
+  isCanvasSpatialObject,
+  isCanvasNodeObject,
+  type CanvasDomObject,
+} from "./types";
 import type { Point } from "../viewport/viewportMath";
 import { ConnectionAnchors } from "../connectors/ConnectionAnchors";
 import { refreshConnectorGeometryFromDom } from "../connectors/connectorDom";
+import {
+  expandIdsToGroups,
+  getMovementIds,
+  toggleObjectOrGroup,
+} from "../groups/grouping";
+import {
+  MIN_FRAME_HEIGHT,
+  MIN_FRAME_WIDTH,
+} from "./objectFactories";
+import {
+  clearMovementTransforms,
+  collectMovementElements,
+  paintMovementElements,
+  type MovementElement,
+} from "./transientMovement";
 
 type CanvasObjectViewProps = {
-  object: CanvasNodeObject;
+  object: CanvasDomObject;
 };
 
 type DragInteraction = {
@@ -21,7 +41,7 @@ type DragInteraction = {
   startClientY: number;
   startPositions: Record<string, Point>;
   nextPositions: Record<string, Point>;
-  elements: Map<string, HTMLElement>;
+  elements: Map<string, MovementElement>;
 };
 
 type ResizeInteraction = {
@@ -52,8 +72,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   const isEditing = useInteractionStore(
     (state) => state.mode === "editingText" && state.objectId === object.id,
   );
-  const selectOnly = useSelectionStore((state) => state.selectOnly);
-  const toggleSelection = useSelectionStore((state) => state.toggleSelection);
+  const setSelection = useSelectionStore((state) => state.setSelection);
   const updateObject = useDocumentStore((state) => state.updateObject);
   const updateObjectPositions = useDocumentStore(
     (state) => state.updateObjectPositions,
@@ -74,36 +93,39 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
       event.currentTarget.closest<HTMLElement>(".canvas-viewport")?.dataset
         .spacePressed === "true";
     if (event.button !== 0 || activeTool === "hand" || isSpacePressed) return;
+    if (activeTool === "pen") return;
 
     event.stopPropagation();
     if (activeTool !== "select" || isEditing) return;
 
     event.preventDefault();
     if (event.shiftKey) {
-      toggleSelection(object.id);
+      setSelection(
+        toggleObjectOrGroup(
+          useSelectionStore.getState().selectedIds,
+          object.id,
+          useDocumentStore.getState().objects,
+        ),
+      );
       return;
     }
 
     const selection = useSelectionStore.getState().selectedIds;
-    const movingIds = selection.has(object.id) ? [...selection] : [object.id];
-    if (!selection.has(object.id)) selectOnly(object.id);
-
     const documentObjects = useDocumentStore.getState().objects;
+    const baseSelection = selection.has(object.id)
+      ? expandIdsToGroups(selection, documentObjects)
+      : expandIdsToGroups([object.id], documentObjects);
+    if (!selection.has(object.id) || baseSelection.size !== selection.size) {
+      setSelection(baseSelection);
+    }
+    const movingIds = getMovementIds(baseSelection, documentObjects);
     const startPositions: Record<string, Point> = {};
     for (const id of movingIds) {
       const movingObject = documentObjects[id];
-      if (movingObject && isCanvasNodeObject(movingObject)) {
+      if (movingObject && isCanvasSpatialObject(movingObject)) {
         startPositions[id] = { x: movingObject.x, y: movingObject.y };
       }
     }
-
-    const elements = new Map<string, HTMLElement>();
-    document
-      .querySelectorAll<HTMLElement>("[data-object-id]")
-      .forEach((element) => {
-        const id = element.dataset.objectId;
-        if (id && id in startPositions) elements.set(id, element);
-      });
 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
@@ -112,7 +134,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
       startClientY: event.clientY,
       startPositions,
       nextPositions: { ...startPositions },
-      elements,
+      elements: collectMovementElements(startPositions),
     };
     beginInteraction("dragging", object.id);
   };
@@ -127,12 +149,12 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
       for (const [id, start] of Object.entries(drag.startPositions)) {
         const next = { x: start.x + deltaX, y: start.y + deltaY };
         drag.nextPositions[id] = next;
-        const element = drag.elements.get(id);
-        if (element) {
-          element.style.left = `${next.x}px`;
-          element.style.top = `${next.y}px`;
-        }
       }
+      paintMovementElements(
+        drag.startPositions,
+        drag.nextPositions,
+        drag.elements,
+      );
       refreshConnectorGeometryFromDom(useDocumentStore.getState().objects);
       return;
     }
@@ -140,7 +162,12 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     const resize = resizeRef.current;
     if (resize?.pointerId === event.pointerId && elementRef.current) {
       const zoom = useViewportStore.getState().viewport.zoom;
-      const minWidth = object.type === "text" ? MIN_TEXT_WIDTH : MIN_CARD_WIDTH;
+      const minWidth =
+        object.type === "text"
+          ? MIN_TEXT_WIDTH
+          : object.type === "frame"
+            ? MIN_FRAME_WIDTH
+            : MIN_CARD_WIDTH;
       resize.nextWidth = Math.max(
         minWidth,
         resize.startWidth + (event.clientX - resize.startClientX) / zoom,
@@ -149,7 +176,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
         object.type === "text"
           ? object.height
           : Math.max(
-              MIN_CARD_HEIGHT,
+              object.type === "frame" ? MIN_FRAME_HEIGHT : MIN_CARD_HEIGHT,
               resize.startHeight + (event.clientY - resize.startClientY) / zoom,
             );
       elementRef.current.style.width = `${resize.nextWidth}px`;
@@ -177,12 +204,13 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     }
 
     if (drag) {
+      clearMovementTransforms(drag.elements);
       updateObjectPositions(drag.nextPositions);
     } else if (resize) {
       updateObject(object.id, {
         width: resize.nextWidth,
         height: resize.nextHeight,
-      }, `Resize ${object.type === "card" ? "note" : "text"}`);
+      }, `Resize ${object.type === "card" ? "note" : object.type}`);
     }
     endInteraction();
   };
@@ -208,7 +236,8 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     if (activeTool !== "select") return;
     event.preventDefault();
     event.stopPropagation();
-    selectOnly(object.id);
+    const objects = useDocumentStore.getState().objects;
+    setSelection(expandIdsToGroups([object.id], objects));
     beginInteraction("editingText", object.id);
   };
 
@@ -245,13 +274,15 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     >
       {object.type === "text" ? (
         <TextObject object={object} isEditing={isEditing} />
+      ) : object.type === "frame" ? (
+        <FrameObject object={object} isEditing={isEditing} />
       ) : (
         <CardObject object={object} isEditing={isEditing} />
       )}
 
-      <ConnectionAnchors objectId={object.id} />
+      {isCanvasNodeObject(object) && <ConnectionAnchors objectId={object.id} />}
 
-      {isSoleSelection && !isEditing && (
+      {activeTool === "select" && isSoleSelection && !isEditing && (
         <button
           className={`resize-handle resize-handle--${object.type === "text" ? "east" : "corner"}`}
           type="button"

@@ -1,7 +1,9 @@
 import {
   ConnectorIcon,
+  FrameIcon,
   HandIcon,
   NoteIcon,
+  PenIcon,
   SelectIcon,
   TextIcon,
 } from "../icons";
@@ -23,6 +25,8 @@ const tools: Array<{
     shortcut: "C",
     icon: ConnectorIcon,
   },
+  { id: "frame", label: "Frame", shortcut: "F", icon: FrameIcon },
+  { id: "pen", label: "Pen", shortcut: "P", icon: PenIcon },
 ];
 
 export function Toolbar() {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createCardObject, createTextObject } from "./objectFactories";
+import {
+  createCardObject,
+  createFrameObject,
+  createTextObject,
+} from "./objectFactories";
 
 describe("canvas object factories", () => {
   it("creates a text object around the requested world position", () => {
@@ -28,5 +32,23 @@ describe("canvas object factories", () => {
       zIndex: 9,
     });
     expect(object.createdAt).toBe(object.updatedAt);
+  });
+
+  it("creates a titled frame with enforced minimum dimensions", () => {
+    const object = createFrameObject(
+      { left: -80, top: 120, right: 20, bottom: 170 },
+      3,
+    );
+
+    expect(object).toMatchObject({
+      type: "frame",
+      x: -80,
+      y: 120,
+      width: 280,
+      height: 180,
+      title: "Untitled section",
+      moveContents: true,
+      zIndex: 3,
+    });
   });
 });

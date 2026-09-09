@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import {
-  isCanvasNodeObject,
+  isCanvasSpatialObject,
   isConnectorObject,
+  isStrokeObject,
   type CanvasObject,
 } from "../canvas/objects/types";
 import type { Point } from "../canvas/viewport/viewportMath";
@@ -17,6 +18,7 @@ type DocumentState = {
   objects: DocumentSnapshot;
   past: HistoryEntry[];
   future: HistoryEntry[];
+  loadDocument: (objects: DocumentSnapshot) => void;
   addObject: (object: CanvasObject, label?: string) => void;
   addObjects: (objects: CanvasObject[], label?: string) => void;
   updateObject: (
@@ -26,6 +28,11 @@ type DocumentState = {
   ) => void;
   updateObjectPositions: (
     positions: Record<string, Point>,
+    label?: string,
+  ) => void;
+  setObjectGroup: (
+    ids: Iterable<string>,
+    groupId: string | null,
     label?: string,
   ) => void;
   deleteObjects: (ids: Iterable<string>, label?: string) => void;
@@ -47,6 +54,8 @@ function pushHistory(
 function creationLabel(object: CanvasObject): string {
   if (object.type === "card") return "Create note";
   if (object.type === "text") return "Create text";
+  if (object.type === "frame") return "Create frame";
+  if (object.type === "stroke") return "Draw stroke";
   return "Create connector";
 }
 
@@ -54,6 +63,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   objects: {},
   past: [],
   future: [],
+
+  loadDocument: (objects) => set({ objects, past: [], future: [] }),
 
   addObject: (object, label) =>
     get().addObjects([object], label ?? creationLabel(object)),
@@ -105,12 +116,57 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const object = nextObjects[id];
         if (
           !object ||
-          !isCanvasNodeObject(object) ||
+          !isCanvasSpatialObject(object) ||
           (object.x === position.x && object.y === position.y)
         ) {
           continue;
         }
-        nextObjects[id] = { ...object, ...position, updatedAt };
+        if (isStrokeObject(object)) {
+          const deltaX = position.x - object.x;
+          const deltaY = position.y - object.y;
+          nextObjects[id] = {
+            ...object,
+            ...position,
+            points: object.points.map((point) => ({
+              ...point,
+              x: point.x + deltaX,
+              y: point.y + deltaY,
+            })),
+            updatedAt,
+          };
+        } else {
+          nextObjects[id] = { ...object, ...position, updatedAt };
+        }
+        changed = true;
+      }
+
+      if (!changed) return state;
+      return {
+        objects: nextObjects,
+        past: pushHistory(state.past, { objects: state.objects, label }),
+        future: [],
+      };
+    }),
+
+  setObjectGroup: (ids, groupId, label = "Group objects") =>
+    set((state) => {
+      const nextObjects = { ...state.objects };
+      const updatedAt = Date.now();
+      let changed = false;
+
+      for (const id of ids) {
+        const object = nextObjects[id];
+        if (
+          !object ||
+          !isCanvasSpatialObject(object) ||
+          (object.groupId ?? null) === groupId
+        ) {
+          continue;
+        }
+        const nextObject = { ...object, updatedAt };
+        if (groupId) nextObject.groupId = groupId;
+        else delete nextObject.groupId;
+        nextObjects[id] = nextObject;
         changed = true;
       }
 

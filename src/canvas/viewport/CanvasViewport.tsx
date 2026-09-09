@@ -7,6 +7,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { ObjectLayer } from "../layers/ObjectLayer";
+import { FrameLayer } from "../layers/FrameLayer";
+import { StrokeLayer } from "../layers/StrokeLayer";
 import { SelectionLayer } from "../layers/SelectionLayer";
 import { ConnectorLayer } from "../layers/ConnectorLayer";
 import { createConnectorObject } from "../connectors/connectorFactories";
@@ -18,16 +20,32 @@ import {
 } from "../connectors/connectorGeometry";
 import {
   createCardObject,
+  createFrameObject,
   createTextObject,
+  DEFAULT_FRAME_HEIGHT,
+  DEFAULT_FRAME_WIDTH,
 } from "../objects/objectFactories";
 import {
+  isFrameObject,
   isConnectorObject,
   type ConnectionAnchor,
   type ConnectionEndpoint,
 } from "../objects/types";
+import {
+  groupSelection,
+  ungroupSelection,
+} from "../groups/groupCommands";
+import { expandIdsToGroups } from "../groups/grouping";
+import {
+  createStrokeObject,
+  DEFAULT_STROKE_WIDTH,
+} from "../strokes/strokeFactories";
+import { buildVariableWidthStrokePath } from "../strokes/strokeGeometry";
+import type { StrokePoint } from "../objects/types";
 import { Toolbar } from "../../components/Toolbar/Toolbar";
 import { ZoomControls } from "../../components/ZoomControls/ZoomControls";
 import { HistoryControls } from "../../components/HistoryControls/HistoryControls";
+import { BoardIdentity } from "../../components/BoardIdentity/BoardIdentity";
 import {
   copySelection,
   duplicateSelection,
@@ -39,6 +57,7 @@ import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
 import { useUiStore } from "../../store/uiStore";
 import { useViewportStore } from "../../store/viewportStore";
+import { useBoardStore } from "../../store/boardStore";
 import {
   boundsIntersect,
   getNodeObjects,
@@ -78,6 +97,20 @@ type ConnectorInteraction = {
   candidate: ConnectionEndpoint | null;
 };
 
+type FrameCreationInteraction = {
+  pointerId: number;
+  startPoint: Point;
+  currentPoint: Point;
+  moved: boolean;
+};
+
+type StrokeInteraction = {
+  pointerId: number;
+  pointerType: string;
+  distance: number;
+  points: StrokePoint[];
+};
+
 const GRID_SIZE = 24;
 const ZOOM_STEP = 1.2;
 const CONNECTION_ANCHORS: ConnectionAnchor[] = [
@@ -114,11 +147,15 @@ export function CanvasViewport() {
   const gridRef = useRef<HTMLDivElement>(null);
   const marqueeOverlayRef = useRef<HTMLDivElement>(null);
   const connectorDraftRef = useRef<SVGPathElement>(null);
+  const strokeDraftRef = useRef<SVGPathElement>(null);
+  const frameDraftRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<Viewport>(useViewportStore.getState().viewport);
   const frameRef = useRef<number | null>(null);
   const panRef = useRef<PanInteraction | null>(null);
   const marqueeRef = useRef<MarqueeInteraction | null>(null);
   const connectorRef = useRef<ConnectorInteraction | null>(null);
+  const frameCreationRef = useRef<FrameCreationInteraction | null>(null);
+  const strokeRef = useRef<StrokeInteraction | null>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const spacePressedRef = useRef(false);
   const suppressDoubleClickUntilRef = useRef(0);
@@ -126,8 +163,11 @@ export function CanvasViewport() {
   const [isPanning, setIsPanning] = useState(false);
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isCreatingFrame, setIsCreatingFrame] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const activeTool = useUiStore((state) => state.activeTool);
+  const isBoardHydrated = useBoardStore((state) => state.isHydrated);
   const objects = useDocumentStore((state) => state.objects);
   const selectedIds = useSelectionStore((state) => state.selectedIds);
   const objectCount = Object.keys(objects).length;
@@ -136,6 +176,18 @@ export function CanvasViewport() {
     const object = objects[id];
     return object !== undefined && isConnectorObject(object);
   });
+  const selectedFrameIds = [...selectedIds].filter((id) => {
+    const object = objects[id];
+    return object !== undefined && isFrameObject(object);
+  });
+  const selectedStrokeIds = [...selectedIds].filter(
+    (id) => objects[id]?.type === "stroke",
+  );
+  const selectedGroupIds = new Set(
+    [...selectedIds]
+      .map((id) => objects[id]?.groupId)
+      .filter((groupId): groupId is string => groupId !== undefined),
+  );
 
   const clearConnectorPreview = useCallback(() => {
     connectorRef.current = null;
@@ -147,6 +199,21 @@ export function CanvasViewport() {
       ?.querySelectorAll(".connection-anchor.is-target")
       .forEach((element) => element.classList.remove("is-target"));
     setIsConnecting(false);
+  }, []);
+
+  const clearFramePreview = useCallback(() => {
+    frameCreationRef.current = null;
+    if (frameDraftRef.current) frameDraftRef.current.style.display = "none";
+    setIsCreatingFrame(false);
+  }, []);
+
+  const clearStrokePreview = useCallback(() => {
+    strokeRef.current = null;
+    if (strokeDraftRef.current) {
+      strokeDraftRef.current.style.display = "none";
+      strokeDraftRef.current.removeAttribute("d");
+    }
+    setIsDrawing(false);
   }, []);
 
   const paintViewport = useCallback((viewport: Viewport) => {
@@ -222,6 +289,15 @@ export function CanvasViewport() {
   }, [commitViewport, scheduleViewport]);
 
   useEffect(() => {
+    return useViewportStore.subscribe((state, previous) => {
+      if (state.viewport === previous.viewport) return;
+      viewportRef.current = state.viewport;
+      setDisplayZoom(state.viewport.zoom);
+      paintViewport(state.viewport);
+    });
+  }, [paintViewport]);
+
+  useEffect(() => {
     const element = surfaceRef.current;
     if (!element) return;
 
@@ -229,9 +305,12 @@ export function CanvasViewport() {
       const { width, height } = entry.contentRect;
       const previous = sizeRef.current;
       const isFirstMeasurement = previous.width === 0 && previous.height === 0;
+      const hasSavedViewport = useBoardStore.getState().hasSavedViewport;
 
       const next = isFirstMeasurement
-        ? { x: width / 2, y: height / 2, zoom: viewportRef.current.zoom }
+        ? hasSavedViewport
+          ? viewportRef.current
+          : { x: width / 2, y: height / 2, zoom: viewportRef.current.zoom }
         : panViewport(viewportRef.current, {
             x: (width - previous.width) / 2,
             y: (height - previous.height) / 2,
@@ -286,6 +365,12 @@ export function CanvasViewport() {
       const commandKey = event.ctrlKey || event.metaKey;
       const shortcut = event.key.toLowerCase();
       if (commandKey && !event.altKey) {
+        if (shortcut === "g") {
+          event.preventDefault();
+          if (event.shiftKey) ungroupSelection();
+          else groupSelection();
+          return;
+        }
         if (shortcut === "z") {
           event.preventDefault();
           if (event.shiftKey) performRedo();
@@ -321,6 +406,24 @@ export function CanvasViewport() {
       }
 
       if (!commandKey && !event.altKey) {
+        if (shortcut === "m") {
+          const selection = useSelectionStore.getState().selectedIds;
+          const selectedFrames = [...selection]
+            .map((id) => useDocumentStore.getState().objects[id])
+            .filter((object) => object !== undefined && isFrameObject(object));
+          if (selectedFrames.length === 1 && selection.size === 1) {
+            event.preventDefault();
+            const frame = selectedFrames[0];
+            useDocumentStore.getState().updateObject(
+              frame.id,
+              { moveContents: !frame.moveContents },
+              frame.moveContents
+                ? "Keep frame contents fixed"
+                : "Move frame contents",
+            );
+            return;
+          }
+        }
         if (shortcut === "a") {
           const selection = useSelectionStore.getState().selectedIds;
           const selectedConnectors = [...selection]
@@ -343,6 +446,8 @@ export function CanvasViewport() {
         if (shortcut === "h") useUiStore.getState().setActiveTool("hand");
         if (shortcut === "t") useUiStore.getState().setActiveTool("text");
         if (shortcut === "n") useUiStore.getState().setActiveTool("card");
+        if (shortcut === "f") useUiStore.getState().setActiveTool("frame");
+        if (shortcut === "p") useUiStore.getState().setActiveTool("pen");
         if (shortcut === "c")
           useUiStore.getState().setActiveTool("connector");
       }
@@ -356,6 +461,19 @@ export function CanvasViewport() {
           surfaceRef.current.releasePointerCapture(connection.pointerId);
         }
         clearConnectorPreview();
+        const frameCreation = frameCreationRef.current;
+        if (
+          frameCreation &&
+          surfaceRef.current?.hasPointerCapture(frameCreation.pointerId)
+        ) {
+          surfaceRef.current.releasePointerCapture(frameCreation.pointerId);
+        }
+        clearFramePreview();
+        const stroke = strokeRef.current;
+        if (stroke && surfaceRef.current?.hasPointerCapture(stroke.pointerId)) {
+          surfaceRef.current.releasePointerCapture(stroke.pointerId);
+        }
+        clearStrokePreview();
         useUiStore.getState().setActiveTool("select");
         useSelectionStore.getState().clearSelection();
         useInteractionStore.getState().endInteraction();
@@ -407,7 +525,13 @@ export function CanvasViewport() {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [clearConnectorPreview, resetViewport, zoomAtCenter]);
+  }, [
+    clearConnectorPreview,
+    clearFramePreview,
+    clearStrokePreview,
+    resetViewport,
+    zoomAtCenter,
+  ]);
 
   useEffect(
     () => () => {
@@ -443,6 +567,190 @@ export function CanvasViewport() {
     if (suppressFollowingDoubleClick) {
       suppressDoubleClickUntilRef.current = performance.now() + 450;
     }
+  };
+
+  const getFrameBounds = (
+    interaction: FrameCreationInteraction,
+    useDefaultSize = false,
+  ): Bounds => {
+    if (useDefaultSize) {
+      return {
+        left: interaction.startPoint.x - DEFAULT_FRAME_WIDTH / 2,
+        top: interaction.startPoint.y - DEFAULT_FRAME_HEIGHT / 2,
+        right: interaction.startPoint.x + DEFAULT_FRAME_WIDTH / 2,
+        bottom: interaction.startPoint.y + DEFAULT_FRAME_HEIGHT / 2,
+      };
+    }
+    return {
+      left: Math.min(interaction.startPoint.x, interaction.currentPoint.x),
+      top: Math.min(interaction.startPoint.y, interaction.currentPoint.y),
+      right: Math.max(interaction.startPoint.x, interaction.currentPoint.x),
+      bottom: Math.max(interaction.startPoint.y, interaction.currentPoint.y),
+    };
+  };
+
+  const paintFrameDraft = (interaction: FrameCreationInteraction) => {
+    if (!frameDraftRef.current) return;
+    const bounds = getFrameBounds(interaction);
+    frameDraftRef.current.style.display = "block";
+    frameDraftRef.current.style.left = `${bounds.left}px`;
+    frameDraftRef.current.style.top = `${bounds.top}px`;
+    frameDraftRef.current.style.width = `${bounds.right - bounds.left}px`;
+    frameDraftRef.current.style.height = `${bounds.bottom - bounds.top}px`;
+  };
+
+  const beginFrameCreation = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const startPoint = screenToWorld(
+      { x: event.clientX - rect.left, y: event.clientY - rect.top },
+      viewportRef.current,
+    );
+    const interaction: FrameCreationInteraction = {
+      pointerId: event.pointerId,
+      startPoint,
+      currentPoint: startPoint,
+      moved: false,
+    };
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    frameCreationRef.current = interaction;
+    setIsCreatingFrame(true);
+    useSelectionStore.getState().clearSelection();
+    useInteractionStore.getState().beginInteraction("creatingFrame");
+    paintFrameDraft(interaction);
+  };
+
+  const continueFrameCreation = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    interaction: FrameCreationInteraction,
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    interaction.currentPoint = screenToWorld(
+      { x: event.clientX - rect.left, y: event.clientY - rect.top },
+      viewportRef.current,
+    );
+    interaction.moved =
+      Math.hypot(
+        interaction.currentPoint.x - interaction.startPoint.x,
+        interaction.currentPoint.y - interaction.startPoint.y,
+      ) >=
+      4 / viewportRef.current.zoom;
+    paintFrameDraft(interaction);
+  };
+
+  const finishFrameCreation = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    interaction: FrameCreationInteraction,
+  ) => {
+    const wasCancelled = event.type === "pointercancel";
+    if (!wasCancelled) {
+      const documentStore = useDocumentStore.getState();
+      const frame = createFrameObject(
+        getFrameBounds(interaction, !interaction.moved),
+        documentStore.getNextZIndex(),
+      );
+      documentStore.addObject(frame);
+      useSelectionStore.getState().selectOnly(frame.id);
+      suppressDoubleClickUntilRef.current = performance.now() + 450;
+    }
+    clearFramePreview();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    useInteractionStore.getState().endInteraction();
+  };
+
+  const paintStrokeDraft = (interaction: StrokeInteraction) => {
+    if (!strokeDraftRef.current) return;
+    strokeDraftRef.current.style.display = "block";
+    strokeDraftRef.current.setAttribute(
+      "d",
+      buildVariableWidthStrokePath(
+        interaction.points,
+        DEFAULT_STROKE_WIDTH,
+      ),
+    );
+  };
+
+  const appendStrokeSamples = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    interaction: StrokeInteraction,
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    const samples = coalesced.length > 0 ? coalesced : [event.nativeEvent];
+    for (const sample of samples) {
+      const point = screenToWorld(
+        { x: sample.clientX - rect.left, y: sample.clientY - rect.top },
+        viewportRef.current,
+      );
+      const previous = interaction.points.at(-1);
+      const segmentDistance = previous
+        ? Math.hypot(point.x - previous.x, point.y - previous.y)
+        : 0;
+      if (
+        previous &&
+        segmentDistance < 0.65 / viewportRef.current.zoom
+      ) {
+        continue;
+      }
+      interaction.distance += segmentDistance;
+      const rampProgress = Math.min(
+        1,
+        interaction.distance / (26 / viewportRef.current.zoom),
+      );
+      const easedRamp = 1 - (1 - rampProgress) ** 3;
+      const reportedPressure = sample.pressure > 0 ? sample.pressure : 0.5;
+      const pressure = interaction.pointerType === "pen"
+        ? reportedPressure * (0.35 + easedRamp * 0.65)
+        : 0.08 + easedRamp * 0.92;
+      interaction.points.push({
+        ...point,
+        pressure: Math.min(1, Math.max(0.05, pressure)),
+      });
+    }
+    paintStrokeDraft(interaction);
+  };
+
+  const beginStroke = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const interaction: StrokeInteraction = {
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      distance: 0,
+      points: [],
+    };
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    strokeRef.current = interaction;
+    setIsDrawing(true);
+    useSelectionStore.getState().clearSelection();
+    useInteractionStore.getState().beginInteraction("drawing");
+    appendStrokeSamples(event, interaction);
+  };
+
+  const finishStroke = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    interaction: StrokeInteraction,
+  ) => {
+    const wasCancelled = event.type === "pointercancel";
+    if (!wasCancelled) {
+      appendStrokeSamples(event, interaction);
+      const documentStore = useDocumentStore.getState();
+      documentStore.addObject(
+        createStrokeObject(
+          [...interaction.points],
+          documentStore.getNextZIndex(),
+        ),
+      );
+      suppressDoubleClickUntilRef.current = performance.now() + 450;
+    }
+    clearStrokePreview();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    useInteractionStore.getState().endInteraction();
   };
 
   const paintConnectorDraft = (interaction: ConnectorInteraction) => {
@@ -632,18 +940,23 @@ export function CanvasViewport() {
         return bounds ? boundsIntersect(marqueeBounds, bounds) : false;
       })
       .map((object) => object.id);
-    const nextSelection = interaction.additive
-      ? new Set([...interaction.initialSelectedIds, ...hitIds])
-      : new Set(hitIds);
+    const nextSelection = expandIdsToGroups(
+      interaction.additive
+        ? [...interaction.initialSelectedIds, ...hitIds]
+        : hitIds,
+      objects,
+    );
 
     interaction.liveSelectedIds = nextSelection;
     surfaceRef.current
       ?.querySelectorAll<HTMLElement | SVGGElement>(
-        "[data-object-id], [data-connector-object-id]",
+        "[data-object-id], [data-connector-object-id], [data-stroke-object-id]",
       )
       .forEach((element) => {
         const id =
-          element.dataset.objectId ?? element.dataset.connectorObjectId;
+          element.dataset.objectId ??
+          element.dataset.connectorObjectId ??
+          element.dataset.strokeObjectId;
         element.dataset.transientSelected = String(
           id !== undefined && nextSelection.has(id),
         );
@@ -690,6 +1003,18 @@ export function CanvasViewport() {
         createObjectAt(activeTool, { x: event.clientX, y: event.clientY }, true);
         return;
       }
+      if (activeTool === "frame") {
+        (document.activeElement as HTMLElement | null)?.blur();
+        useInteractionStore.getState().endInteraction();
+        beginFrameCreation(event);
+        return;
+      }
+      if (activeTool === "pen") {
+        (document.activeElement as HTMLElement | null)?.blur();
+        useInteractionStore.getState().endInteraction();
+        beginStroke(event);
+        return;
+      }
       useSelectionStore.getState().clearSelection();
       return;
     }
@@ -702,6 +1027,16 @@ export function CanvasViewport() {
     ) {
       event.preventDefault();
       createObjectAt(activeTool, { x: event.clientX, y: event.clientY }, true);
+      return;
+    }
+
+    if (isPrimaryButton && !shouldForcePan && activeTool === "frame") {
+      beginFrameCreation(event);
+      return;
+    }
+
+    if (isPrimaryButton && !shouldForcePan && activeTool === "pen") {
+      beginStroke(event);
       return;
     }
 
@@ -727,6 +1062,18 @@ export function CanvasViewport() {
   const continueSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const stroke = strokeRef.current;
+    if (stroke?.pointerId === event.pointerId) {
+      appendStrokeSamples(event, stroke);
+      return;
+    }
+
+    const frameCreation = frameCreationRef.current;
+    if (frameCreation?.pointerId === event.pointerId) {
+      continueFrameCreation(event, frameCreation);
+      return;
+    }
+
     const connection = connectorRef.current;
     if (connection?.pointerId === event.pointerId) {
       const element = surfaceRef.current;
@@ -781,6 +1128,18 @@ export function CanvasViewport() {
   const endSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const stroke = strokeRef.current;
+    if (stroke?.pointerId === event.pointerId) {
+      finishStroke(event, stroke);
+      return;
+    }
+
+    const frameCreation = frameCreationRef.current;
+    if (frameCreation?.pointerId === event.pointerId) {
+      finishFrameCreation(event, frameCreation);
+      return;
+    }
+
     const connection = connectorRef.current;
     if (connection?.pointerId === event.pointerId) {
       const wasCancelled = event.type === "pointercancel";
@@ -856,6 +1215,18 @@ export function CanvasViewport() {
   const handleLostPointerCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    if (strokeRef.current?.pointerId === event.pointerId) {
+      clearStrokePreview();
+      useInteractionStore.getState().endInteraction();
+      return;
+    }
+
+    if (frameCreationRef.current?.pointerId === event.pointerId) {
+      clearFramePreview();
+      useInteractionStore.getState().endInteraction();
+      return;
+    }
+
     if (connectorRef.current?.pointerId === event.pointerId) {
       clearConnectorPreview();
       useInteractionStore.getState().endInteraction();
@@ -897,6 +1268,8 @@ export function CanvasViewport() {
       data-space-pressed={isSpacePressed ? "true" : "false"}
       data-marquee-selecting={isMarqueeSelecting ? "true" : "false"}
       data-connecting={isConnecting ? "true" : "false"}
+      data-creating-frame={isCreatingFrame ? "true" : "false"}
+      data-drawing={isDrawing ? "true" : "false"}
       data-active-tool={activeTool}
       aria-label="Infinite canvas"
       onPointerDown={beginSurfaceInteraction}
@@ -911,11 +1284,17 @@ export function CanvasViewport() {
 
       <div ref={worldRef} className="world-layer">
         <span className="world-origin-dot" aria-hidden="true" />
+        <FrameLayer />
+        <div ref={frameDraftRef} className="frame-draft" aria-hidden="true" />
         <ConnectorLayer />
         <ObjectLayer />
+        <StrokeLayer />
         <SelectionLayer />
         <svg className="connector-draft-layer" aria-hidden="true">
           <path ref={connectorDraftRef} className="connector-draft-path" />
+        </svg>
+        <svg className="stroke-draft-layer" aria-hidden="true">
+          <path ref={strokeDraftRef} className="stroke-draft-path" />
         </svg>
       </div>
 
@@ -925,25 +1304,28 @@ export function CanvasViewport() {
         aria-hidden="true"
       />
 
-      {objectCount === 0 && (
+      {isBoardHydrated && objectCount === 0 && (
         <div className="empty-prompt" aria-hidden="true">
           <span className="empty-prompt-icon">+</span>
-          <div>
-            <strong>Add your first idea</strong>
-            <span>Double-click anywhere to create a note</span>
+          <div className="empty-prompt-content">
+            <strong>Start creating</strong>
+            <span className="empty-prompt-copy">
+              Double-click for a note, or choose a tool above
+            </span>
+            <div className="empty-prompt-tools">
+              <span><kbd>N</kbd> Note</span>
+              <span><kbd>T</kbd> Text</span>
+              <span><kbd>P</kbd> Pen</span>
+            </div>
           </div>
         </div>
       )}
 
-      <header className="brand-mark" onPointerDown={(event) => event.stopPropagation()}>
-        <span className="brand-symbol" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <i />
-        </span>
-        <span>The Canvas</span>
-      </header>
+      <BoardIdentity />
+
+      {!isBoardHydrated && (
+        <div className="board-loading-shield" aria-label="Opening local board" />
+      )}
 
       <div onPointerDown={(event) => event.stopPropagation()}>
         <Toolbar />
@@ -967,9 +1349,33 @@ export function CanvasViewport() {
                 <i aria-hidden="true" />
                 <span><strong>Delete</strong> remove</span>
               </>
+            ) : selectedCount === 1 && selectedStrokeIds.length === 1 ? (
+              <>
+                <span><strong>Drag</strong> to move stroke</span>
+                <i aria-hidden="true" />
+                <span><strong>Ctrl/⌘ D</strong> duplicate</span>
+                <i aria-hidden="true" />
+                <span><strong>Delete</strong> remove stroke</span>
+              </>
+            ) : selectedCount === 1 && selectedFrameIds.length === 1 ? (
+              <>
+                <span><strong>Double-click title</strong> to rename</span>
+                <i aria-hidden="true" />
+                <span><strong>M</strong> toggle moving contents</span>
+                <i aria-hidden="true" />
+                <span><strong>Delete</strong> remove frame</span>
+              </>
+            ) : selectedGroupIds.size > 0 ? (
+              <>
+                <span><strong>Drag any member</strong> to move group</span>
+                <i aria-hidden="true" />
+                <span><strong>Ctrl/⌘ Shift G</strong> ungroup</span>
+                <i aria-hidden="true" />
+                <span><strong>Delete</strong> remove</span>
+              </>
             ) : selectedCount > 0 ? (
               <>
-                <span><strong>Ctrl/⌘ D</strong> duplicate</span>
+                <span><strong>Ctrl/⌘ G</strong> group selection</span>
                 <i aria-hidden="true" />
                 <span><strong>Ctrl/⌘ C · V</strong> copy and paste</span>
                 <i aria-hidden="true" />
@@ -1012,6 +1418,24 @@ export function CanvasViewport() {
             <span><strong>Drag from an anchor</strong> to connect</span>
             <i aria-hidden="true" />
             <span><strong>Shift-drag</strong> for no arrow</span>
+            <i aria-hidden="true" />
+            <span><strong>Esc</strong> to Select</span>
+          </>
+        )}
+        {activeTool === "frame" && (
+          <>
+            <span><strong>Drag empty space</strong> to draw a frame</span>
+            <i aria-hidden="true" />
+            <span><strong>Click</strong> for a default frame</span>
+            <i aria-hidden="true" />
+            <span><strong>Esc</strong> to Select</span>
+          </>
+        )}
+        {activeTool === "pen" && (
+          <>
+            <span><strong>Drag</strong> to draw</span>
+            <i aria-hidden="true" />
+            <span><strong>Stylus pressure</strong> supported</span>
             <i aria-hidden="true" />
             <span><strong>Esc</strong> to Select</span>
           </>

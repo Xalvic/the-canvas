@@ -5,6 +5,7 @@ import {
   isCanvasNodeObject,
   isConnectorObject,
 } from "../canvas/objects/types";
+import { createStrokeObject } from "../canvas/strokes/strokeFactories";
 import { useClipboardStore } from "../store/clipboardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -121,5 +122,63 @@ describe("internal clipboard", () => {
       .toMatchObject({ x: first.x + 28, y: first.y + 28 });
     expect(objects.find((object) => object.id === pastedConnector?.to.objectId))
       .toMatchObject({ x: second.x + 28, y: second.y + 28 });
+  });
+
+  it("preserves a copied group while assigning it a new group identity", () => {
+    const first = {
+      ...createCardObject({ x: 100, y: 100 }, 1),
+      id: "first",
+      groupId: "original-group",
+    };
+    const second = {
+      ...createCardObject({ x: 500, y: 100 }, 2),
+      id: "second",
+      groupId: "original-group",
+    };
+    const ids = ["clone-first", "clone-second", "clone-group"];
+
+    const clones = cloneCanvasObjects(
+      [first, second],
+      28,
+      3,
+      () => ids.shift()!,
+    );
+
+    expect(clones.map((object) => object.groupId)).toEqual([
+      "clone-group",
+      "clone-group",
+    ]);
+    expect(clones[0].groupId).not.toBe(first.groupId);
+  });
+
+  it("offsets stroke bounds and every world-space point", () => {
+    const stroke = {
+      ...createStrokeObject(
+        [
+          { x: 10, y: 20, pressure: 0.4 },
+          { x: 30, y: 60, pressure: 0.6 },
+        ],
+        1,
+      ),
+      id: "stroke",
+    };
+    const clones = cloneCanvasObjects(
+      [stroke],
+      28,
+      2,
+      () => "clone-stroke",
+    );
+    const clone = clones[0];
+    if (clone.type !== "stroke") throw new Error("Expected a stroke clone");
+
+    expect(clone).toMatchObject({
+      id: "clone-stroke",
+      x: stroke.x + 28,
+      y: stroke.y + 28,
+    });
+    expect(clone.points).toEqual([
+      { x: 38, y: 48, pressure: 0.4 },
+      { x: 58, y: 88, pressure: 0.6 },
+    ]);
   });
 });

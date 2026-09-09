@@ -6,6 +6,8 @@ export type InteractionMode =
   | "marquee"
   | "dragging"
   | "resizing"
+  | "creatingFrame"
+  | "drawing"
   | "connecting"
   | "editingText";
 

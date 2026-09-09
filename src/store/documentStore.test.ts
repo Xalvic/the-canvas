@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createCardObject } from "../canvas/objects/objectFactories";
 import { createConnectorObject } from "../canvas/connectors/connectorFactories";
 import { isCanvasNodeObject } from "../canvas/objects/types";
+import { createStrokeObject } from "../canvas/strokes/strokeFactories";
 import {
   MAX_HISTORY_ENTRIES,
   useDocumentStore,
@@ -56,6 +57,23 @@ describe("document history", () => {
     expect(useDocumentStore.getState().past).toHaveLength(0);
   });
 
+  it("loads a saved document without retaining session history", () => {
+    const first = { ...createCardObject({ x: 100, y: 100 }, 1), id: "first" };
+    const restored = {
+      ...createCardObject({ x: 320, y: 220 }, 2),
+      id: "restored",
+    };
+    useDocumentStore.getState().addObject(first);
+
+    useDocumentStore.getState().loadDocument({ [restored.id]: restored });
+
+    expect(useDocumentStore.getState().objects).toEqual({
+      [restored.id]: restored,
+    });
+    expect(useDocumentStore.getState().past).toEqual([]);
+    expect(useDocumentStore.getState().future).toEqual([]);
+  });
+
   it("clears the redo branch after a new edit", () => {
     const card = { ...createCardObject({ x: 100, y: 100 }, 1), id: "card-1" };
     useDocumentStore.getState().addObject(card);
@@ -103,5 +121,64 @@ describe("document history", () => {
     expect(Object.keys(useDocumentStore.getState().objects).sort()).toEqual(
       [connector.id, first.id, second.id].sort(),
     );
+  });
+
+  it("groups and ungroups spatial objects as single history entries", () => {
+    const first = { ...createCardObject({ x: 100, y: 100 }, 1), id: "first" };
+    const second = { ...createCardObject({ x: 500, y: 100 }, 2), id: "second" };
+    useDocumentStore.getState().addObjects([first, second]);
+    useDocumentStore.getState().clearHistory();
+
+    useDocumentStore
+      .getState()
+      .setObjectGroup([first.id, second.id], "group-1");
+    expect(useDocumentStore.getState().objects[first.id].groupId).toBe(
+      "group-1",
+    );
+    expect(useDocumentStore.getState().objects[second.id].groupId).toBe(
+      "group-1",
+    );
+    expect(useDocumentStore.getState().past).toHaveLength(1);
+
+    useDocumentStore
+      .getState()
+      .setObjectGroup([first.id, second.id], null, "Ungroup objects");
+    expect(useDocumentStore.getState().objects[first.id].groupId).toBeUndefined();
+    expect(useDocumentStore.getState().past).toHaveLength(2);
+
+    useDocumentStore.getState().undo();
+    expect(useDocumentStore.getState().objects[first.id].groupId).toBe(
+      "group-1",
+    );
+  });
+
+  it("moves stroke bounds and world points in one history entry", () => {
+    const stroke = {
+      ...createStrokeObject(
+        [
+          { x: 10, y: 20, pressure: 0.5 },
+          { x: 40, y: 60, pressure: 0.5 },
+        ],
+        1,
+      ),
+      id: "stroke",
+    };
+    useDocumentStore.getState().addObject(stroke);
+    useDocumentStore.getState().clearHistory();
+
+    useDocumentStore.getState().updateObjectPositions({
+      [stroke.id]: { x: stroke.x + 25, y: stroke.y - 15 },
+    });
+    const moved = useDocumentStore.getState().objects[stroke.id];
+    expect(moved).toMatchObject({ x: stroke.x + 25, y: stroke.y - 15 });
+    if (moved.type !== "stroke") throw new Error("Expected a stroke");
+    expect(moved.points).toEqual([
+      { x: 35, y: 5, pressure: 0.5 },
+      { x: 65, y: 45, pressure: 0.5 },
+    ]);
+    expect(useDocumentStore.getState().past).toHaveLength(1);
+
+    useDocumentStore.getState().undo();
+    expect(useDocumentStore.getState().objects[stroke.id]).toEqual(stroke);
   });
 });

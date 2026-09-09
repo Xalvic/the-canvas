@@ -1,6 +1,13 @@
 import { create } from "zustand";
 
-export type ActiveTool = "select" | "hand" | "text" | "card" | "connector";
+export type ActiveTool =
+  | "select"
+  | "hand"
+  | "text"
+  | "card"
+  | "connector"
+  | "frame"
+  | "pen";
 
 type UiState = {
   activeTool: ActiveTool;

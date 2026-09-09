@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { boundsIntersect, getCombinedBounds } from "./geometry";
 import { createCardObject, createTextObject } from "../canvas/objects/objectFactories";
 import { createConnectorObject } from "../canvas/connectors/connectorFactories";
+import { createStrokeObject } from "../canvas/strokes/strokeFactories";
 
 describe("geometry helpers", () => {
   it("detects overlap and edge contact", () => {
@@ -70,6 +71,22 @@ describe("geometry helpers", () => {
       top: 40,
       right: 360,
       bottom: 200,
+    });
+  });
+
+  it("uses stored world bounds for freehand strokes", () => {
+    const stroke = createStrokeObject(
+      [
+        { x: 20, y: 40, pressure: 0.5 },
+        { x: 80, y: 100, pressure: 0.5 },
+      ],
+      1,
+    );
+    expect(getCombinedBounds([stroke])).toEqual({
+      left: stroke.x,
+      top: stroke.y,
+      right: stroke.x + stroke.width,
+      bottom: stroke.y + stroke.height,
     });
   });
 });

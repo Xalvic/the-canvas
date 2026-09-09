@@ -61,6 +61,24 @@ export function ConnectorIcon(props: IconProps) {
   );
 }
 
+export function FrameIcon(props: IconProps) {
+  return (
+    <svg {...sharedProps} {...props}>
+      <rect x="3.5" y="4" width="17" height="16" rx="2" />
+      <path d="M3.5 8.5h17M7 6.25h5" />
+    </svg>
+  );
+}
+
+export function PenIcon(props: IconProps) {
+  return (
+    <svg {...sharedProps} {...props}>
+      <path d="m14.5 4.5 5 5L9 20l-5.5.5L4 15 14.5 4.5Z" />
+      <path d="m12.5 6.5 5 5M4 15l5 5" />
+    </svg>
+  );
+}
+
 export function MinusIcon(props: IconProps) {
   return (
     <svg {...sharedProps} {...props}>
