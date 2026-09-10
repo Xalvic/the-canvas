@@ -1,4 +1,8 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
@@ -14,6 +18,7 @@ import {
   type CanvasDomObject,
 } from "./types";
 import type { Point } from "../viewport/viewportMath";
+import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "../viewport/pointerInteractionEvents";
 import { ConnectionAnchors } from "../connectors/ConnectionAnchors";
 import { refreshConnectorGeometryFromDom } from "../connectors/connectorDom";
 import {
@@ -68,6 +73,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   const dragRef = useRef<DragInteraction | null>(null);
   const resizeRef = useRef<ResizeInteraction | null>(null);
   const activeTool = useUiStore((state) => state.activeTool);
+  const isMultiSelectMode = useUiStore((state) => state.isMultiSelectMode);
   const isSelected = useSelectionStore((state) =>
     state.selectedIds.has(object.id),
   );
@@ -104,7 +110,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     if (activeTool !== "select" || isEditing) return;
 
     event.preventDefault();
-    if (event.shiftKey) {
+    if (event.shiftKey || isMultiSelectMode) {
       setSelection(
         toggleObjectOrGroup(
           useSelectionStore.getState().selectedIds,
@@ -143,6 +149,36 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     };
     beginInteraction("dragging", object.id);
   };
+
+  useEffect(() => {
+    const cancelTouchInteraction = () => {
+      const drag = dragRef.current;
+      const resize = resizeRef.current;
+      dragRef.current = null;
+      resizeRef.current = null;
+      if (drag) clearMovementTransforms(drag.elements);
+      if (resize && elementRef.current) {
+        elementRef.current.style.width = `${object.width}px`;
+        elementRef.current.style.height = `${object.height}px`;
+      }
+      const pointerId = drag?.pointerId ?? resize?.pointerId;
+      if (
+        pointerId !== undefined &&
+        elementRef.current?.hasPointerCapture(pointerId)
+      ) {
+        elementRef.current.releasePointerCapture(pointerId);
+      }
+    };
+    window.addEventListener(
+      CANCEL_TOUCH_INTERACTIONS_EVENT,
+      cancelTouchInteraction,
+    );
+    return () =>
+      window.removeEventListener(
+        CANCEL_TOUCH_INTERACTIONS_EVENT,
+        cancelTouchInteraction,
+      );
+  }, [object.height, object.width]);
 
   const continueInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;

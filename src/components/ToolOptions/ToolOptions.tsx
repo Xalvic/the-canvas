@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { AlignLeft, AlignCenter, AlignRight, Check, X } from "lucide-react";
+import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  X,
+} from "lucide-react";
 import {
   COLOR_PALETTE,
   PEN_WIDTHS,
@@ -176,10 +184,19 @@ type AppearanceObject = StrokeCanvasObject | TextCanvasObject;
 type ToolOptionsProps = {
   tool: "pen" | "text";
   object?: AppearanceObject;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
   onClose?: () => void;
 };
 
-export function ToolOptions({ tool, object, onClose }: ToolOptionsProps) {
+export function ToolOptions({
+  tool,
+  object,
+  collapsed = false,
+  onToggleCollapsed,
+  onClose,
+}: ToolOptionsProps) {
+  const contentId = useId();
   const pen = useToolPreferencesStore((state) => state.pen);
   const text = useToolPreferencesStore((state) => state.text);
   const error = useToolPreferencesStore((state) => state.saveError);
@@ -266,7 +283,7 @@ export function ToolOptions({ tool, object, onClose }: ToolOptionsProps) {
 
   return (
     <section
-      className="tool-options"
+      className={`tool-options${collapsed ? " is-collapsed" : ""}${object ? " tool-options--object" : ""}`}
       aria-label={
         object
           ? "Object appearance"
@@ -291,11 +308,24 @@ export function ToolOptions({ tool, object, onClose }: ToolOptionsProps) {
         event.stopPropagation();
       }}
     >
-      {object && (
-        <div className="appearance-heading">
-          <strong>
-            {object.type === "stroke" ? "Stroke" : "Text"} appearance
-          </strong>
+      <div className="appearance-heading">
+        <strong>
+          {object
+            ? `${object.type === "stroke" ? "Stroke" : "Text"} appearance`
+            : `${tool === "pen" ? "Pen" : "Text"} settings`}
+        </strong>
+        <div className="tool-options-heading-actions">
+          <button
+            type="button"
+            className="icon-button tool-options-collapse"
+            aria-label={collapsed ? "Expand settings" : "Collapse settings"}
+            aria-controls={contentId}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {object && (
           <button
             type="button"
             className="icon-button"
@@ -304,72 +334,75 @@ export function ToolOptions({ tool, object, onClose }: ToolOptionsProps) {
           >
             <X size={16} />
           </button>
+          )}
         </div>
-      )}
-      {tool === "pen" ? (
-        <>
-          <Choices
-            label="Mode"
-            value={p.mode}
-            options={["draw", "solid"]}
-            onChange={(mode) => changePen({ mode })}
-          />
-          <ColorPalette
-            value={p.color}
-            onChange={(color) => changePen({ color })}
-          />
-          <Choices
-            label="Thickness"
-            value={p.size}
-            options={["small", "large", "xl"]}
-            onChange={(size) => changePen({ size })}
-          />
-        </>
-      ) : (
-        <>
-          <ColorPalette
-            value={t.color}
-            onChange={(color) => changeText({ color })}
-          />
-          <Choices
-            label="Size"
-            value={t.size}
-            options={["small", "medium", "large", "xl"]}
-            onChange={(size) => changeText({ size })}
-          />
-          <Choices
-            label="Weight"
-            value={t.weight}
-            options={["regular", "medium", "bold"]}
-            onChange={(weight) => changeText({ weight })}
-          />
-          <Choices
-            label="Alignment"
-            value={t.align}
-            options={["left", "center", "right"]}
-            renderOption={(align) => {
-              const Icon = ALIGNMENT_ICONS[align];
-              return <Icon size={16} aria-hidden="true" />;
-            }}
-            onChange={(align) => changeText({ align })}
-          />
-        </>
-      )}
-      <OpacitySlider
-        value={opacity}
-        onChange={(value) => {
-          if (object) preview.setOpacity(object.id, value);
-          else if (tool === "pen") changePen({ opacity: value });
-          else changeText({ opacity: value });
-        }}
-        onCommit={object ? preview.commit : undefined}
-        onCancel={object ? preview.cancel : undefined}
-      />
-      {!object && error && (
-        <p className="preference-error" role="alert">
-          {error}
-        </p>
-      )}
+      </div>
+      <div id={contentId} className="tool-options-content" hidden={collapsed}>
+        {tool === "pen" ? (
+          <>
+            <Choices
+              label="Mode"
+              value={p.mode}
+              options={["draw", "solid"]}
+              onChange={(mode) => changePen({ mode })}
+            />
+            <ColorPalette
+              value={p.color}
+              onChange={(color) => changePen({ color })}
+            />
+            <Choices
+              label="Thickness"
+              value={p.size}
+              options={["small", "large", "xl"]}
+              onChange={(size) => changePen({ size })}
+            />
+          </>
+        ) : (
+          <>
+            <ColorPalette
+              value={t.color}
+              onChange={(color) => changeText({ color })}
+            />
+            <Choices
+              label="Size"
+              value={t.size}
+              options={["small", "medium", "large", "xl"]}
+              onChange={(size) => changeText({ size })}
+            />
+            <Choices
+              label="Weight"
+              value={t.weight}
+              options={["regular", "medium", "bold"]}
+              onChange={(weight) => changeText({ weight })}
+            />
+            <Choices
+              label="Alignment"
+              value={t.align}
+              options={["left", "center", "right"]}
+              renderOption={(align) => {
+                const Icon = ALIGNMENT_ICONS[align];
+                return <Icon size={16} aria-hidden="true" />;
+              }}
+              onChange={(align) => changeText({ align })}
+            />
+          </>
+        )}
+        <OpacitySlider
+          value={opacity}
+          onChange={(value) => {
+            if (object) preview.setOpacity(object.id, value);
+            else if (tool === "pen") changePen({ opacity: value });
+            else changeText({ opacity: value });
+          }}
+          onCommit={object ? preview.commit : undefined}
+          onCancel={object ? preview.cancel : undefined}
+        />
+        {!object && error && (
+          <p className="preference-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

@@ -4,7 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function snapshot(page: Page) {
   return page
     .evaluate(async () => {
-      const path = "/src/store/documentStore.ts";
+      const path = "/scribble/src/store/documentStore.ts";
       const { useDocumentStore } = await import(/* @vite-ignore */ path);
       return useDocumentStore.getState();
     })

@@ -6,8 +6,8 @@ test("legacy board styles stay independent of saved tool preferences, including 
   await page.goto("/");
   await expect(page.getByLabel("Board title")).toBeEnabled();
   await page.evaluate(async () => {
-    const storePath = "/src/store/documentStore.ts";
-    const preferencePath = "/src/store/toolPreferencesStore.ts";
+    const storePath = "/scribble/src/store/documentStore.ts";
+    const preferencePath = "/scribble/src/store/toolPreferencesStore.ts";
     const { useDocumentStore } = await import(/* @vite-ignore */ storePath);
     const { useToolPreferencesStore } = await import(
       /* @vite-ignore */ preferencePath

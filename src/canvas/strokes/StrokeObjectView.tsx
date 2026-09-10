@@ -1,4 +1,8 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
@@ -22,6 +26,7 @@ import {
   type StrokeCanvasObject,
 } from "../objects/types";
 import type { Point } from "../viewport/viewportMath";
+import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "../viewport/pointerInteractionEvents";
 import {
   buildSmoothedStrokePath,
   buildVariableWidthStrokePath,
@@ -44,6 +49,7 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
   const opacity = useObjectOpacity(object.id, object.opacity);
   const dragRef = useRef<DragInteraction | null>(null);
   const activeTool = useUiStore((state) => state.activeTool);
+  const isMultiSelectMode = useUiStore((state) => state.isMultiSelectMode);
   const isSelected = useSelectionStore((state) =>
     state.selectedIds.has(object.id),
   );
@@ -67,7 +73,7 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
     event.stopPropagation();
     const documentObjects = useDocumentStore.getState().objects;
     const selection = useSelectionStore.getState().selectedIds;
-    if (event.shiftKey) {
+    if (event.shiftKey || isMultiSelectMode) {
       setSelection(
         toggleObjectOrGroup(selection, object.id, documentObjects),
       );
@@ -100,6 +106,30 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
     };
     beginInteraction("dragging", object.id);
   };
+
+  useEffect(() => {
+    const cancelTouchInteraction = () => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      dragRef.current = null;
+      clearMovementTransforms(drag.elements);
+      const path = document.querySelector<SVGPathElement>(
+        `[data-stroke-object-id="${object.id}"] .stroke-hit-area`,
+      );
+      if (path?.hasPointerCapture(drag.pointerId)) {
+        path.releasePointerCapture(drag.pointerId);
+      }
+    };
+    window.addEventListener(
+      CANCEL_TOUCH_INTERACTIONS_EVENT,
+      cancelTouchInteraction,
+    );
+    return () =>
+      window.removeEventListener(
+        CANCEL_TOUCH_INTERACTIONS_EVENT,
+        cancelTouchInteraction,
+      );
+  }, [object.id]);
 
   const continueDrag = (event: ReactPointerEvent<SVGPathElement>) => {
     const drag = dragRef.current;

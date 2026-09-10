@@ -49,7 +49,7 @@ export function ConnectorLayer() {
 
     event.preventDefault();
     event.stopPropagation();
-    if (event.shiftKey) {
+    if (event.shiftKey || useUiStore.getState().isMultiSelectMode) {
       useSelectionStore.getState().toggleSelection(connectorId);
     } else {
       useSelectionStore.getState().selectOnly(connectorId);

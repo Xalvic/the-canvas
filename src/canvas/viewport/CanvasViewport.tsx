@@ -80,10 +80,20 @@ import {
   type Point,
   type Viewport,
 } from "./viewportMath";
+import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "./pointerInteractionEvents";
 
 type PanInteraction = {
   pointerId: number;
   lastClientPoint: Point;
+  startClientPoint: Point;
+  moved: boolean;
+  clearSelectionOnTap: boolean;
+};
+
+type PinchInteraction = {
+  pointerIds: [number, number];
+  lastMidpoint: Point;
+  lastDistance: number;
 };
 
 type MarqueeInteraction = {
@@ -162,6 +172,8 @@ export function CanvasViewport() {
   const viewportRef = useRef<Viewport>(useViewportStore.getState().viewport);
   const frameRef = useRef<number | null>(null);
   const panRef = useRef<PanInteraction | null>(null);
+  const touchPointsRef = useRef(new Map<number, Point>());
+  const pinchRef = useRef<PinchInteraction | null>(null);
   const marqueeRef = useRef<MarqueeInteraction | null>(null);
   const connectorRef = useRef<ConnectorInteraction | null>(null);
   const frameCreationRef = useRef<FrameCreationInteraction | null>(null);
@@ -178,6 +190,7 @@ export function CanvasViewport() {
   const noticeTimerRef = useRef<number | null>(null);
   const [displayZoom, setDisplayZoom] = useState(viewportRef.current.zoom);
   const [isPanning, setIsPanning] = useState(false);
+  const [isPinching, setIsPinching] = useState(false);
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isCreatingFrame, setIsCreatingFrame] = useState(false);
@@ -186,6 +199,9 @@ export function CanvasViewport() {
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const [canvasNotice, setCanvasNotice] = useState<string | null>(null);
   const activeTool = useUiStore((state) => state.activeTool);
+  const isEditingText = useInteractionStore(
+    (state) => state.mode === "editingText",
+  );
   const isBoardHydrated = useBoardStore((state) => state.isHydrated);
   const objects = useDocumentStore((state) => state.objects);
   const selectedIds = useSelectionStore((state) => state.selectedIds);
@@ -1111,6 +1127,156 @@ export function CanvasViewport() {
     useInteractionStore.getState().beginInteraction("marquee");
   };
 
+  const cancelCanvasPointerInteractionsForPinch = () => {
+    window.dispatchEvent(new Event(CANCEL_TOUCH_INTERACTIONS_EVENT));
+    clearStrokePreview();
+    clearFramePreview();
+    clearConnectorPreview();
+    panRef.current = null;
+    setIsPanning(false);
+
+    const marquee = marqueeRef.current;
+    if (marquee) {
+      marqueeRef.current = null;
+      useSelectionStore.getState().setSelection(marquee.initialSelectedIds);
+      clearTransientSelectionStyles();
+      if (marqueeOverlayRef.current) {
+        marqueeOverlayRef.current.style.display = "none";
+      }
+      setIsMarqueeSelecting(false);
+    }
+    useInteractionStore.getState().endInteraction();
+  };
+
+  const handleViewportPointerDownCapture = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const target = event.target;
+    const focused = document.activeElement;
+    if (
+      target instanceof Element &&
+      !target.closest(".toolbar-area, .tool-options") &&
+      focused instanceof HTMLElement &&
+      focused.closest(".toolbar-area, .tool-options")
+    ) {
+      focused.blur();
+    }
+
+    if (
+      event.pointerType !== "touch" ||
+      isTypingTarget(target) ||
+      (target instanceof Element &&
+        target.closest(
+          ".toolbar-area, .tool-options, .mobile-selection-actions, .history-dock, .zoom-dock, .brand-mark",
+        ))
+    ) {
+      return;
+    }
+
+    touchPointsRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+    if (touchPointsRef.current.size < 2) return;
+
+    if (!pinchRef.current) {
+      const entries = [...touchPointsRef.current.entries()].slice(0, 2);
+      const [[firstId, first], [secondId, second]] = entries;
+      cancelCanvasPointerInteractionsForPinch();
+      pinchRef.current = {
+        pointerIds: [firstId, secondId],
+        lastMidpoint: {
+          x: (first.x + second.x) / 2,
+          y: (first.y + second.y) / 2,
+        },
+        lastDistance: Math.max(
+          1,
+          Math.hypot(second.x - first.x, second.y - first.y),
+        ),
+      };
+      setIsPinching(true);
+      suppressDoubleClickUntilRef.current = performance.now() + 450;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleViewportPointerMoveCapture = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (
+      event.pointerType !== "touch" ||
+      !touchPointsRef.current.has(event.pointerId)
+    ) {
+      return;
+    }
+    touchPointsRef.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    const pinch = pinchRef.current;
+    if (!pinch) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const first = touchPointsRef.current.get(pinch.pointerIds[0]);
+    const second = touchPointsRef.current.get(pinch.pointerIds[1]);
+    const element = surfaceRef.current;
+    if (!first || !second || !element) return;
+
+    const midpoint = {
+      x: (first.x + second.x) / 2,
+      y: (first.y + second.y) / 2,
+    };
+    const distance = Math.max(
+      1,
+      Math.hypot(second.x - first.x, second.y - first.y),
+    );
+    const rect = element.getBoundingClientRect();
+    const previousLocalMidpoint = {
+      x: pinch.lastMidpoint.x - rect.left,
+      y: pinch.lastMidpoint.y - rect.top,
+    };
+    const zoomed = zoomViewportAtPoint(
+      viewportRef.current,
+      previousLocalMidpoint,
+      viewportRef.current.zoom * (distance / pinch.lastDistance),
+    );
+    const next = panViewport(zoomed, {
+      x: midpoint.x - pinch.lastMidpoint.x,
+      y: midpoint.y - pinch.lastMidpoint.y,
+    });
+    pinch.lastMidpoint = midpoint;
+    pinch.lastDistance = distance;
+    scheduleViewport(next);
+    setDisplayZoom(next.zoom);
+  };
+
+  const handleViewportPointerEndCapture = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (
+      event.pointerType !== "touch" ||
+      !touchPointsRef.current.has(event.pointerId)
+    ) {
+      return;
+    }
+
+    const pinch = pinchRef.current;
+    touchPointsRef.current.delete(event.pointerId);
+    if (!pinch) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (pinch.pointerIds.includes(event.pointerId)) {
+      pinchRef.current = null;
+      setIsPinching(false);
+      commitViewport();
+    }
+  };
+
   const beginSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
@@ -1174,7 +1340,11 @@ export function CanvasViewport() {
       return;
     }
 
-    if (activeTool === "select" && !shouldForcePan) {
+    if (
+      activeTool === "select" &&
+      !shouldForcePan &&
+      event.pointerType !== "touch"
+    ) {
       beginMarquee(event);
       return;
     }
@@ -1184,6 +1354,10 @@ export function CanvasViewport() {
     panRef.current = {
       pointerId: event.pointerId,
       lastClientPoint: { x: event.clientX, y: event.clientY },
+      startClientPoint: { x: event.clientX, y: event.clientY },
+      moved: false,
+      clearSelectionOnTap:
+        activeTool === "select" && event.pointerType === "touch",
     };
     setIsPanning(true);
     useInteractionStore.getState().beginInteraction("panning");
@@ -1256,6 +1430,12 @@ export function CanvasViewport() {
       y: point.y - interaction.lastClientPoint.y,
     };
     interaction.lastClientPoint = point;
+    interaction.moved =
+      interaction.moved ||
+      Math.hypot(
+        point.x - interaction.startClientPoint.x,
+        point.y - interaction.startClientPoint.y,
+      ) >= 4;
     scheduleViewport(panViewport(viewportRef.current, delta));
   };
 
@@ -1338,6 +1518,10 @@ export function CanvasViewport() {
     if (!interaction || interaction.pointerId !== event.pointerId) return;
 
     panRef.current = null;
+    if (interaction.clearSelectionOnTap && !interaction.moved) {
+      useSelectionStore.getState().clearSelection();
+      useUiStore.getState().setMultiSelectMode(false);
+    }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -1483,20 +1667,20 @@ export function CanvasViewport() {
       ref={surfaceRef}
       className="canvas-viewport"
       data-panning={isPanning ? "true" : "false"}
+      data-pinching={isPinching ? "true" : "false"}
       data-space-pressed={isSpacePressed ? "true" : "false"}
       data-marquee-selecting={isMarqueeSelecting ? "true" : "false"}
       data-connecting={isConnecting ? "true" : "false"}
       data-creating-frame={isCreatingFrame ? "true" : "false"}
       data-drawing={isDrawing ? "true" : "false"}
+      data-editing-text={isEditingText ? "true" : "false"}
       data-image-drag-over={isImageDragOver ? "true" : "false"}
       data-active-tool={activeTool}
       aria-label="Infinite canvas"
-      onPointerDownCapture={(event) => {
-        const target = event.target;
-        const focused = document.activeElement;
-        if (target instanceof Element && !target.closest(".toolbar-area, .tool-options") &&
-          focused instanceof HTMLElement && focused.closest(".toolbar-area, .tool-options")) focused.blur();
-      }}
+      onPointerDownCapture={handleViewportPointerDownCapture}
+      onPointerMoveCapture={handleViewportPointerMoveCapture}
+      onPointerUpCapture={handleViewportPointerEndCapture}
+      onPointerCancelCapture={handleViewportPointerEndCapture}
       onPointerDown={beginSurfaceInteraction}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}

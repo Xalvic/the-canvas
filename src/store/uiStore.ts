@@ -11,10 +11,19 @@ export type ActiveTool =
 
 type UiState = {
   activeTool: ActiveTool;
+  isMultiSelectMode: boolean;
   setActiveTool: (tool: ActiveTool) => void;
+  setMultiSelectMode: (enabled: boolean) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
   activeTool: "select",
-  setActiveTool: (activeTool) => set({ activeTool }),
+  isMultiSelectMode: false,
+  setActiveTool: (activeTool) =>
+    set((state) => ({
+      activeTool,
+      isMultiSelectMode:
+        activeTool === "select" ? state.isMultiSelectMode : false,
+    })),
+  setMultiSelectMode: (isMultiSelectMode) => set({ isMultiSelectMode }),
 }));
