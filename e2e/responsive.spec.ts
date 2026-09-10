@@ -26,6 +26,15 @@ test("mobile dock, settings tray, and persisted themes fit narrow screens", asyn
 }) => {
   await openMobile(page, 320, 700);
 
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    "/scribble/favicon.svg",
+  );
+  await expect(page.locator(".brand-symbol")).toHaveAttribute(
+    "src",
+    "/scribble/favicon.svg",
+  );
+
   const dock = page.locator(".mobile-tool-dock");
   await expect(dock).toBeVisible();
   const dockBox = (await dock.boundingBox())!;

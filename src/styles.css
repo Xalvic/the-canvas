@@ -975,27 +975,10 @@ button {
 }
 
 .brand-symbol {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, 7px);
-  gap: 2px;
+  display: block;
   width: 22px;
   height: 22px;
-  padding: 3px;
-  border-radius: 7px;
-  background: var(--text-primary);
-}
-
-.brand-symbol i {
-  display: block;
-  border-radius: 2px;
-  background: var(--canvas-bg);
-  opacity: 0.93;
-}
-
-.brand-symbol i:nth-child(2),
-.brand-symbol i:nth-child(3) {
-  opacity: 0.45;
+  flex: 0 0 auto;
 }
 
 .tool-dock,

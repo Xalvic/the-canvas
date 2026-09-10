@@ -22,12 +22,12 @@ export function BoardIdentity() {
       className="brand-mark"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <span className="brand-symbol" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </span>
+      <img
+        className="brand-symbol"
+        src={`${import.meta.env.BASE_URL}favicon.svg`}
+        alt=""
+        aria-hidden="true"
+      />
       <div className="board-identity-copy">
         <input
           className="board-title-input"
