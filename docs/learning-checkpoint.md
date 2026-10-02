@@ -6,6 +6,8 @@ Learn through small Scribble slices; general study/DSA remain separate.
 
 Covered: Phase 1 backend/HTTP foundations, Node/Express/TypeScript, Zod versus
 JSON parsing, errors, and temporary storage.
+SQL reading, filters, sorting, and limits introduced on the existing board table;
+controlled write practice and transactions remain.
 
 Implemented: local health and metadata CRUD backed by PostgreSQL; Map is only
 an HTTP-test fixture. Guest canvas still saves independently in IndexedDB.
@@ -50,11 +52,26 @@ IndexedDB note persistence after autosave/reload. TanStack Query is not added ye
 This chat needed Docker's bin directory added to the process PATH for its
 credential helper; no permanent PATH change.
 
-Next: SQL practice on the existing `boards` table, starting with SELECT, filters,
-sorting, and limits, then controlled CRUD, constraints, and transactions.
-Compare canvas storage models and design versioned documents/save conflicts
-before choosing a schema. Introduce Prisma after tracing the underlying SQL;
-auth and ownership must precede account-based cloud saves.
+Storage design: proposed relational `boards` metadata plus one JSONB document
+per board in `board_documents`. Use an ordered object array for transport and
+adapt to/from the editor map; preserve guest IndexedDB format. Separate document
+schema version from save revision; use atomic revision checks, committed snapshots,
+and separate durable assets. First local proof excludes images until asset storage
+exists. Database/API design remains proposed; no new migration, API, or upload.
+Detailed comparison, fields, save/conflict flow, and verification sequence:
+`docs/canvas-document-storage.md`.
+
+Implemented storage slice: strict version-1 validator and detached ordered-array/
+editor-map adapters, all five non-image types, legacy rendering defaults,
+duplicate/reference/unknown-field checks and explicit image rejection. No app
+wiring or guest-format/store changes. Verified 117 targeted tests (103 new),
+frontend build/type checks and server type check. Details and inspection path:
+`docs/canvas-document-storage.md`, implemented validator/adapters section.
+
+Next: review this code path one concept at a time; add the numbered document
+migration and then local pg save/load in later slices, with SQL practice alongside
+them. Introduce Prisma
+after tracing that SQL; auth and ownership precede account-based cloud saves.
 Ask permission to verify actual database-process restart persistence;
 ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or

@@ -19,7 +19,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | --- | --- |
 | Local editor foundation | Custom React/TypeScript/Vite/Zustand canvas, history, selection, IndexedDB boards/assets |
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
-| 2. PostgreSQL persistence | In progress: local PostgreSQL, durable metadata CRUD, SQL migration/constraints and real DB tests; canvas document model and Prisma remain |
+| 2. PostgreSQL persistence | Metadata CRUD and document validation/adapters implemented; document database/API and Prisma pending |
 | 3. Authentication | Not started |
 | 4. Authorization/sharing | Not started |
 | 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
@@ -111,7 +111,27 @@ design schema versions/revision conflicts and asset references, then introduce
 Prisma against the existing database. Keep changes small and reviewable; auth and
 ownership precede account-based cloud saves.
 
-Trace INSERT/SELECT and practice table queries, then compare canvas document
-models and introduce Prisma after SQL. Authentication and ownership follow
-before connecting cloud document saves to the canvas. Phase 2 remains in progress.
+Document storage design slice: SQL reading/filtering/sorting/limits introduced;
+write practice and transactions remain. Compared per-object rows, JSONB boards,
+and relational metadata plus JSONB content. Proposed the hybrid, with an ordered
+object array adapted to the existing editor map, independent format/save versions,
+atomic revision checks, explicit guest-upload choice, and separate image assets.
+Detailed design: `canvas-document-storage.md`. No document migration, API,
+Prisma integration, or guest upload is implemented by this slice.
+
+Document validation/adapter slice (2026-10-02): covered strict format validation,
+map/ordered-array conversion, legacy defaults versus explicit values, and
+cross-object reference checks. Implemented a detached version-1 validator and
+adapters for every non-image type, preserving IDs/order/zIndex/world coordinates
+and supported fields. Rejects duplicates, malformed/unknown content, invalid
+connectors, images, and limits without partial acceptance. Numeric-ID orders the
+editor map cannot preserve are rejected. Guest format/persistence, selection,
+history, and server behavior are unchanged; no app wiring yet. Verified 117
+targeted tests (103 new), frontend build/type checking and server type checking.
+Inspection path and defaults: `canvas-document-storage.md`.
+
+Next implementation, after approval: numbered document migration. Local pg
+document save/load with atomic revisions follows separately;
+practice their SQL before introducing Prisma. Authentication and ownership
+precede frontend account saves. Phase 2 remains in progress.
 Explain and build in small slices at the user's pace.

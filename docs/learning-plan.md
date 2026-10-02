@@ -139,6 +139,11 @@ Compare three canvas persistence models before choosing:
 
 Evaluate queryability, write frequency, collaboration, migrations, performance, object-level permissions, and simplicity. Document the choice.
 
+Current proposal: [canvas document storage design](canvas-document-storage.md)
+compares these models and recommends relational board metadata plus a versioned
+JSONB snapshot. Validation and array/map adapters are implemented and tested;
+database migration, document API, and Prisma remain separate pending slices.
+
 Design the save flow: what is persisted, when saving happens, save indicators, failures, retry behavior, and protection against an older save overwriting a newer edit. Explain the initial concurrency guarantees and their limits.
 
 **Checkpoint:** A board and its content survive refresh and backend restart. I can explain the schema, execute representative SQL, and trace an edit through saving and loading.
