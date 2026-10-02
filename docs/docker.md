@@ -4,8 +4,10 @@ Status (2026-10-02): image downloaded and PostgreSQL started with approval.
 The container is healthy; an authenticated Windows connection to port 5434
 confirmed database `scribble`, PostgreSQL 18.6, and a normal `scribble` app role
 without superuser, database-creation, or role-creation privileges. The named
-volume is mounted. No application tables exist yet: migrations, restart
-persistence testing, and API switching remain pending.
+volume is mounted. The existing migration was applied with approval to Docker
+port 5434 as `scribble`. Verified `boards` and `schema_migrations`, all four board
+columns, migration version 1, and zero board rows. Restart persistence testing
+and API switching remain pending.
 React and Express continue to run on npm. The portable database and its `.env`
 stay separate.
 
@@ -32,7 +34,8 @@ under its version-specific directory. Compose names this volume
 `docker/postgres/001_create_app_role.sql` runs on the first initialization of an
 empty volume. It creates the normal `scribble` login and transfers ownership of
 the `scribble` database to it. The API does not use the administrator role.
-The existing npm migration will create the application tables in a later step.
+The existing migration has now created the application tables. Its connection
+was scoped to `.env.docker` for that process, without changing the portable `.env`.
 
 ## Credentials and configuration validation
 
@@ -69,8 +72,13 @@ docker compose --env-file .env.docker up -d --wait postgres
 docker compose --env-file .env.docker ps
 ```
 
-Next, ask permission to run migrations against the Docker connection and test
-persistence. The app login has already been verified. The current npm scripts load the portable
+The app login and migration have been verified. In the container's Exec terminal,
+run `psql -U scribble -d scribble`, then `\dt` to see both tables and `\d boards`
+to see the board columns and constraints. `SELECT version FROM schema_migrations;`
+shows version 1. Exit psql with `\q`.
+
+Next, ask permission to test restart persistence and switch the API connection.
+The current npm scripts load the portable
 `.env`; starting Compose alone does not switch them to `.env.docker`.
 Database switching or importing existing data needs a separate explicit decision.
 

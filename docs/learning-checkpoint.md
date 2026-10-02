@@ -31,14 +31,16 @@ and initialization SQL for a normal app role. Separate generated credentials
 are in ignored `.env.docker`; portable `.env` is unchanged. Guide: `docs/docker.md`.
 Image downloaded and container started with approval; healthy on port 5434.
 Authenticated Windows app connection verified PostgreSQL 18.6 and the normal
-`scribble` role; named volume mounted. No application tables yet. Docker migration,
-restart persistence testing, and API database switching have not been performed.
+`scribble` role; named volume mounted. Existing migration applied with approval
+using a process-scoped Docker connection. Verified both tables, all four board
+columns, migration version 1, and zero board rows. Restart persistence testing
+and API database switching have not been performed.
 This chat needed Docker's bin directory added to the process PATH for its
 credential helper; no permanent PATH change.
 
-Next: explain the Compose/migration path one step at a time, then ask permission
-to run the existing migration against Docker and verify restart persistence.
-Ask separately before switching the API or importing portable data. React/Express stay
+Next: inspect `boards` in psql and explain the existing migration path one step
+at a time. Ask permission to verify restart persistence and switch the API;
+ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or
 stopping databases. Preserve portable data/credentials until a switch is approved.
 An unanswered question is not permission. Ask about committing after updates.

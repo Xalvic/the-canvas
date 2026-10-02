@@ -7,6 +7,7 @@ dist-server
 test-results
 playwright-report
 /collaborative-whiteboard-infinite-canvas-spec.md
+/PEN_DRAWING_UPDATE_PLAN.md
 /postman/
 /.postman/
 /.env

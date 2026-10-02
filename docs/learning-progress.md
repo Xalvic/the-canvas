@@ -25,7 +25,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | 5. TanStack Query/server state | Not started |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
 | 7. Real-time collaboration | Not started |
-| 8. Docker | PostgreSQL running; migrations and restart persistence checks pending |
+| 8. Docker | PostgreSQL running and migrated; restart persistence checks pending |
 | 9. Testing | Existing editor tests plus HTTP/config tests |
 | 10. Production engineering | Frontend/backend builds exist; deployment/CI/operations not configured in the repository |
 
@@ -77,12 +77,14 @@ Compose config validation passed. With approval, downloaded the image and starte
 PostgreSQL; container healthy, named volume mounted. An authenticated Windows
 connection on port 5434 verified PostgreSQL 18.6 and the normal `scribble` role
 without superuser, database-creation, or role-creation privileges. The database
-has no application tables yet. Docker migrations and restart persistence tests
-remain pending; the API connection has not been switched.
+was then migrated with approval using the existing SQL and a process-scoped
+Docker connection. Verified `boards`, `schema_migrations`, all four board columns,
+migration version 1, and zero board rows. Restart persistence testing remains
+pending; the API connection has not been switched.
 Run guide: `docker.md`.
 
-Next Docker step: explain the migration connection, then ask permission to apply
-the existing schema to Docker and test restart persistence. Ask separately before API switching or data import;
+Next Docker step: inspect the schema in psql and explain the migration path.
+Ask permission to test restart persistence and switch the API; ask separately before data import;
 preserve portable data and credentials. Leave unrelated session work untouched.
 Current API implementation commit: `156afec`; Docker setup is a separate slice.
 
