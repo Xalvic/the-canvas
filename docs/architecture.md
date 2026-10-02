@@ -26,7 +26,7 @@ viewport transforms, and the frame/connector/object/stroke/selection layers.
 | Board title and save status | `src/store/boardStore.ts` | Metadata plus hydration/save feedback |
 | Image files | `src/assets/assetStore.ts` | IndexedDB Blobs; document stores asset IDs |
 | Theme/tool preferences | Dedicated preference stores | localStorage, separate from the board |
-| API board metadata | `server/boards.ts` | New process-local `Map`; not connected to the editor |
+| API board metadata | `server/postgresBoards.ts` | PostgreSQL table; not connected to the editor; Map retained only for tests |
 
 ## Trace: place one note
 
@@ -64,8 +64,9 @@ Playwright covers desktop/touch/appearance/reload/storage-error flows.
 See [`learning-progress`](learning-progress.md) for executed checks.
 
 Vite's configured base is `/scribble/`. This establishes an asset path, not proof
-of a hosted site. No tracked CI workflow, Docker, PostgreSQL/Prisma, cloud asset
-configuration, or backend deployment configuration was found. A real deployment,
+of a hosted site. Local PostgreSQL metadata persistence is configured. No tracked
+CI workflow, Docker, Prisma, cloud asset configuration, or backend deployment
+configuration exists. A real deployment,
 if managed outside this repository, remains unknown.
 
 The new API has a separate entry point and build. Vite proxies `/api` and

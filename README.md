@@ -15,9 +15,10 @@ npm run dev
 ## Local API learning prototype
 
 In a second terminal, run `npm run dev:server`. The API listens only on
-`http://127.0.0.1:3001`. It provides health checks and create/list/read endpoints
-for board metadata. Records live in memory and disappear on restart; the canvas
-continues to use IndexedDB independently.
+`http://127.0.0.1:3001`. It provides health checks and create/list/read/rename/delete endpoints
+for board metadata. Records persist in PostgreSQL; the guest canvas continues to
+use IndexedDB independently. Follow [database setup](docs/postgresql.md), start
+the database, and run `npm run db:migrate` before starting the API.
 
 See [the HTTP walkthrough](docs/backend.md) for browser requests and error cases,
 [architecture](docs/architecture.md) for the existing editor flow, and
@@ -27,6 +28,10 @@ Run `npm run test:server` and `npm run typecheck:server` for targeted API checks
 `npm run build:server` then `npm run start:server` runs the compiled API.
 `npm run build` continues to build the frontend. The Vite proxy is development-only;
 deployment of the API has not been configured.
+
+The [Postman collection](https://go.postman.co/collection/11763565-ed048b36-680c-47f7-934f-e7cb6f4dee53) includes all current endpoints,
+validation examples, and a configurable local base URL. It is maintained
+in Postman alongside future API changes. Local Postman files are ignored by Git.
 
 ## Interaction model
 

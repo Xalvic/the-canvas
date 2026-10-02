@@ -38,10 +38,11 @@ Cross-tab conflict handling has not been implemented or tested in this slice.
 
 ## Backend boundary
 
-The new API stores metadata only, in memory. Creating an API board does not
-create or save a canvas document. Backend restart loses its records, while the
-independent IndexedDB board remains in the browser.
+The API stores metadata only in PostgreSQL. Creating an API board does not create
+or save a canvas document. Backend restart preserves database records, while the
+independent guest IndexedDB board remains in the browser without login.
 
-PostgreSQL storage, JSONB versus per-object versus hybrid modeling, network save
-ordering, retry UI, and document migration will be evaluated in Phase 2. No board
-storage decision or remote-save guarantee has been made yet.
+PostgreSQL metadata CRUD is implemented. JSONB versus per-object versus hybrid
+canvas modeling, network save ordering, retry UI, and document migration remain
+Phase 2 work. No remote canvas document storage decision or sync guarantee has
+been made yet. See [PostgreSQL](postgresql.md) for the first durable API slice.

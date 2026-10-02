@@ -7,3 +7,9 @@ dist-server
 test-results
 playwright-report
 /collaborative-whiteboard-infinite-canvas-spec.md
+/postman/
+/.postman/
+/.env
+/.env.*
+!/.env.example
+/.postgres/

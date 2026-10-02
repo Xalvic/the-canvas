@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "./app.js";
+import { createApp as createApiApp } from "./app.js";
 import { createBoardStore } from "./boards.js";
 
 afterEach(() => vi.restoreAllMocks());
+
+const createApp = (boards = createBoardStore()) => createApiApp(boards);
 
 describe("local board API", () => {
   it("reports process health and starts with an empty board list", async () => {
@@ -86,7 +88,86 @@ describe("local board API", () => {
     expect(nonJson.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
   });
 
-  it("starts fresh for a new application instance, modeling a restart", async () => {
+  it("renames metadata, preserves identity, and exposes the change on reads", async () => {
+    const app = createApp();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
+    const created = await request(app).post("/api/boards").send({ title: "Original" }).expect(201);
+    const board = created.body.board;
+    clock.mockReturnValue(2000);
+    const renamed = await request(app)
+      .patch(`/api/boards/${board.id}`)
+      .send({ title: "  Renamed  " })
+      .expect(200);
+    const expected = { ...board, title: "Renamed", updatedAt: 2000 };
+    expect(renamed.body).toEqual({ board: expected });
+    expect(renamed.headers["cache-control"]).toBe("no-store");
+    expect((await request(app).get(`/api/boards/${board.id}`).expect(200)).body).toEqual({ board: expected });
+    expect((await request(app).get("/api/boards").expect(200)).body).toEqual({ boards: [expected] });
+    clock.mockReturnValue(3000);
+    const unchanged = await request(app).patch(`/api/boards/${board.id}`).send({ title: " Renamed " }).expect(200);
+    expect(unchanged.body).toEqual({ board: expected });
+  });
+
+  it.each([
+    {},
+    { title: "" },
+    { title: "   " },
+    { title: 42 },
+    { title: "x".repeat(121) },
+    { title: "Valid", id: randomUUID() },
+    { title: "Valid", updatedAt: 0 },
+    { title: "Valid", ownerId: "someone-else" },
+  ])("rejects invalid rename input without changing metadata: %j", async (body) => {
+    const app = createApp();
+    const created = await request(app).post("/api/boards").send({ title: "Original" }).expect(201);
+    const response = await request(app).patch(`/api/boards/${created.body.board.id}`).send(body).expect(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    const detail = await request(app).get(`/api/boards/${created.body.board.id}`).expect(200);
+    expect(detail.body).toEqual(created.body);
+  });
+
+  it("rejects malformed, oversized, and non-JSON rename bodies without changing the board", async () => {
+    const app = createApp();
+    const created = await request(app).post("/api/boards").send({ title: "Original" }).expect(201);
+    const url = `/api/boards/${created.body.board.id}`;
+    const malformed = await request(app).patch(url).set("Content-Type", "application/json").send('{"title":').expect(400);
+    expect(malformed.body.error.code).toBe("INVALID_JSON");
+    const oversized = await request(app).patch(url).send({ title: "x".repeat(17 * 1024) }).expect(413);
+    expect(oversized.body.error.code).toBe("PAYLOAD_TOO_LARGE");
+    const nonJson = await request(app).patch(url).set("Content-Type", "text/plain").send("Renamed").expect(415);
+    expect(nonJson.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
+    expect((await request(app).get(url).expect(200)).body).toEqual(created.body);
+  });
+
+  it.each(["patch", "delete"] as const)("distinguishes invalid and missing IDs for %s", async (method) => {
+    const app = createApp();
+    const invalidRequest = request(app)[method]("/api/boards/not-a-uuid");
+    const missingRequest = request(app)[method](`/api/boards/${randomUUID()}`);
+    if (method === "patch") {
+      invalidRequest.send({ title: "Renamed" });
+      missingRequest.send({ title: "Renamed" });
+    }
+    expect((await invalidRequest.expect(400)).body.error.code).toBe("VALIDATION_ERROR");
+    expect((await missingRequest.expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
+    expect((await request(app).get("/api/boards").expect(200)).body).toEqual({ boards: [] });
+  });
+
+  it("deletes only the requested board and returns an empty 204", async () => {
+    const app = createApp();
+    const first = await request(app).post("/api/boards").send({ title: "Delete me" }).expect(201);
+    const second = await request(app).post("/api/boards").send({ title: "Keep me" }).expect(201);
+    const url = `/api/boards/${first.body.board.id}`;
+    const deleted = await request(app).delete(url).expect(204);
+    expect(deleted.text).toBe("");
+    expect(deleted.headers["content-type"]).toBeUndefined();
+    expect(deleted.headers["cache-control"]).toBe("no-store");
+    expect((await request(app).get(url).expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
+    expect((await request(app).delete(url).expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
+    expect((await request(app).patch(url).send({ title: "Resurrect" }).expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
+    expect((await request(app).get("/api/boards").expect(200)).body).toEqual({ boards: [second.body.board] });
+  });
+
+  it("keeps in-memory HTTP test fixtures isolated between application instances", async () => {
     await request(createApp()).post("/api/boards").send({ title: "Temporary" }).expect(201);
     const fresh = await request(createApp()).get("/api/boards").expect(200);
     expect(fresh.body.boards).toEqual([]);
