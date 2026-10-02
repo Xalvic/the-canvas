@@ -96,11 +96,104 @@ button {
 }
 
 .app-shell {
+  position: relative;
   width: 100%;
   height: 100vh;
   height: 100dvh;
   color: var(--text-primary);
   background: var(--app-bg);
+}
+
+.server-boards {
+  position: absolute;
+  top: 72px;
+  right: 22px;
+  z-index: 4;
+  width: min(280px, calc(100% - 32px));
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+}
+
+.server-boards summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 12px 14px;
+  list-style: none;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.server-boards summary::-webkit-details-marker {
+  display: none;
+}
+
+.server-boards[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.server-boards-content {
+  max-height: calc(100dvh - 210px);
+  padding: 0 14px 14px;
+  overflow-y: auto;
+}
+
+.server-boards-content p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.server-boards-content .server-boards-description {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.server-boards-content .server-boards-error {
+  color: var(--danger);
+}
+
+.server-boards-list {
+  max-height: 220px;
+  margin: 0 0 12px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.server-boards-list li {
+  padding: 9px 0;
+  border-top: 1px solid var(--border-soft);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.server-boards-refresh {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.server-boards-refresh:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.server-boards-refresh:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.server-boards summary:focus-visible,
+.server-boards-refresh:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .canvas-viewport {
@@ -1527,6 +1620,10 @@ button {
 }
 
 @media (min-width: 768px) and (max-width: 900px) {
+  .server-boards {
+    top: 130px;
+  }
+
   .toolbar-area {
     top: 65px;
   }
@@ -1542,6 +1639,12 @@ button {
 }
 
 @media (max-width: 767px) {
+  .server-boards {
+    top: calc(68px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    width: min(280px, calc(100% - 24px));
+  }
+
   .brand-mark {
     top: calc(9px + env(safe-area-inset-top));
     left: calc(12px + env(safe-area-inset-left));

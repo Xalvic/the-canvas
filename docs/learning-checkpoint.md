@@ -33,17 +33,35 @@ Image downloaded and container started with approval; healthy on port 5434.
 Authenticated Windows app connection verified PostgreSQL 18.6 and the normal
 `scribble` role; named volume mounted. Existing migration applied with approval
 using a process-scoped Docker connection. Verified both tables, all four board
-columns, migration version 1, and zero board rows. Restart persistence testing
-and API database switching have not been performed.
+columns and migration version 1. Express connected with approval through new
+`npm run dev:server:docker` (loads `.env.docker`); API port 3001, Docker DB port 5434.
+Added Docker-specific migration and database-test commands. Four real DB tests
+passed; HTTP POST/GET and direct Docker SQL matched `Docker connection demo`.
+Demo board remains for inspection. Actual database-process restart testing is pending.
+Portable `.env`, database, and records are preserved; no data import.
+Frontend slice: React now reads `GET /api/boards` through the existing Vite proxy.
+`src/api/boards.ts` fetches and validates id/title metadata; `ServerBoards` renders
+a collapsible, read-only title list with loading/empty/error and Refresh/Retry.
+The effect aborts stale requests on cleanup. It sits beside the canvas in App,
+without changing guest stores or adding server-board opening/saving behavior.
+Build passed. Browser verified real demo title, refresh, mocked empty/HTTP/network/
+malformed responses, retry, responsive layout, keyboard isolation, and guest
+IndexedDB note persistence after autosave/reload. TanStack Query is not added yet.
 This chat needed Docker's bin directory added to the process PATH for its
 credential helper; no permanent PATH change.
 
-Next: inspect `boards` in psql and explain the existing migration path one step
-at a time. Ask permission to verify restart persistence and switch the API;
+Next: SQL practice on the existing `boards` table, starting with SELECT, filters,
+sorting, and limits, then controlled CRUD, constraints, and transactions.
+Compare canvas storage models and design versioned documents/save conflicts
+before choosing a schema. Introduce Prisma after tracing the underlying SQL;
+auth and ownership must precede account-based cloud saves.
+Ask permission to verify actual database-process restart persistence;
 ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or
 stopping databases. Preserve portable data/credentials until a switch is approved.
-An unanswered question is not permission. Ask about committing after updates.
+An unanswered question is not permission. Prior updates committed as `c2ca442`.
+Commit future changes only after explicit user authorization, separately for each
+commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
 Phase 2: SQL practice, document modeling, Prisma remain. Auth/ownership precede cloud saves.
 

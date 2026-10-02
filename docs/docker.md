@@ -6,10 +6,13 @@ confirmed database `scribble`, PostgreSQL 18.6, and a normal `scribble` app role
 without superuser, database-creation, or role-creation privileges. The named
 volume is mounted. The existing migration was applied with approval to Docker
 port 5434 as `scribble`. Verified `boards` and `schema_migrations`, all four board
-columns, migration version 1, and zero board rows. Restart persistence testing
-and API switching remain pending.
+columns and migration version 1. Express now runs through `dev:server:docker`
+at `http://127.0.0.1:3001`, using Docker PostgreSQL on port 5434. Four real database
+tests passed. An HTTP POST created `Docker connection demo`; GET and a direct SQL
+query confirmed the same record. That demo row remains for inspection.
+Actual database-process restart persistence testing remains pending.
 React and Express continue to run on npm. The portable database and its `.env`
-stay separate.
+stay separate; existing portable records have not been imported.
 
 ## Follow the connection
 
@@ -77,10 +80,68 @@ run `psql -U scribble -d scribble`, then `\dt` to see both tables and `\d boards
 to see the board columns and constraints. `SELECT version FROM schema_migrations;`
 shows version 1. Exit psql with `\q`.
 
-Next, ask permission to test restart persistence and switch the API connection.
-The current npm scripts load the portable
-`.env`; starting Compose alone does not switch them to `.env.docker`.
-Database switching or importing existing data needs a separate explicit decision.
+## Connect Express to Docker
+
+Run these commands from the project root:
+
+```powershell
+npm run db:migrate:docker
+npm run dev:server:docker
+```
+
+The Docker scripts require `.env.docker`. `dev:server:docker` loads its
+`DATABASE_URL` and runs the existing `server/index.ts`; its `pg` connection pool
+then connects to `127.0.0.1:5434/scribble`. The HTTP API stays on port 3001.
+No route or SQL-store rewrite was needed: the existing backend already accepts
+its database address through configuration.
+
+`dev:server` and `db:migrate` still load the portable `.env`. Choose the Docker
+commands for this setup and run only one API process on port 3001. Exported
+environment variables take precedence over Node's env files; the verified run
+had no exported database or API-port overrides.
+
+Run `npm run test:database:docker` for the four real database tests. They use and
+remove a random test schema without changing the ordinary `boards` table.
+
+For a visible check, open `http://127.0.0.1:3001/api/boards` to see the API's JSON.
+In the Docker psql session, run:
+
+```sql
+SELECT id, title FROM boards;
+```
+
+Both should show `Docker connection demo`, proving that a request to Express
+stored a row in Docker PostgreSQL. API board metadata remains independent of
+guest canvas documents in IndexedDB.
+
+## Read the API from React
+
+With the Docker API running, start Vite in another terminal:
+
+```powershell
+npm run dev
+```
+
+Open the printed `/scribble/` URL. The Server boards panel shows titles from
+`GET /api/boards`, including `Docker connection demo`. Refresh reads the latest
+list; Retry is available after a failed request. Collapse the panel by selecting
+its heading. It displays metadata only; it does not open a stored drawing.
+
+`src/App.tsx` mounts the panel beside the canvas. The effect in
+`src/components/ServerBoards/ServerBoards.tsx` calls `src/api/boards.ts`, which
+fetches `/api/boards`, checks HTTP success, and validates the JSON's id/title
+fields. The existing Vite proxy forwards this request to Express on port 3001.
+The component renders loading, empty, error, or list content. Cleanup aborts
+stale requests; the panel's state stays separate from canvas/IndexedDB stores.
+
+In browser DevTools, open Network, filter for `boards`, and select Refresh.
+Inspect the GET request and its JSON response. The development Strict Mode
+cleanup may cancel an initial request before a fresh one completes.
+The proxy is a Vite development feature; a deployed frontend will need its own
+API routing configuration later.
+
+Next, ask permission to test actual database-process restart persistence.
+Importing existing portable data needs a separate explicit decision.
 
 When approved to stop the Docker database, `docker compose --env-file .env.docker
 stop postgres` retains its container and volume. `down` removes containers and

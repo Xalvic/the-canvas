@@ -22,10 +22,10 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | 2. PostgreSQL persistence | In progress: local PostgreSQL, durable metadata CRUD, SQL migration/constraints and real DB tests; canvas document model and Prisma remain |
 | 3. Authentication | Not started |
 | 4. Authorization/sharing | Not started |
-| 5. TanStack Query/server state | Not started |
+| 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
 | 7. Real-time collaboration | Not started |
-| 8. Docker | PostgreSQL running and migrated; restart persistence checks pending |
+| 8. Docker | Express connected to Docker PostgreSQL; actual DB restart checks pending |
 | 9. Testing | Existing editor tests plus HTTP/config tests |
 | 10. Production engineering | Frontend/backend builds exist; deployment/CI/operations not configured in the repository |
 
@@ -79,14 +79,37 @@ connection on port 5434 verified PostgreSQL 18.6 and the normal `scribble` role
 without superuser, database-creation, or role-creation privileges. The database
 was then migrated with approval using the existing SQL and a process-scoped
 Docker connection. Verified `boards`, `schema_migrations`, all four board columns,
-migration version 1, and zero board rows. Restart persistence testing remains
-pending; the API connection has not been switched.
+migration version 1. Added Docker-specific npm commands for Express development,
+migrations, and real database tests. Express started with `.env.docker` on API
+port 3001 and database port 5434. Four real DB tests passed. A live HTTP POST/GET
+and direct Docker SQL query matched `Docker connection demo`; that record remains
+for inspection. Actual database-process restart persistence testing remains pending.
+Portable data and `.env` remain preserved; no portable-data import.
 Run guide: `docker.md`.
 
-Next Docker step: inspect the schema in psql and explain the migration path.
-Ask permission to test restart persistence and switch the API; ask separately before data import;
+Next Docker step: compare the demo board in API JSON and psql, then trace the
+Docker npm command through env configuration and the Express/pg path.
+Ask permission to test actual database-process restart persistence; ask separately before data import;
 preserve portable data and credentials. Leave unrelated session work untouched.
 Current API implementation commit: `156afec`; Docker setup is a separate slice.
+Earlier notes committed as `c2ca442`. Future implementation commits require
+separate explicit user authorization after review.
+
+Frontend API slice (2026-10-02): App now mounts a collapsible Server boards panel
+beside the canvas. A typed fetch helper validates id/title metadata with Zod;
+the component's effect uses abort cleanup, loading/error/success state, and
+Refresh/Retry. The existing Vite proxy forwards `/api/boards` to Express.
+Build passed. Browser smoke checks verified the real Docker demo title, refresh,
+loading, empty, HTTP/network/malformed errors, retry, collapse, desktop/tablet/
+mobile layout, keyboard isolation, and guest note persistence after autosave and
+reload. No canvas stores, backend endpoints, or database schema changed.
+This is a metadata-only view; server-board opening and canvas saving remain
+unimplemented. TanStack Query, authentication, and ownership remain pending.
+Next: practice SQL on `boards`, beginning with reading/filtering/sorting/limits,
+then controlled CRUD and constraints/transactions. Compare canvas storage models,
+design schema versions/revision conflicts and asset references, then introduce
+Prisma against the existing database. Keep changes small and reviewable; auth and
+ownership precede account-based cloud saves.
 
 Trace INSERT/SELECT and practice table queries, then compare canvas document
 models and introduce Prisma after SQL. Authentication and ownership follow
