@@ -1,14 +1,18 @@
 # Canvas document storage design
 
-Status: validation and serialization slice implemented, 2026-10-02. The database
-and API design below remains proposed. No migration, document API, Prisma
-integration, guest upload, or cloud save is implemented.
+Status: validation/adapters, migration 2, and local pg document GET/PUT implemented,
+2026-10-02. Migration 2 is applied to normal Docker PostgreSQL on port 5434.
+Revision conflicts, rollback, round trips, and an actual API process restart are
+verified. Google-only authentication is now implemented separately; live OAuth
+configuration is pending. Prisma, board ownership, frontend document save/load,
+guest upload, and cloud deployment remain pending. Guest IndexedDB still saves
+independently. See [authentication setup](authentication.md).
 
 ## Decision
 
 Use relational board metadata plus one JSONB canvas snapshot per board. Retain
 `boards` for IDs, titles, and timestamps. Add a separate `board_documents` table
-when implementation is approved. A board can have metadata before its first
+through migration 2. A board can have metadata before its first
 document save; the new row is created only by an explicit save.
 
 This suits the first single-editor save/load feature. Object-level concurrent
@@ -87,7 +91,7 @@ The example object ID is independent of the server board UUID. Keep the format
 version in the document row/API envelope, rather than duplicating it inside
 `content`. It is also independent of the existing guest-record schema version.
 
-## Proposed table
+## Document table (migration 2)
 
 | Column | Type / rule | Purpose |
 | --- | --- | --- |
@@ -109,11 +113,13 @@ an older snapshot. Update `boards.updated_at` and the document row together in
 the same transaction after a successful save. Do not use client timestamps as
 the revision/conflict authority.
 
-## Proposed local API and conflicts
+## Implemented local API and conflicts
 
-These are planned contracts, not working requests or Postman collection entries.
+These routes work against the migrated local PostgreSQL database. The cloud
+Scribble API collection now includes a verified Documents folder; its baseUrl
+still points to the loopback API, not a deployed service.
 
-- `GET /api/boards/:id/document`: return a document envelope with `boardId`,
+- `GET /api/boards/:id/document`: return `{ document: ... }` with `boardId`,
   `schemaVersion`, `revision`, `content`, and server-generated `updatedAt`.
   Distinguish a missing board from metadata with no saved document; return 404
   with the appropriate error code. Do not imply missing content is a saved blank
@@ -132,11 +138,14 @@ Example: two clients read revision 3. One saves and receives revision 4. The
 other's save with `expectedRevision: 3` is rejected; revision 4 is preserved.
 This prevents silent last-writer-wins replacement. It does not merge edits.
 
-Initially propose a route-specific 1 MiB JSON body limit, 5,000 objects, and
+Enforced limits: a route-specific 1 MiB JSON body limit, 5,000 objects, and
 100,000 total stroke points; all limits apply, whichever is reached first.
 These are starting limits to measure, not verified capacity guarantees.
-The existing metadata parser is limited to 16 KiB; document routing/parser setup
-must accept the larger document body without changing metadata limits.
+The document routes precede the existing 16 KiB metadata parser; PUT has its own
+1 MiB parser. Metadata limits are unchanged. expectedRevision accepts integers
+from 0 through 2,147,483,646, leaving room for PostgreSQL's integer increment.
+A document at revision 2,147,483,647 can still be read but needs a future counter
+migration before another save; overflow is rejected during request validation.
 
 ## Later frontend save flow
 
@@ -181,21 +190,24 @@ and account-save UI. Neon deployment remains a later slice.
 
 1. Define the document validator and array/map adapters. Verify all non-image
    types, reference consistency, order/zIndex, defaults, and unknown versions.
-2. Add a new numbered migration for `board_documents`; extend the current runner,
-   which currently only knows version 1. Preserve existing boards and migration 1.
-3. Implement local document read/save with revision checks using `pg` first.
-   Verify first save, replacement, invalid bodies, deletion, competing saves,
-   lost-response reconciliation, and rollback without damaging metadata.
-4. Round-trip a note/stroke/connector document and verify content after API and
-   database restarts. Preserve guest/history behavior. Update the cloud Scribble
-   Postman collection only when these endpoints actually work.
+2. Migration 2 and the ordered runner are implemented, verified in isolated
+   schemas, and applied to normal Docker PostgreSQL. Existing board metadata and
+   migration 1 are preserved; no document rows are created.
+3. Local document read/save using `pg` is implemented and tested for first save,
+   replacement, invalid bodies, deletion, competing saves, response failure after
+   commit, and rollback without damaging metadata.
+4. All five supported types round-trip through HTTP/JSONB/adapters. An actual API
+   restart retained content/revision/timestamps; the cloud Scribble Postman
+   collection is updated and verified. Actual Docker database-process restart
+   persistence remains to be checked in a separate controlled exercise.
 5. Introduce Prisma after tracing this SQL; preserve constraints, API behavior,
    data, and a single clear migration authority. Auth/ownership and assets then
    enable explicit frontend account saves.
 
 ## Implemented validator and adapters
 
-`src/persistence/canvasDocument.ts` defines the strict version-1 envelope:
+`server/contracts/canvasDocument.ts` defines the shared, pure version-1 envelope.
+`src/persistence/canvasDocument.ts` re-exports it for the existing browser imports:
 `{ schemaVersion: 1, content: { objects: [...] } }`. It validates all five
 non-image types, rejects unknown fields/types/versions and images, checks finite
 numbers, positive dimensions/widths, bounded appearance/dynamics, unique IDs,
@@ -209,7 +221,10 @@ text/title/body field, and 128 characters per nonempty color string. Colors
 remain strings as in the editor; validation does not restrict them to the palette.
 Coordinates and zIndex remain finite numbers without rounding or sorting;
 timestamps must be finite and nonnegative. No text or IDs are trimmed/truncated.
-The proposed 1 MiB HTTP body limit remains for the endpoint slice.
+The endpoint now enforces the 1 MiB HTTP body limit as well.
+Strings reject NUL characters and unpaired Unicode surrogates before JSONB writes;
+valid Unicode pairs (including emoji) are preserved. These restrictions match
+[PostgreSQL JSONB Unicode requirements](https://www.postgresql.org/docs/18/datatype-json.html).
 
 Missing text styles use the current legacy rendering defaults: color `#252622`,
 font size 17, font weight **550**, left alignment, and opacity 1. Missing stroke
@@ -252,6 +267,175 @@ annotation warnings from Zod; the build passed. No existing persistence/store
 code, dependency, database, or endpoint changed. The validator/adapters are not
 wired into the app yet.
 
-Next slice: the numbered document migration, followed separately by local `pg`
-document save/load with atomic revision checks. Resolve shared-module/build
-placement when integrating the validator into Node; keep one canonical schema.
+The following endpoint slice shares this canonical schema with Node; the browser
+adapters remain unwired to the editor.
+
+## Migration 2 and SQL walkthrough
+
+`db/002_create_board_documents.sql` creates the table. Migration 1 is unchanged.
+`server/migrations.ts` uses an explicit ordered list of pending versions. This
+slice added version 2; the later Google authentication slice adds version 3
+through the same runner:
+
+```text
+BEGIN -> acquire existing transaction advisory lock -> ensure migration ledger
+      -> read applied versions -> apply each missing SQL file in order
+      -> record each version -> COMMIT
+Any failure -> ROLLBACK -> release connection
+```
+
+Both the table change and its ledger entry commit together. On a fresh database,
+versions 1 and 2 are one transaction; on an existing version-1 database, only 2 is
+pending. The lock makes a concurrent runner wait and then reread the ledger.
+Rerunning skips applied versions and preserves records. A conflicting existing
+table makes the migration fail rather than silently accepting an unknown shape.
+
+Read the SQL one rule at a time:
+
+1. `board_id uuid PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE` uses the
+   board's existing identity as the document key. The primary key enforces
+   uniqueness/non-nullness and supplies the lookup index. The foreign key rejects
+   documents without a board; cascade deletes that board's document when its
+   metadata is deleted. This models **zero or one document per board**. The
+   migration creates no document rows, so metadata-only boards stay metadata-only.
+2. `schema_version integer NOT NULL ... CHECK (schema_version > 0)` describes
+   the document format. `revision` has the same numeric constraints but tracks
+   accepted saves. They have no defaults: the save operation must supply
+   both explicitly. SQL permits positive future format versions; API validation
+   determines which versions the application supports. Revision checks and
+   incrementing live in the save SQL, not a trigger or feature of this migration.
+3. `content jsonb NOT NULL` holds `{ "objects": [...] }`, without duplicating
+   schema version or storing history, selection, or viewport. The shape constraint
+   requires an outer JSON object whose `objects` member is an array. SQL guards
+   that structure; the canonical Zod validator handles individual object fields,
+   IDs, references, unknown fields, limits, and image rejection in the API slice.
+4. The shape expression ends in `IS TRUE`. A missing JSON member evaluates to
+   SQL NULL, and a bare `CHECK` accepts NULL. `IS TRUE` makes the missing member
+   fail. `{}`, JSON `null`, SQL NULL, and non-array `objects` are rejected;
+   `{ "objects": [] }` is accepted as an explicitly saved blank document.
+   See [PostgreSQL check constraints](https://www.postgresql.org/docs/18/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS)
+   and [JSON extraction/type functions](https://www.postgresql.org/docs/18/functions-json.html).
+5. `updated_at timestamptz NOT NULL DEFAULT now()` supplies a database timestamp
+   on INSERT when omitted. A default does not run on UPDATE: save SQL must
+   update this timestamp and `boards.updated_at` together in its transaction.
+
+Once version 2 is applied, these are read-only inspection queries in psql:
+
+```sql
+SELECT version, applied_at FROM schema_migrations ORDER BY version;
+\d board_documents
+SELECT board_id, schema_version, revision, jsonb_array_length(content -> 'objects')
+  AS object_count, updated_at FROM board_documents;
+```
+
+The last query returning zero rows immediately after migration is expected.
+Do not add a fake document to each existing board just to populate the table.
+
+Validation: `npm run test:database:docker` passed 11 real tests, including seven
+new migration cases. They create/drop only new randomly named schemas, never
+reset the ordinary `boards` table. Covered fresh/concurrent install, upgrade with
+metadata/timestamp preservation, no automatic document rows, repeated runs with
+saved content, rollback/retry on both fresh and version-1 schemas, all five column
+types, foreign key/primary key/cascade rules, explicit positive integer counters,
+null/JSON shape rejection on INSERT/UPDATE, and preserved JSON array order.
+Server type checking and server build passed. Migration 2 is applied to the normal
+Docker schema on port 5434: ledger versions 1/2, all five columns/defaults and
+constraints inspected, zero document rows. A before/after comparison verified
+the existing board's ID/title/timestamps are unchanged. Actual Docker
+database-process restart testing remains pending.
+
+Applied with `npm run db:migrate:docker` under the migration-slice authorization.
+The portable database uses separate `.env`/port 5433 and was not migrated; do not run
+`db:migrate` against it by assumption. No endpoint or guest-persistence change is
+part of this migration slice.
+
+## Document request and SQL walkthrough
+
+Start with `server/app.ts`, then follow `server/documents.ts` and
+`server/postgresDocuments.ts`. The shared contract lives under `server/contracts`
+so the server build emits it without importing editor/store code. The browser
+re-export retains the adapter import paths. No dependency or build configuration
+change was needed.
+
+A first explicit save can store an empty drawing:
+
+```json
+{
+  "schemaVersion": 1,
+  "expectedRevision": 0,
+  "content": { "objects": [] }
+}
+```
+
+PUT returns 201 with a Location header and `{ document: { boardId, schemaVersion,
+revision: 1, content, updatedAt } }`. A later PUT supplies the revision it loaded
+and returns 200 with the incremented revision. The envelope adds server metadata;
+extract `{ schemaVersion, content }` before calling the strict browser adapter.
+
+Trace one save through the SQL:
+
+1. Express parses up to 1 MiB of JSON. Zod checks the board UUID, expectedRevision,
+   and the entire non-image document before calling the store. Unsupported formats,
+   duplicates, invalid references, malformed fields, and unknown fields return 400;
+   non-JSON input returns 415 and oversized input returns 413. No partial save occurs.
+2. The store checks out one pg connection, starts BEGIN, and runs
+   `SELECT id FROM boards WHERE id = $1 FOR UPDATE`. This locks the parent board
+   before the document, matching the order of board rename/delete operations.
+   Competing saves wait here; a deleted/missing board returns BOARD_NOT_FOUND/404.
+3. expectedRevision 0 uses INSERT with revision 1 and
+   `ON CONFLICT (board_id) DO NOTHING RETURNING ...`. Other revisions use
+   `UPDATE ... SET revision = revision + 1 ... WHERE board_id = $1 AND revision = $4
+   RETURNING ...`. Values are parameters, including the JSONB content. The
+   conditional write protects against a stale snapshot even after the parent lock
+   serializes requests.
+4. If no document row is returned, read its current revision under the same lock
+   and ROLLBACK. Return REVISION_CONFLICT/409 with
+   `error.details.currentRevision`; 0 means that board has no document yet.
+   Do not retry against a new revision automatically.
+5. An accepted write uses the greatest of the database clock and existing
+   timestamps to keep time from moving backwards. Copy that exact SQL timestamp
+   to boards.updated_at, without changing its title or created_at. Validate the
+   returned document and COMMIT. Any failure before commit rolls back both rows;
+   the connection is always released. API timestamps are epoch milliseconds,
+   while the stored timestamps retain PostgreSQL precision.
+
+For GET, one LEFT JOIN starts from boards. No board row means BOARD_NOT_FOUND/404;
+a board with a null joined document means DOCUMENT_NOT_FOUND/404. Otherwise the
+store validates the stored format before returning it. Unsupported or invalid
+stored content returns INVALID_STORED_DOCUMENT/500 without dropping fields,
+returning a partial drawing, or rewriting the row.
+
+The response-failure test simulates an error after commit: GET recovers the
+accepted canonical snapshot/revision, and repeating expectedRevision 0 conflicts.
+This establishes the server behavior needed for later client reconciliation; no
+frontend retry/reconciliation flow has been wired yet.
+
+Verification:
+
+- `npm test`: 236 passed; the 25 real database tests are skipped without a test URL.
+- `npm run test:database:docker`: all 25 real tests passed in new isolated schemas,
+  including 14 document cases. Covered all supported fields, first/stale/competing
+  saves, unchanged rows on invalid input, transaction rollback with injected
+  metadata-write failures, new connections/app instances, save/delete races,
+  response failure after commit, invalid stored formats, and integer limits.
+- Exact HTTP body boundaries: 1 MiB accepted, 1 MiB + 1 byte rejected; metadata
+  remains limited to 16 KiB. Unicode rejection and valid text round trips passed.
+- Server type checking/build and frontend type checking/build passed. The same
+  two Zod dependency-comment annotation warnings remain in the successful Vite build.
+- The published Scribble API collection passed lint (40 requests, zero issues)
+  and a local run (40 requests, 127 assertions, zero failures). Existing request,
+  script, and example IDs/content are preserved. Variable values remain configurable;
+  their existing guidance is retained in the collection description because the
+  connector's variable PATCH accepts key/value fields only. Local mirrors/logs
+  stay under ignored postman paths.
+- Saved and replaced a five-type document on a separate proof board, restarted
+  the owned API process, and verified the identical envelope plus board timestamp.
+  The proof lifecycle passed 7 requests/24 assertions and deleted its own board.
+  Final normal Docker DB: ledger 1/2, zero documents, original demo board metadata
+  fingerprint unchanged. The database process was not restarted; portable DB
+  files/configuration were untouched and no portable migration/import occurred.
+
+Next implementation: verify live Google sign-in and add board ownership/protected
+access. Prisma must retain constraints/API behavior with one migration authority.
+Actual Docker database-process restart verification remains pending. Durable
+image assets, explicit frontend account saves and deployment remain later milestones.

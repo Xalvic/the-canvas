@@ -14,6 +14,27 @@ Actual database-process restart persistence testing remains pending.
 React and Express continue to run on npm. The portable database and its `.env`
 stay separate; existing portable records have not been imported.
 
+Document migration slice (2026-10-02): migration 2 is now applied to the normal
+Docker schema on port 5434. `board_documents` has five verified columns, a
+primary/foreign key with cascade, positive version/revision checks, a JSONB shape
+check, and timestamp default. Ledger versions are 1/2; there are zero document
+rows, and the existing board metadata is unchanged. Eleven real database tests
+passed in isolated schemas. No document API was included in that slice; portable
+database not migrated. Walkthrough: [document migration SQL](canvas-document-storage.md#migration-2-and-sql-walkthrough).
+
+Document API slice: local GET/PUT now save non-image snapshots with revision
+checks and atomic timestamps. All 25 real DB tests and the published Postman run
+(40 requests/127 assertions) passed. Five-type content survived an actual API
+process restart. Temporary proof boards were removed; existing demo metadata is
+unchanged. Server save/load UI and actual Docker DB process restart remain pending.
+Walkthrough: [document request SQL](canvas-document-storage.md#document-request-and-sql-walkthrough).
+
+Google-only authentication now adds migration 3 (users, auth_sessions,
+google_auth_flows), applied to Docker; ledger versions 1/2/3. Auth and document
+tests total 34 real DB checks. OAuth credentials are not configured locally, so
+Google sign-in remains disabled while guest editing works. Setup:
+[authentication](authentication.md). Existing demo metadata and portable DB are preserved.
+
 ## Follow the connection
 
 An image is the packaged PostgreSQL software. A container runs that image.
@@ -76,9 +97,10 @@ docker compose --env-file .env.docker ps
 ```
 
 The app login and migration have been verified. In the container's Exec terminal,
-run `psql -U scribble -d scribble`, then `\dt` to see both tables and `\d boards`
-to see the board columns and constraints. `SELECT version FROM schema_migrations;`
-shows version 1. Exit psql with `\q`.
+run `psql -U scribble -d scribble`, then `\dt` to see all three tables and `\d boards`
+to see the board columns and constraints. `\d board_documents` shows document
+storage. `SELECT version FROM schema_migrations ORDER BY version;`
+shows versions 1 and 2. Exit psql with `\q`.
 
 ## Connect Express to Docker
 

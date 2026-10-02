@@ -2,6 +2,23 @@
 
 Updated: 2026-10-02. Read once per new project session.
 
+## Tomorrow's handoff
+
+End-of-day delivery: the user authorized committing and pushing the completed
+document migrations/API and Google-only authentication on `main`. Check Git
+status/log for the delivery revision; this authorization does not cover future
+commits or pushes.
+
+Resume with Google web-client setup and a real sign-in check using
+`docs/authentication.md`. Credentials belong only in ignored `.env.docker`.
+Then implement board ownership and protected metadata/document access before
+frontend cloud saves. Keep guest IndexedDB use and explicit upload choice.
+Docker PostgreSQL uses port 5434 with migrations 1/2/3; portable PostgreSQL on
+5433 is preserved. Check service status after reboot. Implementation-only pacing
+and Google sign-in only remain the user's current preferences.
+
+## Implementation record
+
 Learn through small Scribble slices; general study/DSA remain separate.
 
 Covered: Phase 1 backend/HTTP foundations, Node/Express/TypeScript, Zod versus
@@ -57,7 +74,8 @@ per board in `board_documents`. Use an ordered object array for transport and
 adapt to/from the editor map; preserve guest IndexedDB format. Separate document
 schema version from save revision; use atomic revision checks, committed snapshots,
 and separate durable assets. First local proof excludes images until asset storage
-exists. Database/API design remains proposed; no new migration, API, or upload.
+exists. Migration and local document API are now implemented; cloud UI/upload is
+still proposed.
 Detailed comparison, fields, save/conflict flow, and verification sequence:
 `docs/canvas-document-storage.md`.
 
@@ -68,10 +86,38 @@ wiring or guest-format/store changes. Verified 117 targeted tests (103 new),
 frontend build/type checks and server type check. Details and inspection path:
 `docs/canvas-document-storage.md`, implemented validator/adapters section.
 
-Next: review this code path one concept at a time; add the numbered document
-migration and then local pg save/load in later slices, with SQL practice alongside
-them. Introduce Prisma
-after tracing that SQL; auth and ownership precede account-based cloud saves.
+Migration slice: added `db/002_create_board_documents.sql` and an ordered,
+transactional runner for versions 1/2; migration 1 is unchanged. Covered primary/
+foreign keys, cascade, format versus save counters, JSONB shape/NULL checks,
+timestamp defaults, and migration rollback. Verified 11 real Docker DB tests in
+isolated schemas, server type check/build. Applied to normal Docker DB on port
+5434: ledger 1/2, five columns/constraints, zero documents; existing board metadata
+unchanged. Portable DB not migrated. Walkthrough: storage design doc.
+
+Document API slice: implemented GET/PUT /api/boards/:id/document using pg and one
+shared strict schema. Covered parent-row locks, conditional insert/update,
+expectedRevision conflicts, and atomic document/metadata timestamps. Rejects
+images, invalid formats/content, and JSONB-incompatible strings; separate 1 MiB
+document parser preserves 16 KiB metadata limits. Guest stores/UI are unchanged.
+Verified 236 fast tests, 25 real Docker DB tests, server type check and both builds;
+published Scribble API collection passed 40 requests/127 assertions. An actual
+API restart retained all five object types, order, revision, and timestamps.
+Temporary proof boards removed; original Docker demo metadata unchanged.
+Migration and endpoint slices are included in the authorized end-of-day delivery.
+
+Google-only authentication slice: implemented backend OAuth code flow with
+state/nonce/PKCE, verified ID tokens, users and hashed PostgreSQL sessions, me/
+logout, and optional React account UI. Migration 3 applied to normal Docker DB;
+portable DB unchanged. Guest login navigation waits for existing IndexedDB saves.
+Verified 279 fast checks, 34 DB checks, three browser scenarios, server type check
+and both builds. Live Google login remains pending OAuth web-client credentials;
+none are configured locally. Setup/inspection: docs/authentication.md.
+Published Scribble API collection passed 46 requests/145 assertions.
+Current preference: implementation only for now; Google sign-in only, no passwords.
+
+Next: configure/test the Google client, then implement board ownership and
+protected board/document access. Prisma and explicit frontend cloud saves remain
+pending; keep one migration authority. Auth identity alone does not privatize boards.
 Ask permission to verify actual database-process restart persistence;
 ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or
@@ -80,6 +126,8 @@ An unanswered question is not permission. Prior updates committed as `c2ca442`.
 Commit future changes only after explicit user authorization, separately for each
 commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
-Phase 2: SQL practice, document modeling, Prisma remain. Auth/ownership precede cloud saves.
+Phase 2: Prisma remains; document modeling and the local API proof are implemented.
+Phase 3: Google-only auth implemented/tested locally; real Google credentials/login
+pending. Phase 4: board ownership is next, before account-based cloud saves.
 
 Milestone summaries only, no Q&A logging. Guide: `learning-plan.md`; progress: `learning-progress.md`.

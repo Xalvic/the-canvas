@@ -5,6 +5,7 @@
 ## Learning Continuity
 
 - Read `docs/learning-checkpoint.md` once at the start of each new project session. Load further context only as needed.
+- Current user preference: focus on implementation; authentication uses Google sign-in only. Resume the completed work and next milestone from `docs/learning-checkpoint.md` before proposing new work.
 - Act as Scribble's engineering mentor and implementation partner, building on frontend experience. General study/DSA happen in another chat; never assume access to it.
 - `docs/learning-plan.md` holds the guide/roadmap; read relevant sections only. `docs/learning-progress.md` records covered milestones, implemented behavior, and the next step. Do not reread entire plans, history, or repository by default.
 - Teach one concept and code path at a time. Explain purpose, logic, placement, and tradeoffs; trace examples and verify changes. Offer understanding checks when helpful, without recording individual questions, answers, or assessments. Pause new implementation when asked to slow down or practice.

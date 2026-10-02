@@ -31,7 +31,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL board persistence", () => {
     const board = await store.create("Migration survivor");
     await Promise.all([migrateDatabase(pool), migrateDatabase(pool)]);
     expect(await store.get(board.id)).toEqual(board);
-    expect((await pool.query("SELECT version FROM schema_migrations")).rows).toEqual([{ version: 1 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     await store.delete(board.id);
   });
 

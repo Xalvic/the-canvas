@@ -141,8 +141,9 @@ Evaluate queryability, write frequency, collaboration, migrations, performance, 
 
 Current proposal: [canvas document storage design](canvas-document-storage.md)
 compares these models and recommends relational board metadata plus a versioned
-JSONB snapshot. Validation and array/map adapters are implemented and tested;
-database migration, document API, and Prisma remain separate pending slices.
+JSONB snapshot. Validation/adapters, migration 2, and local pg document GET/PUT are
+implemented and verified against Docker PostgreSQL, including revision conflicts
+and an API restart. Frontend cloud saves and Prisma remain separate pending slices.
 
 Design the save flow: what is persisted, when saving happens, save indicators, failures, retry behavior, and protection against an older save overwriting a newer edit. Explain the initial concurrency guarantees and their limits.
 
@@ -152,7 +153,15 @@ Design the save flow: what is persisted, when saving happens, save indicators, f
 
 **Learn:** Authentication versus authorization, password hashing and salts, cookies, sessions, JWT tradeoffs, HttpOnly, Secure, SameSite, CSRF, XSS, and CORS.
 
-**Build:** Sign up, login, logout, current-user endpoint, password hashing, a documented session/token strategy, and protected routes.
+**Current implementation choice (2026-10-02):** Google sign-in only, at the user's
+request; no password signup/login. OAuth code flow, server sessions, me/logout and
+optional account UI are implemented. Configure the user's Google web client to
+verify live login; board ownership/protected resources follow. See
+[authentication](authentication.md). Focus on implementation for now.
+
+**Build:** Provider sign-in, logout, current-user endpoint, a documented
+session/token strategy, and protected routes. Password authentication is outside
+the current scope.
 
 Compare server-backed sessions and token-based authentication for this browser-first product. Do not default to JWT or localStorage. Explain expiry, logout/revocation, credential storage, and relevant protections for the chosen design.
 

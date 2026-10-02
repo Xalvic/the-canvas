@@ -2,8 +2,10 @@ import express from "express";
 import { boardIdSchema, createBoardSchema, renameBoardSchema } from "./boards.js";
 import type { BoardStore } from "./boards.js";
 import { errorHandler, HttpError } from "./errors.js";
+import { DOCUMENT_BODY_LIMIT, saveDocumentSchema, type BoardDocumentStore } from "./documents.js";
+import { createAuthRouter, type AuthDependencies } from "./authRoutes.js";
 
-export function createApp(boards: BoardStore) {
+export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies) {
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -14,6 +16,33 @@ export function createApp(boards: BoardStore) {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+  app.use("/api/auth", createAuthRouter(auth));
+
+  // Document PUT gets its own parser before the smaller metadata parser.
+  if (documents) {
+    app.get("/api/boards/:id/document", async (req, res) => {
+      const id = boardIdSchema.parse(req.params.id);
+      const result = await documents.get(id);
+      if (result.status === "board-not-found") throw new HttpError(404, "BOARD_NOT_FOUND", "Board not found");
+      if (result.status === "document-not-found") throw new HttpError(404, "DOCUMENT_NOT_FOUND", "This board has no saved document");
+      res.json({ document: result.document });
+    });
+
+    app.put("/api/boards/:id/document", express.json({ limit: DOCUMENT_BODY_LIMIT }), async (req, res) => {
+      if (!req.is("application/json")) {
+        throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
+      }
+      const id = boardIdSchema.parse(req.params.id);
+      const input = saveDocumentSchema.parse(req.body);
+      const result = await documents.save(id, input);
+      if (result.status === "board-not-found") throw new HttpError(404, "BOARD_NOT_FOUND", "Board not found");
+      if (result.status === "conflict") {
+        throw new HttpError(409, "REVISION_CONFLICT", "Document revision does not match", { currentRevision: result.currentRevision });
+      }
+      if (result.created) res.location(`/api/boards/${id}/document`);
+      res.status(result.created ? 201 : 200).json({ document: result.document });
+    });
+  }
 
   app.use(express.json({ limit: "16kb" }));
 

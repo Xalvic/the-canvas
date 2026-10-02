@@ -6,6 +6,7 @@ export class HttpError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -33,7 +34,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
 
   if (error instanceof HttpError) {
     res.status(error.status).json({
-      error: { code: error.code, message: error.message },
+      error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) },
     });
     return;
   }
@@ -49,8 +50,10 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
     return;
   }
   if (parserType === "entity.too.large") {
+    const limit = typeof error === "object" && error !== null && "limit" in error && error.limit === 1024 * 1024
+      ? "1 MB" : "16 KB";
     res.status(413).json({
-      error: { code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds the 16 KB limit" },
+      error: { code: "PAYLOAD_TOO_LARGE", message: `Request body exceeds the ${limit} limit` },
     });
     return;
   }

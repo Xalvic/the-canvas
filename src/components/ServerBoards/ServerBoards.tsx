@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { listServerBoards, type ServerBoard } from "../../api/boards";
+import { Account } from "../Account/Account";
 
 type BoardListState =
   | { status: "loading" }
@@ -44,6 +45,7 @@ export function ServerBoards() {
         <ChevronDown size={16} aria-hidden="true" />
       </summary>
       <div className="server-boards-content">
+        <Account />
         <p className="server-boards-description">
           Board titles only. Your canvas stays on this device.
         </p>

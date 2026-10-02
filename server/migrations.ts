@@ -1,18 +1,26 @@
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
 
+const migrations = [
+  { version: 1, file: "001_create_boards.sql" },
+  { version: 2, file: "002_create_board_documents.sql" },
+  { version: 3, file: "003_create_google_auth.sql" },
+] as const;
+
 export async function migrateDatabase(pool: Pool) {
-  const sql = await readFile(new URL("../db/001_create_boards.sql", import.meta.url), "utf8");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     // Serialize migration runners for this database/schema.
     await client.query("SELECT pg_advisory_xact_lock(734621001)");
     await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-    const applied = await client.query("SELECT version FROM schema_migrations WHERE version = 1");
-    if (applied.rowCount === 0) {
+    const applied = await client.query<{ version: number }>("SELECT version FROM schema_migrations ORDER BY version");
+    const appliedVersions = new Set(applied.rows.map(({ version }) => version));
+    for (const migration of migrations) {
+      if (appliedVersions.has(migration.version)) continue;
+      const sql = await readFile(new URL(`../db/${migration.file}`, import.meta.url), "utf8");
       await client.query(sql);
-      await client.query("INSERT INTO schema_migrations (version) VALUES (1)");
+      await client.query("INSERT INTO schema_migrations (version) VALUES ($1)", [migration.version]);
     }
     await client.query("COMMIT");
   } catch (error) {

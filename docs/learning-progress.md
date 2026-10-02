@@ -19,8 +19,8 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | --- | --- |
 | Local editor foundation | Custom React/TypeScript/Vite/Zustand canvas, history, selection, IndexedDB boards/assets |
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
-| 2. PostgreSQL persistence | Metadata CRUD and document validation/adapters implemented; document database/API and Prisma pending |
-| 3. Authentication | Not started |
+| 2. PostgreSQL persistence | Metadata CRUD, document validation/adapters, migration 2, and local document GET/PUT verified on Docker; SQL practice and Prisma pending |
+| 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live OAuth configuration/login pending |
 | 4. Authorization/sharing | Not started |
 | 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
@@ -130,8 +130,46 @@ history, and server behavior are unchanged; no app wiring yet. Verified 117
 targeted tests (103 new), frontend build/type checking and server type checking.
 Inspection path and defaults: `canvas-document-storage.md`.
 
-Next implementation, after approval: numbered document migration. Local pg
-document save/load with atomic revisions follows separately;
-practice their SQL before introducing Prisma. Authentication and ownership
-precede frontend account saves. Phase 2 remains in progress.
+Document migration slice (2026-10-02): covered zero/one document relationships,
+primary/foreign keys and cascade, JSONB shape versus application validation,
+SQL NULL in CHECK, positive format/save counters, timestamp defaults, and
+transactional migration rollback. Added migration 2 without changing migration 1;
+runner applies missing versions in order under its existing lock/transaction.
+Eleven real PostgreSQL tests passed in isolated Docker schemas (seven new), plus
+server type checking/build. Existing metadata survives upgrade; the migration
+creates no documents. Applied to normal Docker PostgreSQL on port 5434: versions
+1/2 recorded, five columns/defaults and constraints verified, zero documents.
+Before/after metadata comparison is unchanged. Portable DB was not migrated;
+endpoints and guest/editor behavior are unchanged.
+Walkthrough: `canvas-document-storage.md#migration-2-and-sql-walkthrough`.
+
+Document API slice (2026-10-02): covered expectedRevision versus schemaVersion,
+parent-row locks, conditional INSERT/UPDATE, transaction rollback, shared schema
+placement, route-specific body limits, and response failure after commit.
+Implemented local GET/PUT with pg, 201/200 saves, distinct missing-board/document
+404s, 409 revision conflicts, atomic timestamps, and stored-format validation.
+No frontend document loading/saving or guest changes. Verified 236 fast tests,
+25 real Docker DB tests, server type check, both builds, and the published cloud
+Postman collection (40 requests/127 assertions). Five-type content/revision/time
+survived an actual API process restart; proof boards removed and original Docker
+demo metadata unchanged. Actual Docker DB process restart remains unverified.
+Both migration and endpoint slices are included in the end-of-day commit/push
+authorized by the user on 2026-10-02.
+Walkthrough: `canvas-document-storage.md#document-request-and-sql-walkthrough`.
+
+Google authentication slice (2026-10-02): user chose implementation-only pacing
+and Google sign-in only. Implemented OAuth authorization-code flow with state,
+nonce and PKCE, official ID-token verification, Google-subject user identity,
+hashed PostgreSQL sessions, me/logout and optional account UI. Migration 3 applied
+to Docker with the original demo board preserved; portable DB untouched. Login
+navigation awaits the existing guest autosave. Verified 279 fast checks, 34 real
+DB checks, three browser scenarios, server type check and both builds. Published
+Scribble API collection passed 46 requests/145 assertions. Live Google
+login is unverified until the user supplies OAuth web-client settings locally.
+No passwords, board ownership, or cloud canvas UI were added in this slice.
+Setup and current limits: authentication.md. The user authorized an end-of-day
+commit/push of the completed work; tomorrow's handoff is in learning-checkpoint.md.
+
+Next: configure/verify Google sign-in, then implement board ownership before
+frontend account saves. Prisma and other roadmap features remain pending.
 Explain and build in small slices at the user's pace.

@@ -132,12 +132,14 @@ describe("canvas document v1", () => {
     ["width", 0], ["width", -1], ["height", 0], ["height", -1],
     ["zIndex", Infinity], ["createdAt", -1], ["updatedAt", NaN],
     ["title", null], ["body", 42], ["body", undefined],
+    ["id", "bad\0id"], ["groupId", "bad\uD800"],
+    ["body", "bad\0text"], ["body", "bad\uD800"], ["body", "bad\uDC00"],
   ])("rejects malformed common/card field %s=%s", (field, value) => {
     expectInvalid(documentWith([{ ...card, [field]: value }]), ["content", "objects", 0, field as string]);
   });
 
   it.each([
-    ["text", null], ["color", ""], ["color", 42],
+    ["text", null], ["color", ""], ["color", 42], ["text", "bad\0text"], ["color", "bad\uD800"],
     ["fontSize", 0], ["fontSize", -1], ["fontSize", Infinity],
     ["fontWeight", 0], ["fontWeight", 1001], ["fontWeight", NaN],
     ["textAlign", "justify"], ["opacity", -0.1], ["opacity", 1.1],
