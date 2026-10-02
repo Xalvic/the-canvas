@@ -12,6 +12,22 @@ npm install
 npm run dev
 ```
 
+## Local API learning prototype
+
+In a second terminal, run `npm run dev:server`. The API listens only on
+`http://127.0.0.1:3001`. It provides health checks and create/list/read endpoints
+for board metadata. Records live in memory and disappear on restart; the canvas
+continues to use IndexedDB independently.
+
+See [the HTTP walkthrough](docs/backend.md) for browser requests and error cases,
+[architecture](docs/architecture.md) for the existing editor flow, and
+[learning progress](docs/learning-progress.md) for the roadmap and checkpoints.
+
+Run `npm run test:server` and `npm run typecheck:server` for targeted API checks.
+`npm run build:server` then `npm run start:server` runs the compiled API.
+`npm run build` continues to build the frontend. The Vite proxy is development-only;
+deployment of the API has not been configured.
+
 ## Interaction model
 
 - Use `V`, `H`, `N`, `T`, `C`, `F`, and `P` to switch between Select, Hand,

@@ -1,7 +1,9 @@
 node_modules
 dist
+dist-server
 .vite
 *.local
 *.log
 test-results
 playwright-report
+/collaborative-whiteboard-infinite-canvas-spec.md
