@@ -25,7 +25,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | 5. TanStack Query/server state | Not started |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
 | 7. Real-time collaboration | Not started |
-| 8. Docker | Not started |
+| 8. Docker | PostgreSQL running; migrations and restart persistence checks pending |
 | 9. Testing | Existing editor tests plus HTTP/config tests |
 | 10. Production engineering | Frontend/backend builds exist; deployment/CI/operations not configured in the repository |
 
@@ -66,6 +66,25 @@ Cross-tab save coordination, physical stylus feel, and real deployment remain
 unverified. Existing Vitest audit findings need a separate upgrade review.
 
 ## Next
+
+Docker slice (2026-10-02): WSL 2, Docker Linux engine 29.8.1, and Compose 5.5.1
+verified after installation. Introduced image/container/volume roles and
+host/container port mapping. Prepared PostgreSQL-only Compose using
+`postgres:18.6-bookworm`, port 5434, a persistent volume, readiness check, and
+first-initialization SQL for a normal app role. Generated separate ignored
+`.env.docker` credentials; the portable database and `.env` remain unchanged.
+Compose config validation passed. With approval, downloaded the image and started
+PostgreSQL; container healthy, named volume mounted. An authenticated Windows
+connection on port 5434 verified PostgreSQL 18.6 and the normal `scribble` role
+without superuser, database-creation, or role-creation privileges. The database
+has no application tables yet. Docker migrations and restart persistence tests
+remain pending; the API connection has not been switched.
+Run guide: `docker.md`.
+
+Next Docker step: explain the migration connection, then ask permission to apply
+the existing schema to Docker and test restart persistence. Ask separately before API switching or data import;
+preserve portable data and credentials. Leave unrelated session work untouched.
+Current API implementation commit: `156afec`; Docker setup is a separate slice.
 
 Trace INSERT/SELECT and practice table queries, then compare canvas document
 models and introduce Prisma after SQL. Authentication and ownership follow

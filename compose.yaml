@@ -1,0 +1,30 @@
+name: scribble-local
+
+services:
+  postgres:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: scribble
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Use --env-file .env.docker and set POSTGRES_PASSWORD}
+      SCRIBBLE_DB_PASSWORD: ${SCRIBBLE_DB_PASSWORD:?Set SCRIBBLE_DB_PASSWORD in .env.docker}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      # PostgreSQL 18 stores data beneath /var/lib/postgresql/18/docker.
+      - postgres-data:/var/lib/postgresql
+      - type: bind
+        source: ./docker/postgres/001_create_app_role.sql
+        target: /docker-entrypoint-initdb.d/001_create_app_role.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "scribble", "-d", "scribble"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres-data:

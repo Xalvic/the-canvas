@@ -2,37 +2,47 @@
 
 Updated: 2026-10-02. Read once per new project session.
 
-Learn product engineering through Scribble, one concept and small slice at a
-time. General study/DSA remain separate.
+Learn through small Scribble slices; general study/DSA remain separate.
 
-Covered: Phase 1 backend foundations — backend purpose, browser/server
-separation, Node.js, Express, TypeScript, HTTP requests/responses, endpoints,
-Zod runtime validation, JSON parsing, errors, and temporary in-memory storage.
+Covered: Phase 1 backend/HTTP foundations, Node/Express/TypeScript, Zod versus
+JSON parsing, errors, and temporary storage.
 
-Implemented: local API with health and board metadata create/list/read/rename/delete,
-now backed by PostgreSQL. The Map remains only as an HTTP-test fixture. Run the
-project-local database (port 5433), `npm run db:migrate`, then `npm run dev:server`
-separately from `npm run dev`. API metadata survives restarts; the guest canvas
-still saves independently in IndexedDB. Setup/run guide: `postgresql.md`.
+Implemented: local health and metadata CRUD backed by PostgreSQL; Map is only
+an HTTP-test fixture. Guest canvas still saves independently in IndexedDB.
+Portable PostgreSQL 18.6 is initialized in ignored `.postgres/`, port 5433,
+credentials in ignored `.env`; no Windows autostart. Check status after reboot.
+Run guide: `docs/postgresql.md`. Implementation committed as `156afec`; no push.
 
-Latest slice: SQL table/constraints, versioned transactional migration,
-parameterized CRUD with pg, async routes, pool lifecycle, ignored credentials
-and database files. Verified 109 fast tests, four real PostgreSQL tests, backend
-typecheck, frontend/backend builds, 17 Postman requests / 51 assertions, and an actual API plus
-database process restart. PostgreSQL 18.6 initialized locally; database currently
-running, no Windows autostart. No Prisma or cloud canvas storage yet.
+Verified: 109 fast tests, four real DB tests, typecheck, both builds, 17 Postman
+requests / 51 assertions, and actual API/database restarts. No Prisma or cloud
+canvas storage yet.
 
-Product direction: free guest use keeps IndexedDB persistence without login.
-PWA installation/offline loading remain to implement (no manifest/service worker
-configured). Login will enable optional cloud storage and cross-device access;
-keep local editing available. Do not silently upload guest boards on login.
+Product: free guest IndexedDB use; optional login for cloud/cross-device saves.
+Keep local editing and explicit guest-upload choice. PWA manifest/offline loading
+are pending.
 
-Next: learn Docker images, containers, volumes, and Compose; explain Windows
-installation first. The user wants PostgreSQL in Docker. Ask before commands,
-file changes, installation, or switching database setups; an unanswered question
-is not permission. Ask about committing after meaningful changes.
-Phase 2 remains in progress: SQL practice, canvas document model, and Prisma
-remain. Authentication and ownership follow before cloud saves.
+Docker: WSL 2 and Docker Desktop installed; Linux engine 29.8.1 and Compose
+5.5.1 verified running. CLI is installed per-user under
+`%LOCALAPPDATA%/Programs/DockerDesktop/resources/bin`; reopen terminals if PATH
+is stale. Images, containers, volumes, and host/container ports introduced.
+PostgreSQL-only `compose.yaml` prepared and config validation passed: official
+18.6-bookworm image, loopback port 5434, persistent volume, readiness check,
+and initialization SQL for a normal app role. Separate generated credentials
+are in ignored `.env.docker`; portable `.env` is unchanged. Guide: `docs/docker.md`.
+Image downloaded and container started with approval; healthy on port 5434.
+Authenticated Windows app connection verified PostgreSQL 18.6 and the normal
+`scribble` role; named volume mounted. No application tables yet. Docker migration,
+restart persistence testing, and API database switching have not been performed.
+This chat needed Docker's bin directory added to the process PATH for its
+credential helper; no permanent PATH change.
 
-Keep milestone summaries only; do not log individual questions/answers or update
-docs after every exchange. Guide: `learning-plan.md`; progress: `learning-progress.md`.
+Next: explain the Compose/migration path one step at a time, then ask permission
+to run the existing migration against Docker and verify restart persistence.
+Ask separately before switching the API or importing portable data. React/Express stay
+on npm initially. Ask before file edits, execution, installation, switching or
+stopping databases. Preserve portable data/credentials until a switch is approved.
+An unanswered question is not permission. Ask about committing after updates.
+Another session may create a root Markdown file; leave unrelated work untouched.
+Phase 2: SQL practice, document modeling, Prisma remain. Auth/ownership precede cloud saves.
+
+Milestone summaries only, no Q&A logging. Guide: `learning-plan.md`; progress: `learning-progress.md`.
