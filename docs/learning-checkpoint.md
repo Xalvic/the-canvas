@@ -1,21 +1,20 @@
 # Scribble: resume here
 
-Updated: 2026-10-02. Read once per new project session.
+Updated: 2026-10-04. Read once per new project session.
 
-## Tomorrow's handoff
+## Current handoff
 
-End-of-day delivery: the user authorized committing and pushing the completed
-document migrations/API and Google-only authentication on `main`. Check Git
-status/log for the delivery revision; this authorization does not cover future
-commits or pushes.
-
-Resume with Google web-client setup and a real sign-in check using
-`docs/authentication.md`. Credentials belong only in ignored `.env.docker`.
-Then implement board ownership and protected metadata/document access before
-frontend cloud saves. Keep guest IndexedDB use and explicit upload choice.
-Docker PostgreSQL uses port 5434 with migrations 1/2/3; portable PostgreSQL on
-5433 is preserved. Check service status after reboot. Implementation-only pacing
-and Google sign-in only remain the user's current preferences.
+The user requested implementing pending items one by one, without lessons.
+Board ownership/protected metadata and documents are now implemented and tested.
+Next: account board save/open with explicit local upload and safe save conflicts;
+see `docs/implementation-status.md` for the implementation queue.
+Live Google login still needs local OAuth settings in ignored `.env.docker`;
+see `docs/authentication.md`. Docker PostgreSQL uses port 5434 with migrations
+1/2/3/4 applied; its original demo board is preserved and hidden as unowned.
+Portable PostgreSQL on 5433 is preserved. Check service status after reboot.
+Google-only sign-in and guest IndexedDB use remain the product choices.
+The user authorized committing this ownership milestone on 2026-10-04; check
+git log for its revision. No push is authorized. Future commits need fresh approval.
 
 ## Implementation record
 
@@ -115,9 +114,17 @@ none are configured locally. Setup/inspection: docs/authentication.md.
 Published Scribble API collection passed 46 requests/145 assertions.
 Current preference: implementation only for now; Google sign-in only, no passwords.
 
-Next: configure/test the Google client, then implement board ownership and
-protected board/document access. Prisma and explicit frontend cloud saves remain
-pending; keep one migration authority. Auth identity alone does not privatize boards.
+Ownership slice (2026-10-04): session-required board/document routes, database
+owner filters, mutation origin/header checks, migration 4 and account-aware list.
+Verified 297 fast tests, 39 Docker DB tests, four private-list browser scenarios
+plus three account scenarios, server typecheck, both builds and the verified
+cloud Postman copy (69 requests / 228 assertions). Existing Postman IDs/scripts
+and normal Docker demo preserved. Guest IndexedDB is unchanged; unowned legacy
+rows are hidden, never claimed.
+
+Next: account board save/open; configure/test the live Google client separately.
+Prisma and other implementation items are in `docs/implementation-status.md`;
+keep one migration authority. Private board/document access is now enforced.
 Ask permission to verify actual database-process restart persistence;
 ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or
@@ -128,6 +135,6 @@ commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
 Phase 2: Prisma remains; document modeling and the local API proof are implemented.
 Phase 3: Google-only auth implemented/tested locally; real Google credentials/login
-pending. Phase 4: board ownership is next, before account-based cloud saves.
+pending. Phase 4: ownership is implemented; sharing/roles remain pending.
 
 Milestone summaries only, no Q&A logging. Guide: `learning-plan.md`; progress: `learning-progress.md`.

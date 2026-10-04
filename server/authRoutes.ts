@@ -6,6 +6,7 @@ import {
   type AuthStore, type GoogleAuthProvider,
 } from "./auth.js";
 import { HttpError } from "./errors.js";
+import { verifyMutationOrigin } from "./boardAccess.js";
 
 export type AuthDependencies = {
   store: AuthStore;
@@ -85,12 +86,7 @@ export function createAuthRouter(auth?: AuthDependencies) {
 
   router.post("/logout", async (req, res) => {
     // A required non-simple header + no CORS allowance prevents forged form logout.
-    const origin = req.get("Origin");
-    if (req.get("X-Scribble-Request") !== "1" ||
-        origin && (!auth || origin !== new URL(auth.frontendUrl).origin) ||
-        req.get("Sec-Fetch-Site") === "cross-site") {
-      throw new HttpError(403, "CSRF_REJECTED", "Request origin could not be verified");
-    }
+    verifyMutationOrigin(req, auth);
     const token = readTokenCookie(req.headers.cookie, SESSION_COOKIE);
     if (token && auth) await auth.store.revokeSession(hashToken(token));
     res.clearCookie(SESSION_COOKIE, sessionCookie);

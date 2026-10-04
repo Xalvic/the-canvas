@@ -1,10 +1,10 @@
 # Canvas document storage design
 
-Status: validation/adapters, migration 2, and local pg document GET/PUT implemented,
-2026-10-02. Migration 2 is applied to normal Docker PostgreSQL on port 5434.
+Status: validation/adapters and owner-protected local pg document GET/PUT
+implemented, 2026-10-04. Migrations 1–4 are applied to Docker PostgreSQL on port 5434.
 Revision conflicts, rollback, round trips, and an actual API process restart are
 verified. Google-only authentication is now implemented separately; live OAuth
-configuration is pending. Prisma, board ownership, frontend document save/load,
+configuration is pending. Board ownership is implemented. Prisma, frontend document save/load,
 guest upload, and cloud deployment remain pending. Guest IndexedDB still saves
 independently. See [authentication setup](authentication.md).
 
@@ -435,7 +435,13 @@ Verification:
   fingerprint unchanged. The database process was not restarted; portable DB
   files/configuration were untouched and no portable migration/import occurred.
 
-Next implementation: verify live Google sign-in and add board ownership/protected
-access. Prisma must retain constraints/API behavior with one migration authority.
+Ownership update (2026-10-04): board/document routes require persisted sessions;
+reads and writes filter by the session owner. Saves check ownership in the locked
+parent-row query before revision conflict checks. Mutation requests require the
+Scribble header and a permitted origin. Migration 4 preserves unowned demo data
+but hides it from all accounts. Guest stores and document format are unchanged.
+
+Next implementation: explicit frontend account save/open; live Google login needs
+local credentials. Prisma must retain constraints/API behavior with one migration authority.
 Actual Docker database-process restart verification remains pending. Durable
 image assets, explicit frontend account saves and deployment remain later milestones.

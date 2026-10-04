@@ -11,7 +11,7 @@ const config = loadServerConfig();
 const authConfig = loadAuthConfig();
 const pool = createDatabasePool(loadDatabaseUrl());
 try {
-  await pool.query("SELECT id FROM boards LIMIT 0");
+  await pool.query("SELECT id, owner_id FROM boards LIMIT 0");
   await pool.query("SELECT board_id FROM board_documents LIMIT 0");
   await pool.query("SELECT id FROM users LIMIT 0");
   await pool.query("SELECT token_hash FROM auth_sessions LIMIT 0");

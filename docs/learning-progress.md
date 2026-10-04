@@ -1,6 +1,6 @@
 # Scribble learning progress
 
-Updated: 2026-10-02. Record milestones and substantial implementation changes
+Updated: 2026-10-04. Record milestones and substantial implementation changes
 only. No individual questions, answers, or understanding assessments.
 
 Start with [the compact checkpoint](learning-checkpoint.md). Use relevant
@@ -21,7 +21,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
 | 2. PostgreSQL persistence | Metadata CRUD, document validation/adapters, migration 2, and local document GET/PUT verified on Docker; SQL practice and Prisma pending |
 | 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live OAuth configuration/login pending |
-| 4. Authorization/sharing | Not started |
+| 4. Authorization/sharing | Owner-only metadata/documents implemented; sharing/roles pending |
 | 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
 | 7. Real-time collaboration | Not started |
@@ -170,6 +170,13 @@ No passwords, board ownership, or cloud canvas UI were added in this slice.
 Setup and current limits: authentication.md. The user authorized an end-of-day
 commit/push of the completed work; tomorrow's handoff is in learning-checkpoint.md.
 
-Next: configure/verify Google sign-in, then implement board ownership before
-frontend account saves. Prisma and other roadmap features remain pending.
-Explain and build in small slices at the user's pace.
+Ownership milestone (2026-10-04): private board/document routes and SQL owner
+filters, session-derived creation ownership, mutation CSRF checks, migration 4
+and account-aware title list implemented. Unowned demo records are preserved and
+hidden; guest IndexedDB and portable PostgreSQL are unchanged. Verified 297 fast
+tests, 39 real DB tests, four private-list browser scenarios plus three account
+scenarios, typecheck/both builds, and the fetched-back cloud Postman collection
+(69 requests / 228 assertions).
+
+Next: explicit account board save/open. Live Google setup still needs local
+credentials. Implementation-only queue: [implementation-status.md](implementation-status.md).

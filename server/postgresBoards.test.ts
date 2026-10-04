@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createApp } from "./app.js";
+import { createAuthenticatedApp as createApp, seedTestOwner, TEST_OWNER_ID } from "./testFixtures/authenticatedApp.js";
 import { migrateDatabase } from "./migrations.js";
 import { createPostgresBoardStore } from "./postgresBoards.js";
 
@@ -18,6 +18,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL board persistence", () => {
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
     await migrateDatabase(pool);
+    await seedTestOwner(pool);
   });
 
   afterAll(async () => {
@@ -28,11 +29,11 @@ describe.skipIf(!databaseUrl)("real PostgreSQL board persistence", () => {
 
   it("applies migrations repeatedly without resetting data", async () => {
     const store = createPostgresBoardStore(pool);
-    const board = await store.create("Migration survivor");
+    const board = await store.create("Migration survivor", TEST_OWNER_ID);
     await Promise.all([migrateDatabase(pool), migrateDatabase(pool)]);
-    expect(await store.get(board.id)).toEqual(board);
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
-    await store.delete(board.id);
+    expect(await store.get(board.id, TEST_OWNER_ID)).toEqual(board);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    await store.delete(board.id, TEST_OWNER_ID);
   });
 
   it("persists create/rename/delete through new pools and application instances", async () => {

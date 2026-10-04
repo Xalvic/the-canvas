@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "./app.js";
+import { createAuthenticatedApp as createApp, seedTestOwner, TEST_OWNER_ID } from "./testFixtures/authenticatedApp.js";
 import { migrateDatabase } from "./migrations.js";
 import { MAX_DOCUMENT_REVISION } from "./documents.js";
 import { createPostgresBoardStore } from "./postgresBoards.js";
@@ -22,6 +22,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
     await migrateDatabase(pool);
+    await seedTestOwner(pool);
   });
   afterEach(async () => {
     vi.restoreAllMocks();
@@ -31,7 +32,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
   afterAll(async () => { await admin.end(); });
 
   function app() { return createApp(createPostgresBoardStore(pool), createPostgresDocumentStore(pool)); }
-  async function board() { return createPostgresBoardStore(pool).create("Keep the metadata title"); }
+  async function board() { return createPostgresBoardStore(pool).create("Keep the metadata title", TEST_OWNER_ID); }
   async function rows() {
     return {
       boards: (await pool.query("SELECT * FROM boards ORDER BY id")).rows,
@@ -56,7 +57,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     const next = await request(api).put(url).send(documentInput(1, "Updated drawing")).expect(200);
     expect(next.body.document.revision).toBe(2);
     expect((await request(api).get(url).expect(200)).body).toEqual(next.body);
-    const after = await createPostgresBoardStore(pool).get(metadata.id);
+    const after = await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID);
     expect(after).toEqual({ ...metadata, updatedAt: next.body.document.updatedAt });
     expect(after!.updatedAt).toBeGreaterThanOrEqual(metadata.updatedAt);
     expect((await pool.query("SELECT b.updated_at = d.updated_at AS timestamps_match FROM boards b JOIN board_documents d ON d.board_id = b.id")).rows).toEqual([{ timestamps_match: true }]);
@@ -72,7 +73,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     expect((await request(api).put(missing).send(documentInput()).expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
     expect((await request(api).put(url).send(documentInput(1)).expect(409)).body.error.details.currentRevision).toBe(0);
     expect((await pool.query("SELECT * FROM board_documents")).rows).toEqual([]);
-    expect(await createPostgresBoardStore(pool).get(metadata.id)).toEqual(metadata);
+    expect(await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID)).toEqual(metadata);
   });
 
   it("preserves document and metadata on invalid requests, including JSONB-incompatible strings", async () => {
@@ -136,15 +137,15 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
   it.each([false, true])("rolls back document writes when the metadata update fails (replacement: %s)", async (replacement) => {
     const metadata = await board();
     const documents = createPostgresDocumentStore(pool);
-    if (replacement) await documents.save(metadata.id, documentInput());
+    if (replacement) await documents.save(metadata.id, documentInput(), TEST_OWNER_ID);
     const before = await rows();
     // Fault injection is restricted to this newly created test schema.
     await pool.query("CREATE FUNCTION reject_metadata_update() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test metadata write failure'; END $$");
     await pool.query("CREATE TRIGGER fail_metadata BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION reject_metadata_update()");
-    await expect(documents.save(metadata.id, documentInput(replacement ? 1 : 0, "Rollback"))).rejects.toMatchObject({ code: "P0001" });
+    await expect(documents.save(metadata.id, documentInput(replacement ? 1 : 0, "Rollback"), TEST_OWNER_ID)).rejects.toMatchObject({ code: "P0001" });
     expect(await rows()).toEqual(before);
     await pool.query("DROP TRIGGER fail_metadata ON boards");
-    expect((await documents.save(metadata.id, documentInput(replacement ? 1 : 0))).status).toBe("saved");
+    expect((await documents.save(metadata.id, documentInput(replacement ? 1 : 0), TEST_OWNER_ID)).status).toBe("saved");
   });
 
   it("loads identical content/revision after every connection and application instance is replaced", async () => {
@@ -172,8 +173,8 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     const documents = createPostgresDocumentStore(pool);
     const api = createApp(createPostgresBoardStore(pool), {
       get: documents.get,
-      async save(id, input) {
-        await documents.save(id, input);
+      async save(id, input, ownerId) {
+        await documents.save(id, input, ownerId);
         throw new Error("Simulated response failure after commit");
       },
     });
@@ -216,7 +217,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     await pool.query("UPDATE board_documents SET updated_at = '2100-01-01T00:00:00Z' WHERE board_id = $1", [metadata.id]);
     const next = await request(api).put(url).send(documentInput(1)).expect(200);
     expect(next.body.document.updatedAt).toBe(Date.parse("2100-01-01T00:00:00Z"));
-    expect((await createPostgresBoardStore(pool).get(metadata.id))!.updatedAt).toBe(next.body.document.updatedAt);
+    expect((await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID))!.updatedAt).toBe(next.body.document.updatedAt);
   });
 
   it("handles the last representable revision increment and rejects a save that would overflow", async () => {

@@ -51,7 +51,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
   }
 
   async function expectVersions() {
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
   }
 
   it("installs all versions on a fresh schema even with concurrent runners", async () => {
@@ -75,14 +75,14 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
     const board = await createBoard();
     await migrateDatabase(pool);
     await expectVersions();
-    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([board]);
+    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([{ ...board, owner_id: null }]);
     expect((await pool.query("SELECT * FROM board_documents")).rows).toEqual([]);
     const document = (await insertDocument(board.id)).rows[0];
     expect(document.updated_at).toBeInstanceOf(Date);
     await Promise.all([migrateDatabase(pool), migrateDatabase(pool)]);
     await expectVersions();
     expect((await pool.query("SELECT * FROM board_documents WHERE board_id = $1", [board.id])).rows).toEqual([document]);
-    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([board]);
+    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([{ ...board, owner_id: null }]);
   });
 
   it.each([false, true])("rolls back a failed version 2 and can retry (version 1 already installed: %s)", async (existingVersionOne) => {

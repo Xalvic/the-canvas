@@ -18,21 +18,22 @@ export type BoardMetadata = {
 
 // HTTP handlers await either the test fixture or the PostgreSQL implementation.
 export interface BoardStore {
-  list(): BoardMetadata[] | Promise<BoardMetadata[]>;
-  get(id: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
-  create(title: string): BoardMetadata | Promise<BoardMetadata>;
-  rename(id: string, title: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
-  delete(id: string): boolean | Promise<boolean>;
+  list(ownerId: string): BoardMetadata[] | Promise<BoardMetadata[]>;
+  get(id: string, ownerId: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
+  create(title: string, ownerId: string): BoardMetadata | Promise<BoardMetadata>;
+  rename(id: string, title: string, ownerId: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
+  delete(id: string, ownerId: string): boolean | Promise<boolean>;
 }
 
 export function createBoardStore() {
   // Each application instance owns its records. Restarting loses all of them.
   const boards = new Map<string, BoardMetadata>();
+  const owners = new Map<string, string>();
 
   return {
-    list: () => [...boards.values()],
-    get: (id: string) => boards.get(id),
-    create: (title: string): BoardMetadata => {
+    list: (ownerId: string) => [...boards.values()].filter((board) => owners.get(board.id) === ownerId),
+    get: (id: string, ownerId: string) => owners.get(id) === ownerId ? boards.get(id) : undefined,
+    create: (title: string, ownerId: string): BoardMetadata => {
       const timestamp = Date.now();
       const board = {
         id: randomUUID(),
@@ -41,16 +42,21 @@ export function createBoardStore() {
         updatedAt: timestamp,
       };
       boards.set(board.id, board);
+      owners.set(board.id, ownerId);
       return board;
     },
-    rename: (id: string, title: string): BoardMetadata | undefined => {
+    rename: (id: string, title: string, ownerId: string): BoardMetadata | undefined => {
       const board = boards.get(id);
-      if (!board) return undefined;
+      if (!board || owners.get(id) !== ownerId) return undefined;
       if (board.title === title) return board;
       const updated = { ...board, title, updatedAt: Date.now() };
       boards.set(id, updated);
       return updated;
     },
-    delete: (id: string) => boards.delete(id),
+    delete: (id: string, ownerId: string) => {
+      if (owners.get(id) !== ownerId) return false;
+      owners.delete(id);
+      return boards.delete(id);
+    },
   };
 }

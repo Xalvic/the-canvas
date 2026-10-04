@@ -16,33 +16,33 @@ function toMetadata(row: BoardRow): BoardMetadata {
 
 export function createPostgresBoardStore(pool: Pool): BoardStore {
   return {
-    async list() {
-      const result = await pool.query<BoardRow>(`SELECT ${columns} FROM boards ORDER BY created_at, id`);
+    async list(ownerId) {
+      const result = await pool.query<BoardRow>(`SELECT ${columns} FROM boards WHERE owner_id = $1 ORDER BY created_at, id`, [ownerId]);
       return result.rows.map(toMetadata);
     },
-    async get(id) {
-      const result = await pool.query<BoardRow>(`SELECT ${columns} FROM boards WHERE id = $1`, [id]);
+    async get(id, ownerId) {
+      const result = await pool.query<BoardRow>(`SELECT ${columns} FROM boards WHERE id = $1 AND owner_id = $2`, [id, ownerId]);
       return result.rows[0] ? toMetadata(result.rows[0]) : undefined;
     },
-    async create(title) {
+    async create(title, ownerId) {
       const result = await pool.query<BoardRow>(
-        `INSERT INTO boards (id, title) VALUES ($1, $2) RETURNING ${columns}`,
-        [randomUUID(), title],
+        `INSERT INTO boards (id, title, owner_id) VALUES ($1, $2, $3) RETURNING ${columns}`,
+        [randomUUID(), title, ownerId],
       );
       return toMetadata(result.rows[0]);
     },
-    async rename(id, title) {
+    async rename(id, title, ownerId) {
       // One atomic statement; no separate read that can race with another update.
       const result = await pool.query<BoardRow>(
         `UPDATE boards SET title = $2,
          updated_at = CASE WHEN title = $2 THEN updated_at ELSE GREATEST(clock_timestamp(), updated_at) END
-         WHERE id = $1 RETURNING ${columns}`,
-        [id, title],
+         WHERE id = $1 AND owner_id = $3 RETURNING ${columns}`,
+        [id, title, ownerId],
       );
       return result.rows[0] ? toMetadata(result.rows[0]) : undefined;
     },
-    async delete(id) {
-      const result = await pool.query("DELETE FROM boards WHERE id = $1", [id]);
+    async delete(id, ownerId) {
+      const result = await pool.query("DELETE FROM boards WHERE id = $1 AND owner_id = $2", [id, ownerId]);
       return result.rowCount === 1;
     },
   };

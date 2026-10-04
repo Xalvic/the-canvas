@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp as createApiApp } from "./app.js";
+import { createAuthenticatedApp as createApiApp } from "./testFixtures/authenticatedApp.js";
 import { createBoardStore } from "./boards.js";
 
 afterEach(() => vi.restoreAllMocks());

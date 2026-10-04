@@ -17,7 +17,10 @@ function callbackError() {
   return callbackMessages[error] ?? callbackMessages.failed;
 }
 
-export function Account() {
+export function Account({ onAccountChange, refreshVersion = 0 }: {
+  onAccountChange?: (userId: string | null) => void;
+  refreshVersion?: number;
+}) {
   const [state, setState] = useState<AccountState | { status: "loading" } | { status: "error" }>({ status: "loading" });
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -33,10 +36,15 @@ export function Account() {
   useEffect(() => {
     const controller = new AbortController();
     getAccount(controller.signal).then((account) => {
-      if (!controller.signal.aborted) setState(account);
-    }).catch(() => { if (!controller.signal.aborted) setState({ status: "error" }); });
+      if (!controller.signal.aborted) {
+        setState(account);
+        onAccountChange?.(account.status === "signed-in" ? account.user.id : null);
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) { setState({ status: "error" }); onAccountChange?.(null); }
+    });
     return () => controller.abort();
-  }, [version]);
+  }, [version, onAccountChange, refreshVersion]);
 
   async function login() {
     if (busy) return;
@@ -58,7 +66,10 @@ export function Account() {
     setBusy(true); setError(null);
     try {
       await signOut(controller.signal);
-      if (!controller.signal.aborted) { setState({ status: "loading" }); setVersion((value) => value + 1); }
+      if (!controller.signal.aborted) {
+        onAccountChange?.(null);
+        setState({ status: "loading" }); setVersion((value) => value + 1);
+      }
     } catch {
       if (!controller.signal.aborted) setError("Couldn’t sign out. Please try again.");
     } finally { if (!controller.signal.aborted) setBusy(false); }

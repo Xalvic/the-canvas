@@ -34,25 +34,28 @@ describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
   }
 
   it("upgrades version 2 with saved content intact and creates no users/sessions automatically", async () => {
+    await pool.query("ALTER TABLE boards DROP COLUMN owner_id");
     await pool.query("DROP TABLE google_auth_flows, auth_sessions, users");
-    await pool.query("DELETE FROM schema_migrations WHERE version = 3");
-    const board = await createPostgresBoardStore(pool).create("Keep this board");
-    const saved = await createPostgresDocumentStore(pool).save(board.id, documentInput());
+    await pool.query("DELETE FROM schema_migrations WHERE version >= 3");
+    const board = (await pool.query("INSERT INTO boards (id, title) VALUES ($1, 'Keep this board') RETURNING *", [randomUUID()])).rows[0];
+    const saved = (await pool.query("INSERT INTO board_documents (board_id, schema_version, revision, content) VALUES ($1, 1, 1, $2::jsonb) RETURNING *", [board.id, JSON.stringify(documentInput().content)])).rows[0];
     await migrateDatabase(pool); await migrateDatabase(pool);
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
-    expect(await createPostgresDocumentStore(pool).get(board.id)).toMatchObject({ status: "found", document: saved.status === "saved" ? saved.document : undefined });
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect((await pool.query("SELECT * FROM board_documents WHERE board_id = $1", [board.id])).rows).toEqual([saved]);
+    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([{ ...board, owner_id: null }]);
     expect((await pool.query("SELECT * FROM users")).rows).toEqual([]);
     expect((await pool.query("SELECT * FROM auth_sessions")).rows).toEqual([]);
   });
 
   it("rolls migration 3 back when its last table conflicts, preserving earlier tables and ledger", async () => {
-    await pool.query("DROP TABLE google_auth_flows, auth_sessions, users"); await pool.query("DELETE FROM schema_migrations WHERE version = 3");
+    await pool.query("ALTER TABLE boards DROP COLUMN owner_id");
+    await pool.query("DROP TABLE google_auth_flows, auth_sessions, users"); await pool.query("DELETE FROM schema_migrations WHERE version >= 3");
     await pool.query("CREATE TABLE google_auth_flows (marker text)");
-    const board = await createPostgresBoardStore(pool).create("Survivor");
+    const board = (await pool.query("INSERT INTO boards (id, title) VALUES ($1, 'Survivor') RETURNING *", [randomUUID()])).rows[0];
     await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });
     expect((await pool.query("SELECT to_regclass('users') AS users, to_regclass('auth_sessions') AS sessions")).rows).toEqual([{ users: null, sessions: null }]);
     expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }]);
-    expect(await createPostgresBoardStore(pool).get(board.id)).toEqual(board);
+    expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([board]);
     await pool.query("DROP TABLE google_auth_flows"); await migrateDatabase(pool);
   });
 

@@ -48,13 +48,13 @@ async function begin(agent: ReturnType<typeof request.agent>) {
 }
 
 describe("Google-only session HTTP", () => {
-  it("keeps guest access when Google is unconfigured and provides an explicit unavailable response", async () => {
+  it("keeps account availability explicit and protects server boards when Google is unconfigured", async () => {
     const app = createApp(createBoardStore());
     for (const path of ["/api/auth/google", "/api/auth/google/callback"]) {
       expect((await request(app).get(path).expect(503)).body.error.code).toBe("GOOGLE_AUTH_NOT_CONFIGURED");
     }
     expect((await request(app).get("/api/auth/me").expect(401)).body.error.details.googleSignInEnabled).toBe(false);
-    await request(app).get("/api/boards").expect(200);
+    await request(app).get("/api/boards").expect(401);
     await request(app).post("/api/auth/logout").set("X-Scribble-Request", "1").expect(204);
   });
 

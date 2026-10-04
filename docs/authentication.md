@@ -1,14 +1,16 @@
 # Google-only authentication
 
-Status (2026-10-02): implemented local Google sign-in, PostgreSQL users/sessions,
+Status (2026-10-04): implemented local Google sign-in, PostgreSQL users/sessions,
 current-user lookup, logout, and an optional React account section. No password
-signup/login is implemented. Migration 3 is applied to Docker PostgreSQL on port
+signup/login is implemented. Migrations 1–4 are applied to Docker PostgreSQL on port
 5434; portable PostgreSQL/configuration is untouched. Live Google consent/login
 is not yet verified because no Google web-client credentials are configured.
 
-Board ownership is the next implementation slice. Board/document routes remain
-the existing local proof, not private account resources; the API still binds to
-127.0.0.1. Signing in does not upload, replace, or associate the guest drawing.
+Board/document routes now require a valid session and enforce ownership in SQL.
+Signed-out/expired sessions return 401; foreign, unowned legacy and missing board
+IDs return 404. Writes require `X-Scribble-Request: 1` and an allowed origin.
+The API still binds to 127.0.0.1. Signing in does not upload, replace, or associate
+the guest drawing. Unowned demo records are preserved and hidden from accounts.
 
 ## Configure the Google web client
 
@@ -140,8 +142,15 @@ and variables. Run with redirects disabled: postman collection run <local mirror
 --ignore-redirects --no-report-events. No configured live Google login is claimed
 by its start/callback unavailable checks. Browser consent requires your client.
 
-Next: configure the Google client and verify a live sign-in, then implement board
-ownership and permission checks for every metadata/document read/write. Keep the
-guest-upload choice explicit. The user authorized committing and pushing this
+Ownership verification (2026-10-04): 297 fast tests, 39 real DB tests, four
+private-list browser scenarios plus three account scenarios, server typecheck
+and both builds passed. The updated cloud Postman collection preserves existing
+IDs/scripts and its fetched-back copy passes lint and 69 requests / 228 assertions.
+Supply session values only through a private local environment; no development
+login route was added. Automated proofs create and remove isolated DB schemas/accounts.
+
+Next: configure the Google client and verify live sign-in; implement explicit
+account board saves. Queue: [implementation-status.md](implementation-status.md).
+Keep the guest-upload choice explicit. The user authorized committing and pushing this
 slice with the completed storage work at the end of 2026-10-02. Future commits
 and pushes require fresh authorization.

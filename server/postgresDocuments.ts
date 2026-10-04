@@ -23,12 +23,12 @@ function toDocument(row: DocumentRow): BoardDocument {
 
 export function createPostgresDocumentStore(pool: Pool): BoardDocumentStore {
   return {
-    async get(boardId) {
+    async get(boardId, ownerId) {
       // One statement gives a consistent distinction between missing board/content.
       const result = await pool.query<ReadRow>(
         `SELECT b.id AS board_exists, d.board_id, d.schema_version, d.revision, d.content, d.updated_at
-         FROM boards b LEFT JOIN board_documents d ON d.board_id = b.id WHERE b.id = $1`,
-        [boardId],
+         FROM boards b LEFT JOIN board_documents d ON d.board_id = b.id WHERE b.id = $1 AND b.owner_id = $2`,
+        [boardId, ownerId],
       );
       const row = result.rows[0];
       if (!row) return { status: "board-not-found" };
@@ -36,12 +36,12 @@ export function createPostgresDocumentStore(pool: Pool): BoardDocumentStore {
       return { status: "found", document: toDocument(row) };
     },
 
-    async save(boardId, input) {
+    async save(boardId, input, ownerId) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         // All saves lock the parent first, matching board rename/delete locking.
-        const board = await client.query("SELECT id FROM boards WHERE id = $1 FOR UPDATE", [boardId]);
+        const board = await client.query("SELECT id FROM boards WHERE id = $1 AND owner_id = $2 FOR UPDATE", [boardId, ownerId]);
         if (board.rowCount === 0) {
           await client.query("ROLLBACK");
           return { status: "board-not-found" };

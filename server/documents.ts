@@ -24,6 +24,6 @@ export type DocumentSaveResult =
   | { status: "conflict"; currentRevision: number };
 
 export interface BoardDocumentStore {
-  get(boardId: string): Promise<DocumentReadResult>;
-  save(boardId: string, input: SaveDocumentInput): Promise<DocumentSaveResult>;
+  get(boardId: string, ownerId: string): Promise<DocumentReadResult>;
+  save(boardId: string, input: SaveDocumentInput, ownerId: string): Promise<DocumentSaveResult>;
 }

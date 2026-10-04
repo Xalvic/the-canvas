@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createApp } from "./app.js";
+import { createAuthenticatedApp as createApp, TEST_OWNER_ID } from "./testFixtures/authenticatedApp.js";
 import { createBoardStore } from "./boards.js";
 import { MAX_DOCUMENT_REVISION, type BoardDocumentStore } from "./documents.js";
 import { documentInput } from "./testFixtures/document.js";
@@ -23,7 +23,7 @@ describe("local document HTTP contract", () => {
     const result = await request(app).get(url).expect(200);
     expect(result.body).toEqual({ document });
     expect(result.headers["cache-control"]).toBe("no-store");
-    expect(get).toHaveBeenCalledExactlyOnceWith(id);
+    expect(get).toHaveBeenCalledExactlyOnceWith(id, TEST_OWNER_ID);
   });
 
   it.each([
@@ -40,12 +40,12 @@ describe("local document HTTP contract", () => {
     const first = await request(app).put(url).send(documentInput()).expect(201);
     expect(first.headers.location).toBe(url);
     expect(first.body).toEqual({ document });
-    expect(save).toHaveBeenCalledExactlyOnceWith(id, documentInput());
+    expect(save).toHaveBeenCalledExactlyOnceWith(id, documentInput(), TEST_OWNER_ID);
     save.mockResolvedValue({ status: "saved", created: false, document: { ...document, revision: 2 } });
     const replaced = await request(app).put(url).send(documentInput(1)).expect(200);
     expect(replaced.body.document.revision).toBe(2);
     expect(replaced.headers.location).toBeUndefined();
-    expect(save).toHaveBeenLastCalledWith(id, documentInput(1));
+    expect(save).toHaveBeenLastCalledWith(id, documentInput(1), TEST_OWNER_ID);
   });
 
   it("reports a conflict's current revision without retrying", async () => {

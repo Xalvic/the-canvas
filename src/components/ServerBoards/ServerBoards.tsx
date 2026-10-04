@@ -1,33 +1,50 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { listServerBoards, type ServerBoard } from "../../api/boards";
+import { BoardSignInRequired, listServerBoards, type ServerBoard } from "../../api/boards";
 import { Account } from "../Account/Account";
 
 type BoardListState =
+  | { status: "signed-out" }
   | { status: "loading" }
   | { status: "success"; boards: ServerBoard[] }
   | { status: "error" };
 
 export function ServerBoards() {
-  const [state, setState] = useState<BoardListState>({ status: "loading" });
+  const [state, setState] = useState<BoardListState>({ status: "signed-out" });
+  const [userId, setUserId] = useState<string | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
+  const [accountVersion, setAccountVersion] = useState(0);
+  const listRequest = useRef<AbortController | null>(null);
+  const accountChanged = useCallback((id: string | null) => {
+    listRequest.current?.abort();
+    setUserId(id);
+    setState(id ? { status: "loading" } : { status: "signed-out" });
+  }, []);
 
   useEffect(() => {
+    if (!userId) return;
     const controller = new AbortController();
+    listRequest.current = controller;
 
     async function loadBoards() {
       try {
         const boards = await listServerBoards(controller.signal);
         if (!controller.signal.aborted) setState({ status: "success", boards });
-      } catch {
-        if (!controller.signal.aborted) setState({ status: "error" });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          if (error instanceof BoardSignInRequired) {
+            setUserId(null);
+            setState({ status: "signed-out" });
+            setAccountVersion((version) => version + 1);
+          } else setState({ status: "error" });
+        }
       }
     }
 
     void loadBoards();
     // Ignore stale results on refresh, unmount, and Strict Mode cleanup.
     return () => controller.abort();
-  }, [requestVersion]);
+  }, [requestVersion, userId]);
 
   function refreshBoards() {
     setState({ status: "loading" });
@@ -45,10 +62,11 @@ export function ServerBoards() {
         <ChevronDown size={16} aria-hidden="true" />
       </summary>
       <div className="server-boards-content">
-        <Account />
+        <Account onAccountChange={accountChanged} refreshVersion={accountVersion} />
         <p className="server-boards-description">
           Board titles only. Your canvas stays on this device.
         </p>
+        {state.status === "signed-out" && <p role="status">Sign in to see your server boards.</p>}
         {state.status === "loading" && <p role="status">Loading boards…</p>}
         {state.status === "error" && (
           <p className="server-boards-error" role="alert">
@@ -62,14 +80,14 @@ export function ServerBoards() {
             </ul>
           )
         )}
-        <button
+        {state.status !== "signed-out" && <button
           className="server-boards-refresh"
           type="button"
           disabled={state.status === "loading"}
           onClick={refreshBoards}
         >
           {state.status === "error" ? "Retry" : "Refresh"}
-        </button>
+        </button>}
       </div>
     </details>
   );
