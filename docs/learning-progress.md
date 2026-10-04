@@ -20,7 +20,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | Local editor foundation | Custom React/TypeScript/Vite/Zustand canvas, history, selection, IndexedDB boards/assets |
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
 | 2. PostgreSQL persistence | Metadata CRUD, document validation/adapters, migration 2, and local document GET/PUT verified on Docker; SQL practice and Prisma pending |
-| 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live OAuth configuration/login pending |
+| 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live sign-in/reload/sign-out user-verified in Chrome |
 | 4. Authorization/sharing | Owner-only metadata/documents implemented; sharing/roles pending |
 | 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
@@ -178,5 +178,12 @@ tests, 39 real DB tests, four private-list browser scenarios plus three account
 scenarios, typecheck/both builds, and the fetched-back cloud Postman collection
 (69 requests / 228 assertions).
 
-Next: explicit account board save/open. Live Google setup still needs local
-credentials. Implementation-only queue: [implementation-status.md](implementation-status.md).
+Live Google verification (2026-10-04): the user configured OAuth credentials in
+ignored `.env.docker` and verified Chrome sign-in, staying logged in after reload,
+and sign-out on the local app. Configuration presence/URLs were checked without
+printing secrets. No auth code changed; credentials remain untracked.
+
+Next session: explicit account board save/open against the existing local
+API/PostgreSQL, with owned-board management, save status and safe conflicts.
+Start with non-image boards and preserve guest IndexedDB. Implementation-only
+queue: [implementation-status.md](implementation-status.md).

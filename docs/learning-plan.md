@@ -155,8 +155,9 @@ Design the save flow: what is persisted, when saving happens, save indicators, f
 
 **Current implementation choice (2026-10-02):** Google sign-in only, at the user's
 request; no password signup/login. OAuth code flow, server sessions, me/logout and
-optional account UI are implemented. Configure the user's Google web client to
-verify live login; board ownership/protected resources follow. See
+optional account UI and protected board/document ownership are implemented.
+Live Google sign-in, reload persistence and sign-out were user-verified in Chrome
+on 2026-10-04. Next: explicit account board save/open. See
 [authentication](authentication.md). Focus on implementation for now.
 
 **Build:** Provider sign-in, logout, current-user endpoint, a documented

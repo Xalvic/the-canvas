@@ -8,13 +8,17 @@ The user requested implementing pending items one by one, without lessons.
 Board ownership/protected metadata and documents are now implemented and tested.
 Next: account board save/open with explicit local upload and safe save conflicts;
 see `docs/implementation-status.md` for the implementation queue.
-Live Google login still needs local OAuth settings in ignored `.env.docker`;
-see `docs/authentication.md`. Docker PostgreSQL uses port 5434 with migrations
+Google OAuth settings are configured in ignored `.env.docker`. On 2026-10-04
+the user verified real Chrome sign-in, staying signed in after reload, and
+sign-out at `http://127.0.0.1:5173/scribble/`; see `docs/authentication.md`.
+Docker PostgreSQL uses port 5434 with migrations
 1/2/3/4 applied; its original demo board is preserved and hidden as unowned.
 Portable PostgreSQL on 5433 is preserved. Check service status after reboot.
 Google-only sign-in and guest IndexedDB use remain the product choices.
-The user authorized committing this ownership milestone on 2026-10-04; check
-git log for its revision. No push is authorized. Future commits need fresh approval.
+Ownership is committed as `8a773fe`. The user authorized committing this live
+Google verification/handoff update; check git log for its revision. No push is
+authorized. Future commits need fresh approval. Cloud save/open implementation
+will start in a new session, as requested; do not begin it during this handoff.
 
 ## Implementation record
 
@@ -122,7 +126,14 @@ cloud Postman copy (69 requests / 228 assertions). Existing Postman IDs/scripts
 and normal Docker demo preserved. Guest IndexedDB is unchanged; unowned legacy
 rows are hidden, never claimed.
 
-Next: account board save/open; configure/test the live Google client separately.
+Live Google verification (2026-10-04): credentials configured locally; the user
+verified real Chrome sign-in, persistence after reload, and sign-out. Configuration
+presence and matching callback/frontend URLs checked without exposing secrets.
+No auth code changed and no credentials are committed.
+
+Next: account board save/open in a new session, first against the local backend:
+explicit guest upload, owned-board management/opening, save status and safe
+revision-conflict recovery. Begin with non-image boards; keep guest IndexedDB.
 Prisma and other implementation items are in `docs/implementation-status.md`;
 keep one migration authority. Private board/document access is now enforced.
 Ask permission to verify actual database-process restart persistence;
@@ -134,7 +145,7 @@ Commit future changes only after explicit user authorization, separately for eac
 commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
 Phase 2: Prisma remains; document modeling and the local API proof are implemented.
-Phase 3: Google-only auth implemented/tested locally; real Google credentials/login
-pending. Phase 4: ownership is implemented; sharing/roles remain pending.
+Phase 3: Google-only auth implemented; live login/reload/logout user-verified.
+Phase 4: ownership is implemented; sharing/roles remain pending.
 
 Milestone summaries only, no Q&A logging. Guide: `learning-plan.md`; progress: `learning-progress.md`.

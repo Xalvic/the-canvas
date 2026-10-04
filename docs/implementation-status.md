@@ -2,7 +2,7 @@
 
 Updated: 2026-10-04. Implementation only; lesson topics are excluded.
 
-## Completed in this milestone
+## Completed milestones
 
 - Private board ownership for metadata CRUD and document GET/PUT. Every board
   route requires a persisted session; creation takes its owner from that session.
@@ -17,6 +17,11 @@ Updated: 2026-10-04. Implementation only; lesson topics are excluded.
   pending requests cancelled, and account recheck after a board-session expiry.
   Guest IndexedDB, document history and editor interactions retain their existing
   behavior. Login never uploads a local board.
+- Google OAuth credentials configured in ignored `.env.docker`. On 2026-10-04
+  the user verified real Chrome sign-in, staying logged in after reload and
+  successful sign-out at `http://127.0.0.1:5173/scribble/`. Configuration presence
+  and matching URLs were checked without printing credentials; secrets stay
+  untracked. No authentication code change was needed.
 - Updated the cloud Scribble API collection through the Postman plugin while
   preserving all existing request/example IDs and scripts. The verified cloud
   copy passes lint and 69 local requests / 228 assertions with zero failures.
@@ -25,40 +30,38 @@ Updated: 2026-10-04. Implementation only; lesson topics are excluded.
 
 Validation: 297 fast tests, 39 real Docker PostgreSQL tests, four private-list
 browser scenarios plus three account scenarios, server typecheck, and both
-production builds. These checks cover controlled sessions; live Google consent/
-login still needs the user's OAuth client settings. Setup:
+production builds. Automated checks cover controlled sessions; live Google
+sign-in/reload/sign-out are separately user-verified in Chrome. Setup:
 [authentication.md](authentication.md).
 
 ## Pending implementation queue
 
-1. **Live Google sign-in:** configure the web-client credentials in ignored
-   `.env.docker`, then verify consent, reload/session persistence and logout.
-   Credentials are currently absent; do not store them in frontend code or Git.
-2. **Account board save/open:** explicit upload of a local board, protected
+1. **Account board save/open:** explicit upload of a local board, protected
    list/create/rename/delete UI, document save/load, save status, revision-conflict
    recovery and safe switching that preserves unsaved local work. Non-image
    documents can use the current API; image boards need the asset milestone.
-3. **TanStack Query:** server metadata/document queries, mutations, caching,
+2. **TanStack Query:** server metadata/document queries, mutations, caching,
    invalidation and error recovery; keep pointer/editor state in its current
    stores. This can be delivered with the account-board UI.
-4. **Prisma:** integrate against the existing schema while preserving data,
+3. **Prisma:** integrate against the existing schema while preserving data,
    constraints, transaction behavior and a single migration authority.
-5. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
+4. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
    sharing flow, with server enforcement on every read and mutation.
-6. **Cloud image assets:** durable private storage, validated uploads, access
+5. **Cloud image assets:** durable private storage, validated uploads, access
    checks, recoverable failures, deletion and orphan cleanup.
-7. **Real-time collaboration:** authorized connections, presence/cursors,
+6. **Real-time collaboration:** authorized connections, presence/cursors,
    synchronized edits, reconnect handling and tested concurrent-edit behavior.
-8. **PWA and local reliability:** installation/offline loading and cross-tab
+7. **PWA and local reliability:** installation/offline loading and cross-tab
    coordination for local saves; preserve stored guest data compatibility.
-9. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
+8. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
    document fresh setup, and verify an actual Docker database-process restart.
-10. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
+9. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
     assets, CI checks, HTTPS/configuration, logs/error monitoring, deployment
     rate limiting, backups, restore verification and operational runbooks.
-11. **End-to-end cloud validation:** complete sign-in → board creation → drawing
+10. **End-to-end cloud validation:** complete sign-in → board creation → drawing
     → save → refresh/reopen tests, followed by sharing/assets/collaboration paths
     as those features become available.
 
-Next implementable milestone: account board save/open. Live Google setup can be
-completed independently when the local credentials are available.
+Next session: account board save/open, beginning with non-image boards against
+the existing local API/PostgreSQL. Deployment follows later. Preserve guest use
+and require an explicit user choice to upload a local drawing.

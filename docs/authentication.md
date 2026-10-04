@@ -3,8 +3,11 @@
 Status (2026-10-04): implemented local Google sign-in, PostgreSQL users/sessions,
 current-user lookup, logout, and an optional React account section. No password
 signup/login is implemented. Migrations 1–4 are applied to Docker PostgreSQL on port
-5434; portable PostgreSQL/configuration is untouched. Live Google consent/login
-is not yet verified because no Google web-client credentials are configured.
+5434; portable PostgreSQL/configuration is untouched. Google web-client settings
+are configured in ignored `.env.docker`. On 2026-10-04 the user verified real
+Google sign-in in Chrome at `http://127.0.0.1:5173/scribble/`, staying signed in
+after reload, and successful sign-out. This is user-reported live verification;
+automated tests use controlled sessions. Credentials remain outside Git.
 
 Board/document routes now require a valid session and enforce ownership in SQL.
 Signed-out/expired sessions return 401; foreign, unowned legacy and missing board
@@ -149,8 +152,14 @@ IDs/scripts and its fetched-back copy passes lint and 69 requests / 228 assertio
 Supply session values only through a private local environment; no development
 login route was added. Automated proofs create and remove isolated DB schemas/accounts.
 
-Next: configure the Google client and verify live sign-in; implement explicit
-account board saves. Queue: [implementation-status.md](implementation-status.md).
+Live Google setup is complete: the user verified sign-in, session persistence
+after reload and sign-out in Chrome on 2026-10-04. Configuration validation also
+confirmed Google credentials are present and the local callback/frontend URLs
+match, without printing credentials.
+
+Next: implement explicit account board save/open against the existing local
+API/PostgreSQL, followed by deployment. Start with non-image documents until
+durable cloud assets exist. Queue: [implementation-status.md](implementation-status.md).
 Keep the guest-upload choice explicit. The user authorized committing and pushing this
 slice with the completed storage work at the end of 2026-10-02. Future commits
 and pushes require fresh authorization.

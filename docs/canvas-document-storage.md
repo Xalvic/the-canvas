@@ -3,8 +3,9 @@
 Status: validation/adapters and owner-protected local pg document GET/PUT
 implemented, 2026-10-04. Migrations 1–4 are applied to Docker PostgreSQL on port 5434.
 Revision conflicts, rollback, round trips, and an actual API process restart are
-verified. Google-only authentication is now implemented separately; live OAuth
-configuration is pending. Board ownership is implemented. Prisma, frontend document save/load,
+verified. Google-only authentication is implemented and configured locally;
+live sign-in/reload/sign-out were user-verified in Chrome on 2026-10-04.
+Board ownership is implemented. Prisma, frontend document save/load,
 guest upload, and cloud deployment remain pending. Guest IndexedDB still saves
 independently. See [authentication setup](authentication.md).
 
@@ -441,7 +442,8 @@ parent-row query before revision conflict checks. Mutation requests require the
 Scribble header and a permitted origin. Migration 4 preserves unowned demo data
 but hides it from all accounts. Guest stores and document format are unchanged.
 
-Next implementation: explicit frontend account save/open; live Google login needs
-local credentials. Prisma must retain constraints/API behavior with one migration authority.
+Next session: explicit frontend account save/open against the existing local
+backend, first for non-image boards. Google sign-in is now configured and
+user-verified. Prisma must retain constraints/API behavior with one migration authority.
 Actual Docker database-process restart verification remains pending. Durable
 image assets, explicit frontend account saves and deployment remain later milestones.
