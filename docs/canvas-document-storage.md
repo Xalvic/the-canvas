@@ -148,11 +148,11 @@ from 0 through 2,147,483,646, leaving room for PostgreSQL's integer increment.
 A document at revision 2,147,483,647 can still be read but needs a future counter
 migration before another save; overflow is rejected during request validation.
 
-## Later frontend save flow
+## Frontend save flow
 
-Keep guest IndexedDB saves free and independent. The current Server boards panel
-remains a read-only metadata list until a separate integration slice is approved.
-After authentication and ownership, offer an explicit account-save/upload choice.
+Keep guest IndexedDB saves free and independent. Account save/open is implemented
+in `src/persistence/accountBoardSession.ts` and the Server boards panel, using
+the existing protected API. It offers an explicit account-save/upload choice.
 The local `current-board` identity must not become a server UUID or an owner ID
 by assumption; create/select the server board and maintain a separate association.
 Never upload the guest board merely because the user logged in.
@@ -163,6 +163,13 @@ snapshot and a local edit generation. On success, advance the server revision;
 mark saved only if that generation is still current, otherwise save the newest
 queued snapshot next. Pointer frames stay transient. Undo/redo changes the saved
 content but does not create extra history entries through persistence.
+
+Owner/board-scoped IndexedDB records retain the baseline revision/document/title
+and any pending submitted snapshot. Startup opens the guest board; explicitly
+opening an account board recovers its unsaved draft and checks the server revision.
+Reload backs up the exact latest draft before adoption, repeating the backup if
+edits arrive while it is writing. Restore previous draft and save-as-new are
+explicit recovery actions. Account writes never replace the guest record.
 
 On a network failure, retain edits and expose retry. A lost response leaves the
 result uncertain: refetch and compare the canonical submitted snapshot before

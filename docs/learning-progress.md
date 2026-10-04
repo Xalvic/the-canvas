@@ -183,7 +183,18 @@ ignored `.env.docker` and verified Chrome sign-in, staying logged in after reloa
 and sign-out on the local app. Configuration presence/URLs were checked without
 printing secrets. No auth code changed; credentials remain untracked.
 
-Next session: explicit account board save/open against the existing local
-API/PostgreSQL, with owned-board management, save status and safe conflicts.
-Start with non-image boards and preserve guest IndexedDB. Implementation-only
-queue: [implementation-status.md](implementation-status.md).
+Account board save/open milestone (2026-10-04, implementation only): added
+explicit guest upload, blank account boards, open/rename/delete, serial autosave,
+revision conflicts and retry with lost-response reconciliation. Guest IndexedDB
+is preserved; owner/board-scoped drafts retain edits through reload, switching
+and sign-out/expiry. Reload backs up the latest draft for explicit restoration;
+save-as-new preserves both versions. Opening clears selection/history and
+restores the saved local viewport. Image uploads stay unsupported, while locally
+inserted image drafts remain recoverable. Mobile tool selection collapses the
+board panel. Verified 360 fast tests, 39 isolated-schema Docker DB checks,
+32 browser checks, typechecks and both builds. Browser account APIs are mocked;
+live Google account save/open still needs manual verification. Existing endpoints
+and the cloud Postman collection are unchanged. No lessons or Q&A were recorded.
+
+Next session: review this implementation, then TanStack Query server caching.
+Queue: [implementation-status.md](implementation-status.md).

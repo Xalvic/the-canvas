@@ -5,9 +5,12 @@ Updated: 2026-10-04. Read once per new project session.
 ## Current handoff
 
 The user requested implementing pending items one by one, without lessons.
-Board ownership/protected metadata and documents are now implemented and tested.
-Next: account board save/open with explicit local upload and safe save conflicts;
-see `docs/implementation-status.md` for the implementation queue.
+Account board save/open is now implemented against the existing local API:
+explicit local upload, owned-board management, autosave and safe conflicts.
+Guest IndexedDB is preserved under its existing key; account drafts are separate.
+Next: review this milestone, then TanStack Query caching and Prisma in the queue;
+see `docs/implementation-status.md`. The user authorized committing this
+implementation and handoff; check git log for its revision. No push is authorized.
 Google OAuth settings are configured in ignored `.env.docker`. On 2026-10-04
 the user verified real Chrome sign-in, staying signed in after reload, and
 sign-out at `http://127.0.0.1:5173/scribble/`; see `docs/authentication.md`.
@@ -17,8 +20,8 @@ Portable PostgreSQL on 5433 is preserved. Check service status after reboot.
 Google-only sign-in and guest IndexedDB use remain the product choices.
 Ownership is committed as `8a773fe`. The user authorized committing this live
 Google verification/handoff update; check git log for its revision. No push is
-authorized. Future commits need fresh approval. Cloud save/open implementation
-will start in a new session, as requested; do not begin it during this handoff.
+authorized. Future commits need fresh approval. Cloud save/open is now implemented
+in the user-authorized follow-up session.
 
 ## Implementation record
 
@@ -131,9 +134,24 @@ verified real Chrome sign-in, persistence after reload, and sign-out. Configurat
 presence and matching callback/frontend URLs checked without exposing secrets.
 No auth code changed and no credentials are committed.
 
-Next: account board save/open in a new session, first against the local backend:
-explicit guest upload, owned-board management/opening, save status and safe
-revision-conflict recovery. Begin with non-image boards; keep guest IndexedDB.
+Account board save/open milestone (2026-10-04): explicit upload and new/open/
+rename/delete controls use the existing protected APIs. Committed edits autosave
+serially with expected revisions; failures retain local drafts, and uncertain
+saves reconcile the submitted snapshot before retry. Conflicts never overwrite
+automatically. Reload preserves a recoverable previous draft; save-as-new creates
+a separate board. Guest `current-board` storage/schema remain compatible, with
+owner/board-scoped account drafts and save markers added to the existing store.
+Opening resets selection/history and restores a local viewport. Logout/expiry
+preserve account edits before returning to the guest board. Image uploads are
+rejected before creation; locally inserted images remain recoverable in drafts.
+On mobile, choosing a canvas tool collapses the board panel to keep drawing clear.
+Verified 360 fast tests, 39 real Docker DB checks in isolated schemas, 32 browser
+checks (including 12 new account scenarios), frontend/server typechecks and both
+builds. Account browser HTTP responses are mocked; the existing actual DB/API
+contracts passed separately. Live Google account save/open still needs manual
+verification. No API/schema/dependency changes or Postman update were needed.
+
+Next: review account board save/open, then TanStack Query for server caching.
 Prisma and other implementation items are in `docs/implementation-status.md`;
 keep one migration authority. Private board/document access is now enforced.
 Ask permission to verify actual database-process restart persistence;

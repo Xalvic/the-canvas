@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCardObject,
   createImageObject,
@@ -7,11 +7,22 @@ import {
 import { createStrokeObject } from "../canvas/strokes/strokeFactories";
 import { DEFAULT_PEN_SETTINGS, DEFAULT_TEXT_SETTINGS } from "../tools/toolSettings";
 import {
+  accountBoardStorageId,
   CURRENT_BOARD_ID,
   LOCAL_BOARD_SCHEMA_VERSION,
   parseLocalBoard,
+  loadLocalBoard,
+  type AccountBoardLink,
   type LocalBoardRecord,
 } from "./localBoardStorage";
+import { serializeDocumentSnapshot } from "./canvasDocumentAdapters";
+
+const database = vi.hoisted(() => ({ open: vi.fn(), get: vi.fn() }));
+vi.mock("./database", () => ({
+  BOARD_STORE_NAME: "boards",
+  openCanvasDatabase: database.open,
+  requestResult: async (request: { result: unknown }) => request.result,
+}));
 
 function validBoard(): LocalBoardRecord {
   const card = {
@@ -26,6 +37,21 @@ function validBoard(): LocalBoardRecord {
     viewport: { x: 640, y: 400, zoom: 1 },
     createdAt: 10,
     updatedAt: 20,
+  };
+}
+
+function accountBoard(): LocalBoardRecord & { account: AccountBoardLink } {
+  const board = validBoard();
+  return {
+    ...board,
+    id: accountBoardStorageId("owner-1", "board-1"),
+    account: {
+      ownerId: "owner-1",
+      boardId: "board-1",
+      revision: 2,
+      savedDocument: serializeDocumentSnapshot(board.objects),
+      savedTitle: "Previously saved title",
+    },
   };
 }
 
@@ -85,5 +111,90 @@ describe("local board format", () => {
     board.objects[image.id] = image;
 
     expect(parseLocalBoard(board)).toBe(board);
+  });
+
+  it("keeps guest records free of account metadata", () => {
+    const board = validBoard();
+    const restored = parseLocalBoard(JSON.parse(JSON.stringify(board)));
+    expect(restored).toEqual(board);
+    expect(restored).not.toHaveProperty("account");
+  });
+
+  it("round trips account save baselines and pending requests without changing the local schema", () => {
+    const board = accountBoard();
+    board.account.pendingSave = {
+      document: serializeDocumentSnapshot(board.objects),
+      expectedRevision: board.account.revision,
+    };
+    expect(parseLocalBoard(JSON.parse(JSON.stringify(board)))).toEqual(board);
+    expect(board.schemaVersion).toBe(1);
+  });
+
+  it("rejects malformed account metadata or unsupported baseline documents", () => {
+    const board = accountBoard();
+    for (const account of [
+      null,
+      { ...board.account, ownerId: " " },
+      { ...board.account, boardId: "" },
+      { ...board.account, revision: -1 },
+      { ...board.account, revision: 1.5 },
+      { ...board.account, savedTitle: 42 },
+      { ...board.account, savedDocument: { schemaVersion: 2, content: { objects: [] } } },
+      { ...board.account, savedDocument: { schemaVersion: 1, content: { objects: [{ type: "image" }] } } },
+      { ...board.account, pendingSave: { document: board.account.savedDocument, expectedRevision: -1 } },
+      { ...board.account, pendingSave: { document: {}, expectedRevision: 2 } },
+    ]) {
+      expect(parseLocalBoard({ ...board, account })).toBeNull();
+    }
+  });
+
+  it("prevents account drafts from using the guest key or another owner's key", () => {
+    const board = accountBoard();
+    expect(parseLocalBoard({ ...board, id: CURRENT_BOARD_ID })).toBeNull();
+    expect(parseLocalBoard({ ...board, id: accountBoardStorageId("owner-2", "board-1") })).toBeNull();
+    expect(parseLocalBoard({ ...board, id: `${board.id}:recovery` })).toEqual({ ...board, id: `${board.id}:recovery` });
+    expect(parseLocalBoard({ ...board, id: `${board.id}:other` })).toBeNull();
+  });
+
+  it("scopes storage keys by both account and board without delimiter collisions", () => {
+    expect(accountBoardStorageId("owner-1", "board-1")).toBe(accountBoardStorageId("owner-1", "board-1"));
+    expect(accountBoardStorageId("owner-1", "board-1")).not.toBe(accountBoardStorageId("owner-2", "board-1"));
+    expect(accountBoardStorageId("owner:board", "one")).not.toBe(accountBoardStorageId("owner", "board:one"));
+    expect(accountBoardStorageId("owner", "board:recovery")).not.toBe(`${accountBoardStorageId("owner", "board")}:recovery`);
+  });
+});
+
+describe("loading local boards by identity", () => {
+  beforeEach(() => {
+    database.get.mockReset();
+    database.open.mockReset();
+    database.open.mockResolvedValue({
+      transaction: (name: string, mode: string) => {
+        expect(name).toBe("boards");
+        expect(mode).toBe("readonly");
+        return { objectStore: () => ({ get: database.get }) };
+      },
+    });
+  });
+
+  it("defaults to the unchanged guest board key", async () => {
+    const board = validBoard();
+    database.get.mockReturnValue({ result: board });
+    await expect(loadLocalBoard()).resolves.toEqual(board);
+    expect(database.get).toHaveBeenCalledWith(CURRENT_BOARD_ID);
+  });
+
+  it("loads only the requested account draft and treats missing drafts as absent", async () => {
+    const board = accountBoard();
+    database.get.mockReturnValue({ result: board });
+    await expect(loadLocalBoard(board.id)).resolves.toEqual(board);
+    expect(database.get).toHaveBeenCalledWith(board.id);
+    database.get.mockReturnValue({ result: undefined });
+    await expect(loadLocalBoard(accountBoardStorageId("owner-2", "board-1"))).resolves.toBeNull();
+  });
+
+  it("rejects an otherwise valid board returned under a different requested key", async () => {
+    database.get.mockReturnValue({ result: validBoard() });
+    await expect(loadLocalBoard("another-board")).rejects.toThrow("mismatched identity");
   });
 });

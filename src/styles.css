@@ -172,6 +172,27 @@ button {
   line-height: 1.5;
 }
 
+.server-board-title {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.server-board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.server-boards-list .server-board-actions {
+  margin-bottom: 0;
+}
+
+.server-boards-list li[aria-current="true"] .server-board-title {
+  color: var(--accent);
+}
+
 .server-boards-refresh {
   min-height: 36px;
   padding: 6px 12px;

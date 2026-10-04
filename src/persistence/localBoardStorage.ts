@@ -2,6 +2,8 @@ import type { CanvasObject } from "../canvas/objects/types";
 import type { Viewport } from "../canvas/viewport/viewportMath";
 import type { DocumentSnapshot } from "../store/documentStore";
 import { isOpacity } from "../tools/toolSettings";
+import { z } from "zod";
+import { canvasDocumentSchema, type CanvasDocument } from "./canvasDocument";
 import {
   BOARD_STORE_NAME,
   openCanvasDatabase,
@@ -11,6 +13,31 @@ import {
 export const CURRENT_BOARD_ID = "current-board";
 export const LOCAL_BOARD_SCHEMA_VERSION = 1;
 
+export type AccountBoardLink = {
+  ownerId: string;
+  boardId: string;
+  revision: number;
+  savedDocument: CanvasDocument;
+  savedTitle: string;
+  pendingSave?: { document: CanvasDocument; expectedRevision: number };
+};
+
+export function accountBoardStorageId(ownerId: string, boardId: string): string {
+  return `account-board:${encodeURIComponent(ownerId)}:${encodeURIComponent(boardId)}`;
+}
+
+const accountBoardLinkSchema = z.strictObject({
+  ownerId: z.string().min(1).refine((value) => value.trim().length > 0),
+  boardId: z.string().min(1).refine((value) => value.trim().length > 0),
+  revision: z.number().int().nonnegative(),
+  savedDocument: canvasDocumentSchema,
+  savedTitle: z.string(),
+  pendingSave: z.strictObject({
+    document: canvasDocumentSchema,
+    expectedRevision: z.number().int().nonnegative(),
+  }).optional(),
+});
+
 export type LocalBoardRecord = {
   schemaVersion: typeof LOCAL_BOARD_SCHEMA_VERSION;
   id: string;
@@ -19,6 +46,7 @@ export type LocalBoardRecord = {
   viewport: Viewport;
   createdAt: number;
   updatedAt: number;
+  account?: AccountBoardLink;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -139,18 +167,32 @@ export function parseLocalBoard(value: unknown): LocalBoardRecord | null {
     return null;
   }
 
+  if (value.account !== undefined) {
+    const account = accountBoardLinkSchema.safeParse(value.account);
+    if (!account.success) return null;
+    let storageId: string;
+    try {
+      storageId = accountBoardStorageId(account.data.ownerId, account.data.boardId);
+    } catch {
+      return null;
+    }
+    if (value.id !== storageId && value.id !== `${storageId}:recovery`) return null;
+    return { ...value, account: account.data } as LocalBoardRecord;
+  }
+
   return value as LocalBoardRecord;
 }
 
-export async function loadLocalBoard(): Promise<LocalBoardRecord | null> {
+export async function loadLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardRecord | null> {
   const database = await openCanvasDatabase();
   const transaction = database.transaction(BOARD_STORE_NAME, "readonly");
   const rawBoard = await requestResult(
-    transaction.objectStore(BOARD_STORE_NAME).get(CURRENT_BOARD_ID),
+    transaction.objectStore(BOARD_STORE_NAME).get(id),
   );
   if (rawBoard === undefined) return null;
   const board = parseLocalBoard(rawBoard);
   if (!board) throw new Error("The locally saved board has an unsupported format");
+  if (board.id !== id) throw new Error("The locally saved board has a mismatched identity");
   return board;
 }
 

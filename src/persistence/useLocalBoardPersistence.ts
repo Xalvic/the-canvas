@@ -17,7 +17,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Local save failed";
 }
 
-function captureBoard(updatedAt = Date.now()): LocalBoardRecord {
+export function captureLocalBoard(updatedAt = Date.now()): LocalBoardRecord {
   const board = useBoardStore.getState();
   return {
     schemaVersion: LOCAL_BOARD_SCHEMA_VERSION,
@@ -27,6 +27,7 @@ function captureBoard(updatedAt = Date.now()): LocalBoardRecord {
     viewport: useViewportStore.getState().viewport,
     createdAt: board.createdAt,
     updatedAt,
+    ...(board.account ? { account: board.account } : {}),
   };
 }
 
@@ -65,6 +66,7 @@ export function useLocalBoardPersistence(): void {
           title: board.title,
           createdAt: board.createdAt,
           updatedAt: board.updatedAt,
+          account: board.account,
         }, hasSavedBoard);
       } catch (error) {
         if (!cancelled) {
@@ -85,27 +87,39 @@ export function useLocalBoardPersistence(): void {
     let saveTimer: number | null = null;
     let revision = 0;
     let saveQueue = Promise.resolve();
+    let pendingSession: { id: string; version: number } | null = null;
+
+    const isCurrentSession = (id: string, version: number) => {
+      const current = useBoardStore.getState();
+      return current.isHydrated && current.id === id && current.sessionVersion === version;
+    };
 
     const queueSave = () => {
+      const session = pendingSession;
+      pendingSession = null;
+      if (!session || !isCurrentSession(session.id, session.version)) return;
       const queuedRevision = revision;
-      const board = captureBoard();
+      const board = captureLocalBoard();
       saveQueue = saveQueue
         .catch(() => undefined)
         .then(() => saveLocalBoard(board))
         .then(() => {
-          if (queuedRevision === revision) {
+          if (queuedRevision === revision && isCurrentSession(board.id, session.version)) {
             useBoardStore.getState().markSaved(board.updatedAt);
           }
         })
         .catch((error) => {
-          if (queuedRevision === revision) {
+          if (queuedRevision === revision && isCurrentSession(board.id, session.version)) {
             useBoardStore.getState().markSaveError(errorMessage(error));
           }
         });
     };
 
     const scheduleSave = () => {
+      const board = useBoardStore.getState();
+      if (!board.isHydrated) return;
       revision += 1;
+      pendingSession = { id: board.id, version: board.sessionVersion };
       useBoardStore.getState().markSaving();
       if (saveTimer !== null) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
@@ -128,7 +142,11 @@ export function useLocalBoardPersistence(): void {
       if (state.viewport !== previous.viewport) scheduleSave();
     });
     const unsubscribeBoard = useBoardStore.subscribe((state, previous) => {
-      if (state.title !== previous.title) scheduleSave();
+      if (
+        state.isHydrated && previous.isHydrated &&
+        state.id === previous.id && state.sessionVersion === previous.sessionVersion &&
+        (state.title !== previous.title || state.account !== previous.account)
+      ) scheduleSave();
     });
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") flushPendingSave();
