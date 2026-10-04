@@ -449,8 +449,14 @@ parent-row query before revision conflict checks. Mutation requests require the
 Scribble header and a permitted origin. Migration 4 preserves unowned demo data
 but hides it from all accounts. Guest stores and document format are unchanged.
 
-Next session: explicit frontend account save/open against the existing local
-backend, first for non-image boards. Google sign-in is now configured and
-user-verified. Prisma must retain constraints/API behavior with one migration authority.
+Account save/open is implemented and committed as `7449241`; the user confirmed
+completed live Google account save/open verification on 2026-10-04. TanStack
+Query now owns account server snapshots and mutations. Documents always fetch
+a fresh revision for opening/reloading/uncertain-save reconciliation; writes do
+not retry automatically. Accepted responses update/invalidate owner caches;
+auth transitions remove private caches. The existing serial queue, explicit
+upload, guest IndexedDB, recoverable drafts and safe conflicts remain intact.
+Background server refresh never replaces the Zustand canvas/editor state.
+Next: Prisma must retain constraints/API behavior with one migration authority.
 Actual Docker database-process restart verification remains pending. Durable
-image assets, explicit frontend account saves and deployment remain later milestones.
+image assets and deployment remain later milestones.

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
 import {
   createServerBoard, getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
   type ServerBoardDocument,
@@ -40,6 +41,7 @@ const initialBoard = useBoardStore.getState();
 const records = new Map<string, LocalBoardRecord>();
 let session: AccountBoardSession;
 let stop: () => void;
+let queryClient: QueryClient;
 
 function document(body: string): CanvasDocument {
   const card = {
@@ -111,13 +113,15 @@ beforeEach(() => {
   vi.mocked(saveServerBoardDocument).mockImplementation(async (_id, content, expected) => remote(content, expected + 1));
   vi.mocked(createServerBoard).mockResolvedValue(metadata);
   vi.mocked(renameServerBoard).mockImplementation(async (id, title) => ({ ...metadata, id, title }));
-  session = new AccountBoardSession();
+  queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+  session = new AccountBoardSession(queryClient);
   session.setUser(ownerId);
   stop = session.start();
 });
 
 afterEach(() => {
   stop();
+  queryClient.clear();
   vi.useRealTimers();
   useBoardStore.setState(initialBoard);
   useDocumentStore.getState().loadDocument({});

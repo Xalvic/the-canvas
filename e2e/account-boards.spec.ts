@@ -23,11 +23,16 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
   const cloud = {
     signedIn: true,
     failSaves: false,
+    failLists: false,
+    loseNextSaveResponse: false,
+    listRequests: 0,
     conflictOnNextSave: false,
     mutations: [] as Mutation[],
     boards: new Map(initial.map((board) => [board.id, structuredClone(board)])),
     documentGate: null as Promise<void> | null,
     documentStarted: null as (() => void) | null,
+    listGate: null as Promise<void> | null,
+    listStarted: null as (() => void) | null,
   };
   let nextId = 4;
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user } : guest }));
@@ -47,7 +52,13 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     if (!cloud.signedIn) { await route.fulfill({ status: 401, json: guest }); return; }
     if (path === "/api/boards") {
       if (method === "GET") {
-        await route.fulfill({ json: { boards: [...cloud.boards.values()].map(({ document: _document, ...board }) => board) } });
+        cloud.listRequests++;
+        const boards = [...cloud.boards.values()].map(({ document: _document, ...board }) => board);
+        cloud.listStarted?.();
+        if (cloud.listGate) await cloud.listGate;
+        await route.fulfill(cloud.failLists
+          ? { status: 503, json: { error: { code: "UNAVAILABLE", message: "Try later" } } }
+          : { json: { boards } }).catch(() => {});
       } else if (method === "POST") {
         const id = `${String(nextId++).padStart(8, "0")}-4444-4444-8444-444444444444`;
         const board = { id, title: body.title, createdAt: 1, updatedAt: 1, document: null };
@@ -77,6 +88,7 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
         return;
       }
       board.document = { boardId: id, schemaVersion: body.schemaVersion, revision: revision + 1, updatedAt: Date.now(), content: body.content };
+      if (cloud.loseNextSaveResponse) { cloud.loseNextSaveResponse = false; await route.abort("failed"); return; }
       await route.fulfill({ status: revision === 0 ? 201 : 200, json: { document: board.document } });
       return;
     }
@@ -411,4 +423,105 @@ test("new account boards and explicit rename/delete leave the guest board intact
   expect((await canvasState(page)).objects).toEqual(guestObjects);
   expect(cloud.boards.size).toBe(0);
   expect(cloud.mutations.map((mutation) => mutation.method)).toEqual(["POST", "PUT", "PATCH", "DELETE"]);
+});
+
+test("cached board titles stay visible during refresh failure and recover on retry", async ({ page }) => {
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Cached board")]);
+  await page.goto("/scribble/");
+  await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
+  let release!: () => void;
+  cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
+  cloud.failLists = true;
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.getByText("Refreshing boards…", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
+  release();
+  await expect(page.getByRole("alert").filter({ hasText: "Showing the last loaded list" })).toBeVisible();
+  await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
+  cloud.failLists = false;
+  cloud.listGate = null;
+  cloud.boards.get(firstId)!.title = "Refreshed board";
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(page.getByText("Refreshed board", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Showing the last loaded list" })).toHaveCount(0);
+  expect(cloud.mutations).toEqual([]);
+});
+
+test("fresh lists avoid focus requests and stale focus refresh leaves the active canvas alone", async ({ page }) => {
+  async function refocus() {
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    });
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+      document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+    });
+  }
+  await page.clock.install();
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Focus board")]);
+  await page.goto("/scribble/");
+  await openBoard(page, "Focus board");
+  const before = await canvasState(page);
+  const reads = cloud.listRequests;
+  await refocus();
+  await page.waitForTimeout(100);
+  expect(cloud.listRequests).toBe(reads);
+  cloud.boards.get(firstId)!.title = "Changed title elsewhere";
+  cloud.boards.get(firstId)!.document = savedBoard(firstId, "Remote canvas change").document;
+  await page.clock.fastForward(31_000);
+  await refocus();
+  await expect(page.getByText("Changed title elsewhere", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Board title")).toHaveValue("Focus board");
+  expect(await canvasState(page)).toEqual(before);
+  expect(cloud.mutations).toEqual([]);
+});
+
+test("reconnect refreshes the board list without submitting guest work", async ({ page }) => {
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Before reconnect")]);
+  await page.goto("/scribble/");
+  await expect(page.getByText("Before reconnect", { exact: true })).toBeVisible();
+  await page.getByLabel("Board title").fill("Local reconnect draft");
+  cloud.boards.get(firstId)!.title = "After reconnect";
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByText("After reconnect", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Board title")).toHaveValue("Local reconnect draft");
+  expect(cloud.mutations).toEqual([]);
+});
+
+test("an older list refresh cannot roll back an acknowledged rename", async ({ page }) => {
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Before rename")]);
+  await page.goto("/scribble/");
+  await expect(page.getByText("Before rename", { exact: true })).toBeVisible();
+  let release!: () => void;
+  let started!: () => void;
+  cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
+  const requestStarted = new Promise<void>((resolve) => { started = resolve; });
+  cloud.listStarted = started;
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await requestStarted;
+  cloud.listGate = null;
+  page.once("dialog", (dialog) => dialog.accept("Acknowledged rename"));
+  await page.getByRole("listitem").filter({ has: page.getByText("Before rename", { exact: true }) }).getByRole("button", { name: "Rename", exact: true }).click();
+  await expect(page.getByText("Acknowledged rename", { exact: true })).toBeVisible();
+  release();
+  await expect(page.getByText("Before rename", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Acknowledged rename", { exact: true })).toBeVisible();
+  expect(cloud.mutations.map((mutation) => mutation.method)).toEqual(["PATCH"]);
+});
+
+test("a lost save acknowledgement reconciles a fresh revision without duplicating the write", async ({ page }) => {
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Lost response board")]);
+  await page.goto("/scribble/");
+  await openBoard(page, "Lost response board");
+  cloud.loseNextSaveResponse = true;
+  await editNote(page, "Lost response board", "Accepted before response loss");
+  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  expect(documentWrites(cloud)).toHaveLength(1);
+  expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);
+  await page.getByRole("button", { name: "Retry account save", exact: true }).click();
+  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  expect(documentWrites(cloud)).toHaveLength(1);
+  await expect(page.getByText("Accepted before response loss", { exact: true })).toBeVisible();
 });

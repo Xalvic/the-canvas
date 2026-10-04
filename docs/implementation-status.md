@@ -4,6 +4,19 @@ Updated: 2026-10-04. Implementation only; lesson topics are excluded.
 
 ## Completed milestones
 
+- TanStack Query v5 for owner-scoped account metadata/document queries and
+  mutations, with one app QueryClient/provider. Lists stay fresh for 30 seconds,
+  retain cached titles through refresh failures, and refresh on stale focus or
+  reconnect. One automatic retry is limited to network/5xx read failures;
+  permanent/auth errors do not retry. Refresh/Retry remains explicit.
+- The existing serial save/draft queue runs mutations through MutationObserver;
+  writes fail promptly offline and never replay automatically. Accepted writes
+  update/invalidate caches and cancel older reads. Logout/expiry/account changes
+  remove private query/mutation caches and ignore late responses. Document open,
+  reload and uncertain-save reconciliation always read a fresh server revision;
+  background refresh never replaces the Zustand editor or durable local drafts.
+- Account save/open is committed as `7449241`; the user confirmed completed live
+  Google account save/open verification on 2026-10-04 against the local backend.
 - Account board save/open UI against the existing local API: explicit upload,
   blank creation, open/rename/delete, serial autosave, save status and retry.
   Login never uploads a board. Guest `current-board` IndexedDB storage remains
@@ -40,39 +53,37 @@ Updated: 2026-10-04. Implementation only; lesson topics are excluded.
   Verification sessions/accounts live only in a temporary random DB schema;
   the environment file and schema are removed after the run.
 
-Validation: 360 fast tests, 39 real Docker PostgreSQL tests, and 32 browser
-scenarios (12 new account-board scenarios plus authentication, private-list and
-canvas regressions), frontend/server typechecks and both production builds.
+Validation: 382 fast tests (22 new query cases), 39 real Docker PostgreSQL tests,
+and 37 browser scenarios (five new cache/refresh/recovery cases plus account,
+authentication, private-list and canvas regressions), frontend/server typechecks
+and both production builds.
 Account browser scenarios use mocked HTTP; database/API contracts run separately
-in isolated schemas. Live Google sign-in/reload/sign-out were user-verified;
-the new account save/open flow still needs manual Chrome verification. Setup:
+in isolated schemas. Live Google sign-in/reload/sign-out and account save/open
+were user-verified; an automated real browser/API/DB fixture remains pending. Setup:
 [authentication.md](authentication.md).
 
 ## Pending implementation queue
 
-1. **TanStack Query:** server metadata/document queries, mutations, caching,
-   invalidation and error recovery; keep pointer/editor state in its current
-   stores. Account save/open currently uses the existing React/Zustand patterns.
-2. **Prisma:** integrate against the existing schema while preserving data,
+1. **Prisma:** integrate against the existing schema while preserving data,
    constraints, transaction behavior and a single migration authority.
-3. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
+2. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
    sharing flow, with server enforcement on every read and mutation.
-4. **Cloud image assets:** durable private storage, validated uploads, access
+3. **Cloud image assets:** durable private storage, validated uploads, access
    checks, recoverable failures, deletion and orphan cleanup.
-5. **Real-time collaboration:** authorized connections, presence/cursors,
+4. **Real-time collaboration:** authorized connections, presence/cursors,
    synchronized edits, reconnect handling and tested concurrent-edit behavior.
-6. **PWA and local reliability:** installation/offline loading and cross-tab
+5. **PWA and local reliability:** installation/offline loading and cross-tab
    coordination for local saves; preserve stored guest data compatibility.
-7. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
+6. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
    document fresh setup, and verify an actual Docker database-process restart.
-8. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
+7. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
     assets, CI checks, HTTPS/configuration, logs/error monitoring, deployment
     rate limiting, backups, restore verification and operational runbooks.
-9. **End-to-end cloud validation:** manually verify live Google sign-in → board
-   creation/upload → drawing → save → refresh/reopen against the local backend,
-   then automate a real browser/API/DB fixture and repeat on deployment. Sharing/
-   assets/collaboration paths follow as those features become available.
+8. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
+   the completed user live-Google account save/open verification, then repeat on
+   deployment. Sharing/assets/collaboration paths follow as those features
+   become available.
 
-Next session: review account save/open, then TanStack Query. Non-image account
+Next session: review TanStack Query, then Prisma. Non-image account
 boards are implemented against local API/PostgreSQL; deployment and image assets
 follow later. Preserve guest use and explicit upload.

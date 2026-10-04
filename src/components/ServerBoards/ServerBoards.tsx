@@ -1,28 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { BoardSignInRequired, listServerBoards, type ServerBoard } from "../../api/boards";
+import { BoardSignInRequired } from "../../api/boards";
+import { accountBoardListOptions } from "../../api/accountBoardQueries";
 import { Account } from "../Account/Account";
 import { useAccountBoardSession } from "../../persistence/accountBoardSession";
 import { useBoardStore } from "../../store/boardStore";
 import { useUiStore } from "../../store/uiStore";
 
-type BoardListState =
-  | { status: "signed-out" }
-  | { status: "loading" }
-  | { status: "success"; boards: ServerBoard[] }
-  | { status: "error" };
-
 export function ServerBoards() {
-  const [state, setState] = useState<BoardListState>({ status: "signed-out" });
-  const [userId, setUserId] = useState<string | null>(null);
-  const [requestVersion, setRequestVersion] = useState(0);
-  const [accountVersion, setAccountVersion] = useState(0);
   const { session, state: accountBoards } = useAccountBoardSession();
+  const userId = accountBoards.userId;
+  const boards = useQuery({ ...accountBoardListOptions(userId ?? ""), enabled: !!userId });
   const activeAccount = useBoardStore((board) => board.account);
   const isHydrated = useBoardStore((board) => board.isHydrated);
   const localSaveStatus = useBoardStore((board) => board.saveStatus);
   const localSaveError = useBoardStore((board) => board.saveError);
-  const listRequest = useRef<AbortController | null>(null);
   const panel = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => useUiStore.subscribe((next, previous) => {
@@ -31,50 +24,12 @@ export function ServerBoards() {
     }
   }), []);
   const accountChanged = useCallback((id: string | null) => {
-    listRequest.current?.abort();
-    setUserId(id);
-    setState(id ? { status: "loading" } : { status: "signed-out" });
     session.setUser(id);
   }, [session]);
 
   useEffect(() => {
-    if (!accountBoards.userId && userId) {
-      listRequest.current?.abort();
-      setUserId(null);
-      setState({ status: "signed-out" });
-    }
-  }, [accountBoards.userId, userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-    const controller = new AbortController();
-    listRequest.current = controller;
-
-    async function loadBoards() {
-      try {
-        const boards = await listServerBoards(controller.signal);
-        if (!controller.signal.aborted) setState({ status: "success", boards });
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          if (error instanceof BoardSignInRequired) {
-            setUserId(null);
-            setState({ status: "signed-out" });
-            setAccountVersion((version) => version + 1);
-            session.expire();
-          } else setState({ status: "error" });
-        }
-      }
-    }
-
-    void loadBoards();
-    // Ignore stale results on refresh, unmount, and Strict Mode cleanup.
-    return () => controller.abort();
-  }, [requestVersion, userId, accountBoards.listVersion, session]);
-
-  function refreshBoards() {
-    setState({ status: "loading" });
-    setRequestVersion((version) => version + 1);
-  }
+    if (userId && boards.error instanceof BoardSignInRequired) session.expire();
+  }, [boards.error, userId, session]);
 
   return (
     <details
@@ -88,7 +43,7 @@ export function ServerBoards() {
         <ChevronDown size={16} aria-hidden="true" />
       </summary>
       <div className="server-boards-content">
-        <Account onAccountChange={accountChanged} refreshVersion={accountVersion + accountBoards.accountVersion} />
+        <Account onAccountChange={accountChanged} refreshVersion={accountBoards.accountVersion} />
         <p className="server-boards-description">
           {activeAccount ? "Account board. A draft is also kept on this device." : "Local board. Upload only when you choose; signing in keeps it on this device."}
         </p>
@@ -124,17 +79,18 @@ export function ServerBoards() {
           {!activeAccount && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => void session.upload()}>Upload local board</button>}
           <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => void session.createBlank()}>New account board</button>
         </div>}
-        {state.status === "signed-out" && <p role="status">Sign in to see your server boards.</p>}
-        {state.status === "loading" && <p role="status">Loading boards…</p>}
-        {state.status === "error" && (
+        {!userId && <p role="status">Sign in to see your server boards.</p>}
+        {userId && boards.isPending && <p role="status">Loading boards…</p>}
+        {userId && boards.isFetching && boards.data && <p role="status">Refreshing boards…</p>}
+        {userId && boards.isError && !(boards.error instanceof BoardSignInRequired) && (
           <p className="server-boards-error" role="alert">
-            Couldn’t load server boards. Try again.
+            {boards.data ? "Couldn’t refresh server boards. Showing the last loaded list. Try again." : "Couldn’t load server boards. Try again."}
           </p>
         )}
-        {state.status === "success" && (
-          state.boards.length === 0 ? <p role="status">No server boards yet.</p> : (
+        {userId && boards.data && !(boards.error instanceof BoardSignInRequired) && (
+          boards.data.length === 0 ? <p role="status">No server boards yet.</p> : (
             <ul className="server-boards-list" aria-label="Boards from server">
-              {state.boards.map((board) => <li key={board.id} aria-current={activeAccount?.boardId === board.id ? "true" : undefined}>
+              {boards.data.map((board) => <li key={board.id} aria-current={activeAccount?.boardId === board.id ? "true" : undefined}>
                 <span className="server-board-title">{board.title}</span>
                 <div className="server-board-actions">
                   <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated || activeAccount?.boardId === board.id} onClick={() => void session.open(board)}>Open</button>
@@ -150,13 +106,13 @@ export function ServerBoards() {
             </ul>
           )
         )}
-        {state.status !== "signed-out" && <button
+        {userId && <button
           className="server-boards-refresh"
           type="button"
-          disabled={state.status === "loading"}
-          onClick={refreshBoards}
+          disabled={boards.isFetching}
+          onClick={() => void boards.refetch()}
         >
-          {state.status === "error" ? "Retry" : "Refresh"}
+          {boards.isError ? "Retry" : "Refresh"}
         </button>}
       </div>
     </details>

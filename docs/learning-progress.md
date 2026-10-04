@@ -22,7 +22,7 @@ storage. This records coverage; it does not claim every planned endpoint exists.
 | 2. PostgreSQL persistence | Metadata CRUD, document validation/adapters, migration 2, and local document GET/PUT verified on Docker; SQL practice and Prisma pending |
 | 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live sign-in/reload/sign-out user-verified in Chrome |
 | 4. Authorization/sharing | Owner-only metadata/documents implemented; sharing/roles pending |
-| 5. TanStack Query/server state | First read-only API list via fetch/effect; TanStack Query pending |
+| 5. TanStack Query/server state | Owner-scoped account queries/mutations, caching, invalidation, refresh/recovery implemented; editor stays in Zustand |
 | 6. Cloud assets | Local image storage exists; cloud storage not started |
 | 7. Real-time collaboration | Not started |
 | 8. Docker | Express connected to Docker PostgreSQL; actual DB restart checks pending |
@@ -193,8 +193,22 @@ restores the saved local viewport. Image uploads stay unsupported, while locally
 inserted image drafts remain recoverable. Mobile tool selection collapses the
 board panel. Verified 360 fast tests, 39 isolated-schema Docker DB checks,
 32 browser checks, typechecks and both builds. Browser account APIs are mocked;
-live Google account save/open still needs manual verification. Existing endpoints
-and the cloud Postman collection are unchanged. No lessons or Q&A were recorded.
+live Google account save/open is now user-verified. Committed as `7449241`.
+Existing endpoints and the cloud Postman collection are unchanged. No lessons
+or Q&A were recorded.
 
-Next session: review this implementation, then TanStack Query server caching.
+TanStack Query milestone (2026-10-04, implementation only): v5 provider and
+owner-scoped metadata/document caches; 30-second list freshness, retained cached
+titles through refresh failures, bounded transient read retry, Refresh/Retry,
+stale-focus/reconnect refresh, and cache removal on logout/expiry/account change.
+The existing draft/save queue executes mutations with retries disabled, updates
+accepted snapshots and cancels stale reads. Documents are read freshly for open,
+reload and uncertain-save reconciliation. Background reads do not replace the
+editor; guest IndexedDB, explicit upload, local recovery, safe conflicts and
+Zustand canvas state are preserved. Verified 382 fast tests, 39 real Docker DB
+tests, 37 browser scenarios, typechecks and both builds. No endpoint/schema changes
+or Postman update. The user confirmed completed live Google account save/open;
+automated real browser/API/DB verification remains pending. No lessons recorded.
+
+Next session: review TanStack Query, then Prisma with a single migration authority.
 Queue: [implementation-status.md](implementation-status.md).

@@ -5,12 +5,20 @@ Updated: 2026-10-04. Read once per new project session.
 ## Current handoff
 
 The user requested implementing pending items one by one, without lessons.
-Account board save/open is now implemented against the existing local API:
-explicit local upload, owned-board management, autosave and safe conflicts.
-Guest IndexedDB is preserved under its existing key; account drafts are separate.
-Next: review this milestone, then TanStack Query caching and Prisma in the queue;
-see `docs/implementation-status.md`. The user authorized committing this
-implementation and handoff; check git log for its revision. No push is authorized.
+Account board save/open is committed as `7449241`. Live Google account save/open
+verification is complete, confirmed by the user on 2026-10-04.
+TanStack Query now manages owner-scoped account metadata/document reads,
+mutations, caching, invalidation, refresh and read-error recovery. The existing
+serial save queue still reconciles uncertain writes against a fresh revision;
+writes never retry automatically. Cached lists survive transient refresh errors,
+refresh on stale focus/reconnect, and clear on logout/expiry/account changes.
+Opening/reloading/reconciling documents always checks the server. Background
+refresh never replaces the editor; canvas/editor state stays in Zustand.
+Guest IndexedDB, explicit upload, scoped drafts and recoverable conflicts remain.
+Next: review this milestone, then Prisma against the existing schema with one
+migration authority; see `docs/implementation-status.md`. The user authorized
+committing this milestone and handoff; check git log for its revision. Future
+commits need fresh approval. No push is authorized.
 Google OAuth settings are configured in ignored `.env.docker`. On 2026-10-04
 the user verified real Chrome sign-in, staying signed in after reload, and
 sign-out at `http://127.0.0.1:5173/scribble/`; see `docs/authentication.md`.
@@ -18,10 +26,8 @@ Docker PostgreSQL uses port 5434 with migrations
 1/2/3/4 applied; its original demo board is preserved and hidden as unowned.
 Portable PostgreSQL on 5433 is preserved. Check service status after reboot.
 Google-only sign-in and guest IndexedDB use remain the product choices.
-Ownership is committed as `8a773fe`. The user authorized committing this live
-Google verification/handoff update; check git log for its revision. No push is
-authorized. Future commits need fresh approval. Cloud save/open is now implemented
-in the user-authorized follow-up session.
+Ownership is committed as `8a773fe`. Prior verification/handoff updates are
+committed as `c2ca442`. Future commits need fresh approval.
 
 ## Implementation record
 
@@ -148,10 +154,28 @@ On mobile, choosing a canvas tool collapses the board panel to keep drawing clea
 Verified 360 fast tests, 39 real Docker DB checks in isolated schemas, 32 browser
 checks (including 12 new account scenarios), frontend/server typechecks and both
 builds. Account browser HTTP responses are mocked; the existing actual DB/API
-contracts passed separately. Live Google account save/open still needs manual
-verification. No API/schema/dependency changes or Postman update were needed.
+contracts passed separately. The user has now confirmed completed live Google
+account save/open verification. This milestone is committed as `7449241`.
+No API/schema/dependency changes or Postman update were needed for that milestone.
 
-Next: review account board save/open, then TanStack Query for server caching.
+TanStack Query milestone (2026-10-04, implementation only): added
+`@tanstack/react-query` v5 and one app QueryClient/provider. Metadata lists use
+30-second freshness, five-minute inactive caching, one bounded retry for network/
+5xx errors, retained cached titles on refresh failure, and explicit Refresh/Retry.
+Stale focus and reconnect refresh only server snapshots. Documents are cached
+but always read freshly before open, reload or pending-save reconciliation.
+The existing queue executes mutations through MutationObserver with retries
+disabled and prompt offline failure; accepted responses update/invalidate owner
+caches and cancel older reads. Auth transitions cancel/remove private queries
+and mutation records; late responses cannot restore them. Guest persistence,
+explicit uploads, local draft recovery, revision safety and Zustand editor state
+are preserved. No endpoint/schema changes or Postman update were needed.
+Verified 382 fast tests (22 new query cases), 39 real Docker DB checks in isolated
+schemas, 37 browser scenarios (five new refresh/recovery cases), server typecheck
+and both production builds. Browser HTTP remains mocked; live Google save/open
+is recorded as user-verified, not an automated real browser/API/DB proof.
+
+Next: review TanStack Query, then Prisma against the existing schema.
 Prisma and other implementation items are in `docs/implementation-status.md`;
 keep one migration authority. Private board/document access is now enforced.
 Ask permission to verify actual database-process restart persistence;

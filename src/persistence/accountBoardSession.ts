@@ -1,9 +1,10 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  BoardApiError, BoardSignInRequired, createServerBoard, deleteServerBoard,
-  getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
+  BoardApiError, BoardSignInRequired,
   type ServerBoard,
 } from "../api/boards";
+import { AccountBoardQueries } from "../api/accountBoardQueries";
 import { useBoardStore, DEFAULT_BOARD_TITLE } from "../store/boardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useViewportStore, initialViewport } from "../store/viewportStore";
@@ -26,7 +27,6 @@ type SessionState = {
   status: CloudStatus;
   error: string | null;
   hasRecovery: boolean;
-  listVersion: number;
   accountVersion: number;
 };
 
@@ -37,13 +37,18 @@ const message = (error: unknown) => error instanceof Error ? error.message : "Co
 
 /** Only committed store changes enter this queue. Pointer previews stay in the editor. */
 export class AccountBoardSession {
-  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, listVersion: 0, accountVersion: 0 };
+  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, accountVersion: 0 };
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private request: AbortController | null = null;
   private saving: Promise<void> | null = null;
   private operationSession = 0;
   private returnToGuest = false;
+  private queries: AccountBoardQueries;
+
+  constructor(queryClient: QueryClient) {
+    this.queries = new AccountBoardQueries(queryClient);
+  }
 
   getState = () => this.state;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -52,7 +57,6 @@ export class AccountBoardSession {
     this.listeners.forEach((listener) => listener());
   }
   private clearTimer() { if (this.timer !== null) clearTimeout(this.timer); this.timer = null; }
-  refreshList = () => this.update({ listVersion: this.state.listVersion + 1 });
 
   start() {
     const changed = () => {
@@ -80,6 +84,7 @@ export class AccountBoardSession {
   setUser = (userId: string | null) => {
     if (userId === this.state.userId) return;
     this.clearTimer(); this.request?.abort();
+    this.queries.clear();
     this.update({ userId, error: null });
     const account = useBoardStore.getState().account;
     if (account && account.ownerId !== userId) {
@@ -175,7 +180,9 @@ export class AccountBoardSession {
   }
 
   private async readDocument(boardId: string, signal: AbortSignal) {
-    try { return await getServerBoardDocument(boardId, signal); }
+    const ownerId = this.state.userId;
+    if (!ownerId) throw new BoardSignInRequired();
+    try { return await this.queries.document(ownerId, boardId, signal); }
     catch (error) {
       if (error instanceof BoardApiError && error.code === "DOCUMENT_NOT_FOUND") return { ...blankDocument(), boardId, revision: 0, updatedAt: Date.now() };
       throw error;
@@ -243,7 +250,7 @@ export class AccountBoardSession {
     // Validate before POST: images are kept local until durable assets exist.
     const document = copy ? serializeDocumentSnapshot(useDocumentStore.getState().objects) : blankDocument();
     const title = copy ? titleNow() : DEFAULT_BOARD_TITLE;
-    const remote = await createServerBoard(title, signal);
+    const remote = await this.queries.create(ownerId, title, signal);
     if (signal.aborted || this.state.userId !== ownerId) return;
     const record: LocalBoardRecord = {
       schemaVersion: LOCAL_BOARD_SCHEMA_VERSION, id: accountBoardStorageId(ownerId, remote.id),
@@ -256,7 +263,6 @@ export class AccountBoardSession {
     await this.replace(record, signal);
     if (!signal.aborted) {
       this.update({ status: "unsaved", hasRecovery: false });
-      this.refreshList();
       // A blank new board needs an explicit first document write too.
       await this.save(true, signal);
     }
@@ -298,17 +304,16 @@ export class AccountBoardSession {
           // Persist the submission marker before sending a write with an uncertain outcome.
           await waitForLocalBoardSave(signal);
           if (!current()) return;
-          const remote = await saveServerBoardDocument(link.boardId, document, link.revision, signal);
+          const remote = await this.queries.save(account.ownerId, link.boardId, document, link.revision, signal);
           if (!current()) return;
           link = { ...link, revision: remote.revision, savedDocument: { schemaVersion: remote.schemaVersion, content: remote.content }, pendingSave: undefined };
           useBoardStore.getState().setAccount(link);
         }
         if (title !== link.savedTitle) {
-          const renamed = await renameServerBoard(link.boardId, title, signal);
+          const renamed = await this.queries.rename(account.ownerId, link.boardId, title, signal);
           if (!current()) return;
           link = { ...link, savedTitle: renamed.title };
           useBoardStore.getState().setAccount(link);
-          this.refreshList();
         }
         if (!current()) return;
         const dirty = titleNow() !== link.savedTitle || !sameDocument(serializeDocumentSnapshot(useDocumentStore.getState().objects), link.savedDocument);
@@ -329,7 +334,7 @@ export class AccountBoardSession {
     const board = useBoardStore.getState();
     if (!board.account || board.account.ownerId !== this.state.userId) throw new BoardSignInRequired();
     const remote = await this.readDocument(board.account.boardId, signal);
-    const metadata = (await listServerBoards(signal)).find((item) => item.id === board.account!.boardId);
+    const metadata = (await this.queries.list(board.account.ownerId, signal)).find((item) => item.id === board.account!.boardId);
     if (!metadata) throw new Error("This account board no longer exists.");
     const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
     const record: LocalBoardRecord = {
@@ -354,17 +359,20 @@ export class AccountBoardSession {
   });
 
   rename = (board: ServerBoard, title: string) => this.operation(async (signal) => {
+    const ownerId = this.state.userId;
+    if (!ownerId) throw new BoardSignInRequired();
     if (useBoardStore.getState().account?.boardId === board.id) {
       useBoardStore.getState().setTitle(title);
       if (!["conflict", "error"].includes(this.state.status)) this.update({ status: "unsaved" });
-    } else await renameServerBoard(board.id, title, signal);
-    if (!signal.aborted) this.refreshList();
+    } else await this.queries.rename(ownerId, board.id, title, signal);
   });
 
   remove = (board: ServerBoard) => this.operation(async (signal) => {
+    const ownerId = this.state.userId;
+    if (!ownerId) throw new BoardSignInRequired();
     // Preserve any active draft before deletion; deleting never destroys IndexedDB records.
     await waitForLocalBoardSave(signal);
-    await deleteServerBoard(board.id, signal);
+    await this.queries.remove(ownerId, board.id, signal);
     if (signal.aborted) return;
     if (useBoardStore.getState().account?.boardId === board.id) {
       const guest = await loadLocalBoard();
@@ -372,12 +380,12 @@ export class AccountBoardSession {
       await this.replace(guest, signal);
       this.update({ status: "local", hasRecovery: false });
     }
-    this.refreshList();
   });
 }
 
 export function useAccountBoardSession() {
-  const [session] = useState(() => new AccountBoardSession());
+  const queryClient = useQueryClient();
+  const [session] = useState(() => new AccountBoardSession(queryClient));
   const state = useSyncExternalStore(session.subscribe, session.getState);
   useEffect(() => session.start(), [session]);
   return { session, state };

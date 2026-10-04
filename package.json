@@ -25,6 +25,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.1",
     "express": "^5.2.1",
     "google-auth-library": "^11.1.0",
     "lucide-react": "^1.43.0",

@@ -157,9 +157,14 @@ after reload and sign-out in Chrome on 2026-10-04. Configuration validation also
 confirmed Google credentials are present and the local callback/frontend URLs
 match, without printing credentials.
 
-Next: implement explicit account board save/open against the existing local
-API/PostgreSQL, followed by deployment. Start with non-image documents until
-durable cloud assets exist. Queue: [implementation-status.md](implementation-status.md).
+Account save/open is implemented and committed as `7449241`. On 2026-10-04 the
+user confirmed completed live Google account save/open verification against the
+local backend. TanStack Query now caches account server state and clears private
+snapshots on logout/expiry/account changes; draft recovery stays in IndexedDB and
+canvas/editor state stays in Zustand. Automated account browser scenarios use
+mocked HTTP; a real browser/API/DB fixture and deployment verification remain.
+Next: Prisma with one migration authority; non-image account documents remain
+the scope until durable cloud assets exist. Queue: [implementation-status.md](implementation-status.md).
 Keep the guest-upload choice explicit. The user authorized committing and pushing this
 slice with the completed storage work at the end of 2026-10-02. Future commits
 and pushes require fresh authorization.
