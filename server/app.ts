@@ -5,8 +5,11 @@ import { errorHandler, HttpError } from "./errors.js";
 import { DOCUMENT_BODY_LIMIT, saveDocumentSchema, type BoardDocumentStore } from "./documents.js";
 import { createAuthRouter, type AuthDependencies } from "./authRoutes.js";
 import { requireBoardSession } from "./boardAccess.js";
+import { inviteSchema, memberUpdateSchema, type SharingStore } from "./sharing.js";
+import { createUploadGate, type ImageAssetService } from "./imageAssets.js";
+import { MAX_IMAGE_BYTES } from "./imageValidation.js";
 
-export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies) {
+export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService) {
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -19,6 +22,35 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
   });
   app.use("/api/auth", createAuthRouter(auth));
   app.use("/api/boards", requireBoardSession(auth));
+  if (sharing) app.use("/api/invitations", requireBoardSession(auth));
+
+  if (assets) {
+    const acquire = createUploadGate();
+    const parseImage = express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: MAX_IMAGE_BYTES, inflate: false });
+    app.post("/api/boards/:id/assets", async (req, res) => {
+      const id = boardIdSchema.parse(req.params.id);
+      await assets.authorizeUpload(id, res.locals.ownerId);
+      const type = req.get("Content-Type")?.toLowerCase();
+      if (!type || !["image/jpeg", "image/png", "image/webp"].includes(type)) {
+        throw new HttpError(415, "UNSUPPORTED_IMAGE_TYPE", "Send raw JPEG, PNG or WebP bytes with the matching Content-Type");
+      }
+      const release = acquire(res.locals.ownerId);
+      try {
+        const bodyTimer = setTimeout(() => req.destroy(), 30_000);
+        bodyTimer.unref();
+        try {
+          await new Promise<void>((resolve, reject) => parseImage(req, res, (error?: unknown) => error ? reject(error) : resolve()));
+        } finally { clearTimeout(bodyTimer); }
+        const asset = await assets.upload(id, res.locals.ownerId, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), type);
+        res.status(201).location(`/api/boards/${id}/assets/${asset.id}`).json({ asset });
+      } finally { release(); }
+    });
+    app.get("/api/boards/:id/assets/:assetId", async (req, res) => {
+      const id = boardIdSchema.parse(req.params.id);
+      const assetId = boardIdSchema.parse(req.params.assetId);
+      res.json({ asset: await assets.read(id, assetId, res.locals.ownerId) });
+    });
+  }
 
   // Document PUT gets its own parser before the smaller metadata parser.
   if (documents) {
@@ -47,6 +79,41 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
   }
 
   app.use(express.json({ limit: "16kb" }));
+
+  if (sharing) {
+    app.get("/api/invitations", async (_req, res) => {
+      res.json({ invitations: await sharing.incoming(res.locals.ownerId, res.locals.userEmail) });
+    });
+    app.post("/api/invitations/:inviteId/accept", async (req, res) => {
+      const id = boardIdSchema.parse(req.params.inviteId);
+      res.json({ board: await sharing.accept(id, res.locals.ownerId, res.locals.userEmail) });
+    });
+    app.delete("/api/invitations/:inviteId", async (req, res) => {
+      await sharing.decline(boardIdSchema.parse(req.params.inviteId), res.locals.ownerId, res.locals.userEmail);
+      res.status(204).end();
+    });
+    app.get("/api/boards/:id/sharing", async (req, res) => {
+      res.json(await sharing.get(boardIdSchema.parse(req.params.id), res.locals.ownerId));
+    });
+    app.post("/api/boards/:id/invitations", async (req, res) => {
+      if (!req.is("application/json")) throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
+      const invite = await sharing.invite(boardIdSchema.parse(req.params.id), res.locals.ownerId, inviteSchema.parse(req.body));
+      res.status(201).json({ invitation: invite });
+    });
+    app.delete("/api/boards/:id/invitations/:inviteId", async (req, res) => {
+      await sharing.cancel(boardIdSchema.parse(req.params.id), res.locals.ownerId, boardIdSchema.parse(req.params.inviteId));
+      res.status(204).end();
+    });
+    app.patch("/api/boards/:id/members/:userId", async (req, res) => {
+      if (!req.is("application/json")) throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
+      await sharing.updateMember(boardIdSchema.parse(req.params.id), res.locals.ownerId, boardIdSchema.parse(req.params.userId), memberUpdateSchema.parse(req.body).role);
+      res.status(204).end();
+    });
+    app.delete("/api/boards/:id/members/:userId", async (req, res) => {
+      await sharing.removeMember(boardIdSchema.parse(req.params.id), res.locals.ownerId, boardIdSchema.parse(req.params.userId));
+      res.status(204).end();
+    });
+  }
 
   app.get("/api/boards", async (_req, res) => {
     res.json({ boards: await boards.list(res.locals.ownerId) });

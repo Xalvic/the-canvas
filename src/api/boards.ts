@@ -5,9 +5,12 @@ const MAX_DOCUMENT_REVISION = 2_147_483_647;
 const identifier = z.string().min(1);
 const timestamp = z.number().finite().nonnegative();
 const titleSchema = z.string().trim().min(1).max(120);
+export const boardRoleSchema = z.enum(["owner", "editor", "viewer"]);
+export type BoardRole = z.infer<typeof boardRoleSchema>;
 const boardSchema = z.object({
   id: identifier,
   title: titleSchema,
+  role: boardRoleSchema.optional(),
   // Older metadata-only clients and fixtures did not include timestamps.
   createdAt: timestamp.optional(),
   updatedAt: timestamp.optional(),
@@ -18,6 +21,7 @@ const boardDocumentSchema = canvasDocumentSchema.safeExtend({
   boardId: identifier,
   revision: z.number().int().min(1).max(MAX_DOCUMENT_REVISION),
   updatedAt: timestamp,
+  role: boardRoleSchema.optional(),
 });
 const documentResponseSchema = z.object({ document: boardDocumentSchema });
 const saveDocumentSchema = canvasDocumentSchema.safeExtend({
@@ -56,7 +60,7 @@ export class BoardSignInRequired extends BoardApiError {
   }
 }
 
-async function boardRequest(url: string, init: RequestInit, failureMessage: string) {
+export async function boardRequest(url: string, init: RequestInit, failureMessage: string) {
   const response = await fetch(url, { credentials: "same-origin", ...init });
   if (response.status === 401) throw new BoardSignInRequired();
   if (!response.ok) {
@@ -75,7 +79,7 @@ async function boardRequest(url: string, init: RequestInit, failureMessage: stri
   return response;
 }
 
-async function parseResponse<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+export async function parseResponse<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
   const payload: unknown = await response.json().catch(() => null);
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
@@ -94,7 +98,7 @@ function boardUrl(id: string) {
   return `/api/boards/${encodeURIComponent(identifier.parse(id))}`;
 }
 
-function mutation(method: string, signal?: AbortSignal, body?: unknown): RequestInit {
+export function mutation(method: string, signal?: AbortSignal, body?: unknown): RequestInit {
   return {
     method,
     headers: {
@@ -109,6 +113,13 @@ function mutation(method: string, signal?: AbortSignal, body?: unknown): Request
 export async function listServerBoards(signal?: AbortSignal): Promise<ServerBoard[]> {
   const response = await boardRequest("/api/boards", { signal }, "Could not load server boards");
   return (await parseResponse(response, boardListSchema)).boards;
+}
+
+export async function getServerBoard(id: string, signal?: AbortSignal): Promise<ServerBoard> {
+  const response = await boardRequest(boardUrl(id), { signal }, "Could not check board access");
+  const board = (await parseResponse(response, boardResponseSchema)).board;
+  requireIdentity(board.id, id, response.status);
+  return board;
 }
 
 export async function createServerBoard(title: string, signal?: AbortSignal): Promise<ServerBoard> {

@@ -21,6 +21,9 @@ model Board {
   ownerId   String?        @map("owner_id") @db.Uuid
   owner     User?          @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   document  BoardDocument?
+  members   BoardMember[]
+  invitations BoardInvitation[]
+  assets    BoardAsset[]
 
   @@index([ownerId, createdAt, id], map: "boards_owner_created_idx", where: raw("(owner_id IS NOT NULL)"))
   @@map("boards")
@@ -45,6 +48,8 @@ model User {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   sessions      AuthSession[]
   boards        Board[]
+  memberships   BoardMember[]
+  uploadedAssets BoardAsset[]
 
   @@map("users")
 }
@@ -71,6 +76,67 @@ model GoogleAuthFlow {
 
   @@index([expiresAt], map: "google_auth_flows_expires_at_idx")
   @@map("google_auth_flows")
+}
+
+model BoardMember {
+  boardId   String   @map("board_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([boardId, userId])
+  @@index([userId, boardId], map: "board_members_user_id_idx")
+  @@map("board_members")
+}
+
+model BoardInvitation {
+  id        String   @id @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  email     String
+  role      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime @default(dbgenerated("(clock_timestamp() + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(6)
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([boardId, email], map: "board_invitations_board_id_email_key")
+  @@index([email, expiresAt], map: "board_invitations_email_expires_idx")
+  @@map("board_invitations")
+}
+
+model BoardAsset {
+  id               String    @id @db.Uuid
+  boardId          String?   @map("board_id") @db.Uuid
+  scopeBoardId     String    @map("scope_board_id") @db.Uuid
+  uploaderId       String    @map("uploader_id") @db.Uuid
+  status           String    @default("pending")
+  byteSize         Int       @map("byte_size")
+  mimeType         String    @map("mime_type")
+  width            Int
+  height           Int
+  providerFileId   String?   @unique(map: "board_assets_provider_file_id_key") @map("provider_file_id")
+  providerFilePath String    @unique(map: "board_assets_provider_file_path_key") @map("provider_file_path")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  lastReferencedAt DateTime? @map("last_referenced_at") @db.Timestamptz(6)
+  board            Board?    @relation(fields: [boardId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  uploader         User      @relation(fields: [uploaderId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([scopeBoardId, createdAt], map: "board_assets_board_created_idx")
+  @@index([uploaderId, createdAt], map: "board_assets_uploader_created_idx")
+  @@index([status, createdAt, updatedAt], map: "board_assets_cleanup_idx", where: raw("(last_referenced_at IS NULL)"))
+  @@map("board_assets")
+}
+
+model AssetRequestBudget {
+  bucket       String   @id
+  requestCount Int      @default(0) @map("request_count")
+  byteCount    BigInt   @default(0) @map("byte_count")
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt], map: "asset_request_budgets_expiry_idx")
+  @@map("asset_request_budgets")
 }
 
 // Only the SQL migration runner writes the ledger; omit it from Prisma Client.

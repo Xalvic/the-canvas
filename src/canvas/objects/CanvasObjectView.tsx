@@ -3,6 +3,7 @@ import {
   useRef,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useBoardStore } from "../../store/boardStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
@@ -72,6 +73,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   const elementRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragInteraction | null>(null);
   const resizeRef = useRef<ResizeInteraction | null>(null);
+  const readOnly = useBoardStore((state) => state.readOnly);
   const activeTool = useUiStore((state) => state.activeTool);
   const isMultiSelectMode = useUiStore((state) => state.isMultiSelectMode);
   const isSelected = useSelectionStore((state) =>
@@ -129,6 +131,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
     if (!selection.has(object.id) || baseSelection.size !== selection.size) {
       setSelection(baseSelection);
     }
+    if (useBoardStore.getState().readOnly) return;
     const movingIds = getMovementIds(baseSelection, documentObjects);
     const startPositions: Record<string, Point> = {};
     for (const id of movingIds) {
@@ -280,7 +283,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   };
 
   const beginResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || useBoardStore.getState().readOnly) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.parentElement?.setPointerCapture(event.pointerId);
@@ -297,7 +300,7 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
   };
 
   const beginEditing = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (activeTool !== "select" || object.type === "image") return;
+    if (useBoardStore.getState().readOnly || activeTool !== "select" || object.type === "image") return;
     event.preventDefault();
     event.stopPropagation();
     const objects = useDocumentStore.getState().objects;
@@ -346,9 +349,9 @@ export function CanvasObjectView({ object }: CanvasObjectViewProps) {
         <CardObject object={object} isEditing={isEditing} />
       )}
 
-      {isCanvasNodeObject(object) && <ConnectionAnchors objectId={object.id} />}
+      {!readOnly && isCanvasNodeObject(object) && <ConnectionAnchors objectId={object.id} />}
 
-      {activeTool === "select" && isSoleSelection && !isEditing && (
+      {!readOnly && activeTool === "select" && isSoleSelection && !isEditing && (
         <button
           className={`resize-handle resize-handle--${object.type === "text" ? "east" : "corner"}`}
           type="button"

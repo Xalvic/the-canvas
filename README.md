@@ -24,6 +24,16 @@ The API now queries PostgreSQL through Prisma Client. Installation generates
 the client automatically; the existing SQL runner still owns schema migrations.
 See [Prisma integration and workflow](docs/prisma.md).
 
+Account boards support email-addressed invitations and owner/editor/viewer
+permissions. Choose Share beside an owned board, copy the invitation link, and
+have the recipient sign in with the invited Google email and explicitly accept.
+Scribble does not send email. See [sharing and roles](docs/sharing.md).
+
+Cloud-image backend APIs use ImageKit private files and short-lived signed URLs,
+with PostgreSQL metadata and revision-safe board references. Frontend image
+integration is pending. See [backend cloud images](docs/cloud-images.md) for
+configuration, API contracts, limits and cleanup.
+
 See [the HTTP walkthrough](docs/backend.md) for browser requests and error cases,
 [architecture](docs/architecture.md) for the existing editor flow, and
 [learning progress](docs/learning-progress.md) for the roadmap and checkpoints.

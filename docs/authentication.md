@@ -1,16 +1,18 @@
 # Google-only authentication
 
-Status (2026-10-04): implemented local Google sign-in, PostgreSQL users/sessions,
+Status (2026-10-05): implemented local Google sign-in, PostgreSQL users/sessions,
 current-user lookup, logout, and an optional React account section. No password
-signup/login is implemented. Migrations 1–4 are applied to Docker PostgreSQL on port
+signup/login is implemented. Migrations 1–6 are applied to Docker PostgreSQL on port
 5434; portable PostgreSQL/configuration is untouched. Google web-client settings
 are configured in ignored `.env.docker`. On 2026-10-04 the user verified real
 Google sign-in in Chrome at `http://127.0.0.1:5173/scribble/`, staying signed in
 after reload, and successful sign-out. This is user-reported live verification;
 automated tests use controlled sessions. Credentials remain outside Git.
 
-Board/document routes now require a valid session and enforce ownership in SQL.
-Signed-out/expired sessions return 401; foreign, unowned legacy and missing board
+Board/document routes require a valid session and enforce ownership or accepted
+editor/viewer membership in SQL. Owners manage sharing/deletion, editors edit and
+rename, and viewers read. See [sharing.md](sharing.md).
+Signed-out/expired sessions return 401; unshared, unowned legacy and missing board
 IDs return 404. Writes require `X-Scribble-Request: 1` and an allowed origin.
 The API still binds to 127.0.0.1. Signing in does not upload, replace, or associate
 the guest drawing. Unowned demo records are preserved and hidden from accounts.
@@ -164,8 +166,12 @@ snapshots on logout/expiry/account changes; draft recovery stays in IndexedDB an
 canvas/editor state stays in Zustand. Automated account browser scenarios use
 mocked HTTP; a real browser/API/DB fixture and deployment verification remain.
 Prisma is integrated with SQL as the migration authority; see [prisma.md](prisma.md).
-Next: sharing and roles; non-image account documents remain
-the scope until durable cloud assets exist. Queue: [implementation-status.md](implementation-status.md).
+Sharing now adds accepted editor/viewer memberships, email-addressed invitations
+and owner-only sharing/deletion. All routes still use the existing Google session
+and mutation-origin checks. See [sharing.md](sharing.md). Backend cloud-image
+storage is implemented; frontend image upload/loading and deployment remain
+pending. See [cloud-images.md](cloud-images.md).
+Queue: [implementation-status.md](implementation-status.md).
 Keep the guest-upload choice explicit. The user authorized committing and pushing this
 slice with the completed storage work at the end of 2026-10-02. Future commits
 and pushes require fresh authorization.

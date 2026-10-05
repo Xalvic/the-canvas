@@ -1,7 +1,10 @@
 import type { PrismaClient } from "./generated/prisma/client.js";
-import { canvasDocumentSchema } from "./contracts/canvasDocument.js";
+import { cloudDocumentSchema, documentAssetIds } from "./contracts/cloudDocument.js";
+import { markDocumentAssets } from "./postgresAssets.js";
 import type { BoardDocument, BoardDocumentStore, DocumentSaveResult } from "./documents.js";
 import { HttpError } from "./errors.js";
+import { boardRoleSql, lockBoardAccess } from "./boardPermissions.js";
+import type { BoardRole } from "./boards.js";
 
 type DocumentRow = {
   board_id: string;
@@ -9,15 +12,16 @@ type DocumentRow = {
   revision: number;
   content: unknown;
   updated_at: Date;
+  role?: BoardRole;
 };
 type ReadRow = { board_exists: string } & (DocumentRow | { [Key in keyof DocumentRow]: null });
 
 function toDocument(row: DocumentRow): BoardDocument {
-  const parsed = canvasDocumentSchema.safeParse({ schemaVersion: row.schema_version, content: row.content });
+  const parsed = cloudDocumentSchema.safeParse({ schemaVersion: row.schema_version, content: row.content });
   if (!parsed.success) {
     throw new HttpError(500, "INVALID_STORED_DOCUMENT", "The saved document has an unsupported or invalid format");
   }
-  return { ...parsed.data, boardId: row.board_id, revision: row.revision, updatedAt: row.updated_at.getTime() };
+  return { ...parsed.data, boardId: row.board_id, revision: row.revision, updatedAt: row.updated_at.getTime(), role: row.role ?? "owner" };
 }
 
 export function createPostgresDocumentStore(prisma: PrismaClient): BoardDocumentStore {
@@ -25,9 +29,11 @@ export function createPostgresDocumentStore(prisma: PrismaClient): BoardDocument
     async get(boardId, ownerId) {
       // One statement gives a consistent distinction between missing board/content.
       const rows = await prisma.$queryRaw<ReadRow[]>`
-        SELECT b.id AS board_exists, d.board_id, d.schema_version, d.revision, d.content, d.updated_at
+        SELECT b.id AS board_exists, d.board_id, d.schema_version, d.revision, d.content, d.updated_at, ${boardRoleSql(ownerId)} AS role
         FROM boards b LEFT JOIN board_documents d ON d.board_id = b.id
-        WHERE b.id = ${boardId}::uuid AND b.owner_id = ${ownerId}::uuid
+        LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${ownerId}::uuid
+        WHERE b.id = ${boardId}::uuid AND b.owner_id IS NOT NULL
+          AND (b.owner_id = ${ownerId}::uuid OR m.role IN ('editor', 'viewer'))
       `;
       const row = rows[0];
       if (!row) return { status: "board-not-found" };
@@ -38,10 +44,15 @@ export function createPostgresDocumentStore(prisma: PrismaClient): BoardDocument
     async save(boardId, input, ownerId) {
       return prisma.$transaction<DocumentSaveResult>(async (tx) => {
         // All saves lock the parent first, matching board rename/delete locking.
-        const board = await tx.$queryRaw<{ id: string }[]>`
-          SELECT id FROM boards WHERE id = ${boardId}::uuid AND owner_id = ${ownerId}::uuid FOR UPDATE
-        `;
-        if (!board[0]) return { status: "board-not-found" };
+        const access = await lockBoardAccess(tx, boardId, ownerId, "edit");
+        if (!access) return { status: "board-not-found" };
+
+        // Detect stale saves first, without retaining assets from a rejected save.
+        const current = await tx.boardDocument.findUnique({ where: { boardId }, select: { revision: true } });
+        if ((current?.revision ?? 0) !== input.expectedRevision) {
+          return { status: "conflict", currentRevision: current?.revision ?? 0 };
+        }
+        await markDocumentAssets(tx, boardId, documentAssetIds(input));
 
         const content = JSON.stringify(input.content);
         const rows = input.expectedRevision === 0
@@ -71,7 +82,7 @@ export function createPostgresDocumentStore(prisma: PrismaClient): BoardDocument
           UPDATE boards SET updated_at = (SELECT updated_at FROM board_documents WHERE board_id = ${boardId}::uuid)
           WHERE id = ${boardId}::uuid
         `;
-        const document = toDocument(row);
+        const document = toDocument({ ...row, role: access.role });
         return { status: "saved", created: input.expectedRevision === 0, document };
       });
     },

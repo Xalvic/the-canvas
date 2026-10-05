@@ -14,6 +14,8 @@ export const CURRENT_BOARD_ID = "current-board";
 export const LOCAL_BOARD_SCHEMA_VERSION = 1;
 
 export type AccountBoardLink = {
+  // Signed-in account scoping this device's draft, including accepted shared boards.
+  // The server owns the actual board owner/role; neither is trusted from IndexedDB.
   ownerId: string;
   boardId: string;
   revision: number;

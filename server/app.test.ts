@@ -29,6 +29,7 @@ describe("local board API", () => {
     expect(board).toEqual({
       id: expect.any(String),
       title: "Product ideas",
+      role: "owner",
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });

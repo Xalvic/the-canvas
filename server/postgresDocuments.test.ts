@@ -52,7 +52,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     const input = documentInput();
     const snapshot = deserializeCanvasDocument({ schemaVersion: input.schemaVersion, content: input.content });
     const first = await request(api).put(url).send(input).expect(201);
-    expect(first.body.document).toEqual({ schemaVersion: 1, content: input.content, boardId: metadata.id, revision: 1, updatedAt: expect.any(Number) });
+    expect(first.body.document).toEqual({ schemaVersion: 1, content: input.content, role: "owner", boardId: metadata.id, revision: 1, updatedAt: expect.any(Number) });
     expect(first.headers.location).toBe(url);
     expect((await request(api).get(url).expect(200)).body).toEqual(first.body);
     // API metadata must be removed explicitly before passing the pure envelope to the adapter.

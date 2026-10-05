@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { CURRENT_BOARD_ID, type AccountBoardLink } from "../persistence/localBoardStorage";
+import type { BoardRole } from "../api/boards";
 
 export type BoardSaveStatus = "loading" | "saving" | "saved" | "error";
 
@@ -13,6 +14,9 @@ export type BoardMetadata = {
 
 type BoardState = Omit<BoardMetadata, "account"> & {
   account: AccountBoardLink | null;
+  accessRole: BoardRole | "none" | null;
+  readOnly: boolean;
+  setAccessRole: (role: BoardRole | "none" | null) => void;
   isHydrated: boolean;
   sessionVersion: number;
   hasSavedViewport: boolean;
@@ -36,6 +40,9 @@ export const useBoardStore = create<BoardState>((set) => ({
   createdAt: startedAt,
   updatedAt: startedAt,
   account: null,
+  accessRole: null,
+  readOnly: false,
+  setAccessRole: (role) => set({ accessRole: role, readOnly: role === "viewer" || role === "none" }),
   isHydrated: false,
   sessionVersion: 0,
   hasSavedViewport: false,
@@ -45,6 +52,8 @@ export const useBoardStore = create<BoardState>((set) => ({
   hydrate: (metadata, hasSavedViewport) => set((state) => ({
     ...metadata,
     account: metadata.account ?? null,
+    accessRole: metadata.account ? "none" : null,
+    readOnly: !!metadata.account,
     isHydrated: true,
     sessionVersion: state.sessionVersion + 1,
     hasSavedViewport,
@@ -59,7 +68,7 @@ export const useBoardStore = create<BoardState>((set) => ({
     saveError: message,
   })),
 
-  setTitle: (title) => set({ title }),
+  setTitle: (title) => set((state) => state.readOnly ? state : { title }),
   setAccount: (account) => set({ account }),
   markSaving: () => set({ saveStatus: "saving", saveError: null }),
   markSaved: (updatedAt) => set({

@@ -6,6 +6,8 @@ const migrations = [
   { version: 2, file: "002_create_board_documents.sql" },
   { version: 3, file: "003_create_google_auth.sql" },
   { version: 4, file: "004_add_board_ownership.sql" },
+  { version: 5, file: "005_create_board_sharing.sql" },
+  { version: 6, file: "006_create_board_assets.sql" },
 ] as const;
 
 export async function migrateDatabase(pool: Pool) {

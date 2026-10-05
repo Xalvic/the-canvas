@@ -3,12 +3,14 @@ import { createCardObject } from "../canvas/objects/objectFactories";
 import { createConnectorObject } from "../canvas/connectors/connectorFactories";
 import { isCanvasNodeObject } from "../canvas/objects/types";
 import { createStrokeObject } from "../canvas/strokes/strokeFactories";
+import { useBoardStore } from "./boardStore";
 import {
   MAX_HISTORY_ENTRIES,
   useDocumentStore,
 } from "./documentStore";
 
 function resetDocumentStore() {
+  useBoardStore.getState().setAccessRole(null);
   useDocumentStore.setState({ objects: {}, past: [], future: [] });
 }
 
@@ -22,6 +24,24 @@ function getNodeX(id: string): number {
 
 describe("document history", () => {
   beforeEach(resetDocumentStore);
+
+  it("blocks every durable mutation and history replay for a viewer while allowing snapshot loading", () => {
+    const card = { ...createCardObject({ x: 100, y: 100 }, 1), id: "card-1" };
+    const store = useDocumentStore.getState();
+    store.addObject(card); store.updateObject(card.id, { body: "Edited" }); store.undo();
+    const before = useDocumentStore.getState();
+    useBoardStore.getState().setAccessRole("viewer");
+    store.addObject({ ...card, id: "extra" });
+    store.updateObject(card.id, { body: "Forbidden" });
+    store.updateObjectPositions({ [card.id]: { x: 300, y: 500 } });
+    store.setObjectGroup([card.id], "group"); store.deleteObjects([card.id]); store.undo(); store.redo();
+    expect(useDocumentStore.getState()).toBe(before);
+    store.loadDocument({ [card.id]: card });
+    expect(useDocumentStore.getState().objects[card.id]).toEqual(card);
+    useBoardStore.getState().setAccessRole(null);
+    store.updateObject(card.id, { body: "Guest edit" });
+    expect(useDocumentStore.getState().objects[card.id]).toMatchObject({ body: "Guest edit" });
+  });
 
   it("undoes and redoes meaningful document mutations", () => {
     const card = { ...createCardObject({ x: 100, y: 100 }, 1), id: "card-1" };

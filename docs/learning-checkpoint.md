@@ -4,42 +4,57 @@ Updated: 2026-10-05. Read once per new project session.
 
 ## Current handoff
 
-The user requested implementing pending items one by one, without lessons.
-Latest request: implement Prisma, then explain it simply. Prisma Client 7.10.0
-is now integrated against the existing schema, using typed model queries for
-routine operations and parameterized SQL in Prisma transactions for exact save/
-auth behavior. The existing pg pool is shared. SQL migrations remain the only
-schema-change authority; ledger 1/2/3/4 and normal data/constraints/index
-fingerprints are unchanged. No new migration or Prisma migration ledger.
-Verified 382 fast tests, 41 real Docker DB checks, server typecheck, both builds,
-69 Postman requests / 228 assertions, schema equality, clean client generation
-and development/compiled API startup. Browser tests were not rerun. The stopped
-existing Docker container was started for validation; portable DB unchanged.
-Guide/commands: `docs/prisma.md`. The user authorized committing Prisma on
-2026-10-05; check git log for its revision. Subsequent commits need fresh approval.
-No push is authorized. Next: sharing and roles, now authorized for implementation.
-Account board save/open is committed as `7449241`. Live Google account save/open
-verification is complete, confirmed by the user on 2026-10-04.
-TanStack Query now manages owner-scoped account metadata/document reads,
-mutations, caching, invalidation, refresh and read-error recovery. The existing
-serial save queue still reconciles uncertain writes against a fresh revision;
-writes never retry automatically. Cached lists survive transient refresh errors,
-refresh on stale focus/reconnect, and clear on logout/expiry/account changes.
-Opening/reloading/reconciling documents always checks the server. Background
-refresh never replaces the editor; canvas/editor state stays in Zustand.
-Guest IndexedDB, explicit upload, scoped drafts and recoverable conflicts remain.
-TanStack Query and its handoff are committed as `fdd2228`; see
-`docs/implementation-status.md` for the remaining queue. Future commits need
-fresh approval. No push is authorized.
-Google OAuth settings are configured in ignored `.env.docker`. On 2026-10-04
-the user verified real Chrome sign-in, staying signed in after reload, and
-sign-out at `http://127.0.0.1:5173/scribble/`; see `docs/authentication.md`.
-Docker PostgreSQL uses port 5434 with migrations
-1/2/3/4 applied; its original demo board is preserved and hidden as unowned.
-Portable PostgreSQL on 5433 is preserved. Check service status after reboot.
-Google-only sign-in and guest IndexedDB use remain the product choices.
-Ownership is committed as `8a773fe`. Prior verification/handoff updates are
-committed as `c2ca442`. Future commits need fresh approval.
+Prisma is committed as `c092b74`. Sharing/roles and the backend cloud-image
+milestone are implemented and included in the combined commit authorized on
+2026-10-05; check `git log` for its revision. Future commits need fresh approval;
+no push or deployment is authorized. Sharing supports seven-day Google-email invitations,
+explicit acceptance/decline and owner-managed roles/removal/cancellation. Owners
+manage sharing/deletion; editors edit/rename; viewers read only. Invite links are
+copied by the owner; no email delivery service. Guide: `docs/sharing.md`.
+Viewer canvas mutations are blocked; focus/30-second access checks preserve
+local drafts after downgrade/revocation. Permission is never trusted from disk.
+
+ImageKit backend configuration, private immutable storage, validated binary
+uploads and board-scoped five-minute signed reads are implemented. Owners/editors
+upload; owners/editors/viewers read with current-access checks. JPEG/PNG/WebP
+are fully decoded and normalized; SVG/GIF/animation are rejected for cloud
+uploads. Limits: 5 MiB, 4096 per dimension, 16 million pixels; bounded concurrency,
+upload rates/storage and persistent signed-URL issuance budgets. Backend version-1
+documents accept completed same-board UUID image references; revision conflicts,
+permission locks and transaction rollback remain intact. Frontend cloud-image
+integration is still pending: browser adapters continue rejecting cloud images.
+
+SQL migration 6 adds asset metadata/budgets and Prisma maps them. Migrations 1–6
+are applied to Docker PostgreSQL on 5434; all pre-existing rows, columns,
+constraints and indexes fingerprint unchanged and Prisma reports no drift.
+Portable PostgreSQL on 5433 is untouched. SQL remains the migration authority.
+Saved-once assets are retained indefinitely, including after removal/board
+deletion. Never-saved uploads become cleanup candidates after 24 hours; the
+explicit cleanup command releases quota only after confirmed provider deletion
+or absence. Failed/uncertain uploads retain their reservations and exact paths.
+Guide and operational limits: `docs/cloud-images.md`.
+
+Backend ImageKit variables are configured locally in ignored `.env.docker`.
+The actual restricted key passed upload/read/delete/signing checks; signed URLs
+returned 200, unsigned/expired URLs 401. A separate real HTTP/Prisma/PostgreSQL/
+ImageKit proof verified owner/editor uploads, viewer read/denial, image save/read
+and revocation in an isolated schema. All disposable ImageKit files were deleted;
+the existing uploaded image was preserved. The active subscription screen has
+not been independently verified. No paid-plan change or upgrade was requested.
+
+Verification: 438 fast tests, 76 isolated-schema PostgreSQL tests, server
+typecheck, both builds and Prisma comparison passed. Postman verification is
+138 requests / 466 assertions with a clean fetched-back mirror; details are
+recorded in `docs/implementation-status.md`. Browser tests were not rerun for
+this backend-only slice; previous sharing checks covered 41 scenarios with
+mocked account HTTP. Manual sharing between two actual Google accounts remains
+unverified. Live Google sign-in/reload/sign-out and account save/open were
+user-verified on 2026-10-04. Next: frontend image upload/recovery, cloud asset
+references and signed-image refresh. API/Neon deployment, PWA loading and
+real-time collaboration remain pending. Guest IndexedDB stays free and separate;
+login never uploads a board. Google-only authentication remains the choice.
+The frontend is already deployed through a Cloudflare Worker at
+`https://milanputhukkudy.com/scribble/`; Express/PostgreSQL remain local.
 
 ## Implementation record
 
@@ -201,6 +216,7 @@ commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
 Phase 2: Prisma, document modeling and the local API proof are implemented.
 Phase 3: Google-only auth implemented; live login/reload/logout user-verified.
-Phase 4: ownership is implemented; sharing/roles remain pending.
+Phase 4: ownership and sharing/roles are implemented; manual two-account verification remains.
+Phase 6: backend ImageKit assets implemented; frontend integration and deployment remain pending.
 
 Milestone summaries only, no Q&A logging. Guide: `learning-plan.md`; progress: `learning-progress.md`.

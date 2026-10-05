@@ -3,6 +3,7 @@ import {
   useRef,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useBoardStore } from "../../store/boardStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import { useSelectionStore } from "../../store/selectionStore";
@@ -86,6 +87,7 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
     if (!selection.has(object.id) || baseSelection.size !== selection.size) {
       setSelection(baseSelection);
     }
+    if (useBoardStore.getState().readOnly) return;
     const movingIds = getMovementIds(baseSelection, documentObjects);
     const startPositions: Record<string, Point> = {};
     for (const id of movingIds) {

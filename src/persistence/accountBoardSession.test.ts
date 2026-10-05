@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import {
-  createServerBoard, getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
+  createServerBoard, getServerBoard, getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
   type ServerBoardDocument,
 } from "../api/boards";
 import { createCardObject } from "../canvas/objects/objectFactories";
@@ -23,6 +23,7 @@ vi.mock("../api/boards", async (importOriginal) => ({
   ...await importOriginal<typeof import("../api/boards")>(),
   createServerBoard: vi.fn(),
   deleteServerBoard: vi.fn(),
+  getServerBoard: vi.fn(),
   getServerBoardDocument: vi.fn(),
   listServerBoards: vi.fn(),
   renameServerBoard: vi.fn(),
@@ -79,6 +80,7 @@ function hydrate(record: LocalBoardRecord) {
     id: record.id, title: record.title, createdAt: record.createdAt,
     updatedAt: record.updatedAt, account: structuredClone(record.account),
   }, true);
+  useBoardStore.getState().setAccessRole(record.account ? "owner" : null);
 }
 
 function startAccount(record: LocalBoardRecord) {
@@ -110,6 +112,7 @@ beforeEach(() => {
   vi.mocked(waitForLocalBoardSave).mockResolvedValue(undefined);
   vi.mocked(getServerBoardDocument).mockResolvedValue(remote(document("Saved"), 2));
   vi.mocked(listServerBoards).mockResolvedValue([metadata]);
+  vi.mocked(getServerBoard).mockResolvedValue(metadata);
   vi.mocked(saveServerBoardDocument).mockImplementation(async (_id, content, expected) => remote(content, expected + 1));
   vi.mocked(createServerBoard).mockResolvedValue(metadata);
   vi.mocked(renameServerBoard).mockImplementation(async (id, title) => ({ ...metadata, id, title }));
@@ -129,6 +132,45 @@ afterEach(() => {
 });
 
 describe("account draft save queue", () => {
+  it("opens a viewer snapshot and preserves an old editable draft without sending writes", async () => {
+    const draft = accountRecord(); records.set(draft.id, draft);
+    vi.mocked(getServerBoardDocument).mockResolvedValue({ ...remote(document("Saved"), 2), role: "viewer" });
+    await session.open({ ...metadata, role: "viewer" });
+    expect(useBoardStore.getState().readOnly).toBe(true);
+    expect(session.getState().status).toBe("read-only");
+    expect(records.get(`${draft.id}:recovery`)?.objects).toEqual(draft.objects);
+    useDocumentStore.getState().addObject(createCardObject({ x: 0, y: 0 }, 2));
+    useBoardStore.getState().setTitle("Forbidden rename");
+    await session.save();
+    expect(useDocumentStore.getState().objects).toEqual(deserializeCanvasDocument(document("Saved")));
+    expect(useBoardStore.getState().title).toBe(metadata.title);
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    await session.back();
+    expect(useBoardStore.getState().readOnly).toBe(false);
+  });
+
+  it("stops a queued autosave on downgrade and keeps the exact local draft", async () => {
+    startAccount(accountRecord());
+    useDocumentStore.getState().updateObject("card-1", { body: "Waiting edit" });
+    const objects = useDocumentStore.getState().objects;
+    vi.mocked(getServerBoard).mockResolvedValue({ ...metadata, role: "viewer" });
+    await session.refreshAccess();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().objects).toBe(objects);
+    expect(useBoardStore.getState().readOnly).toBe(true);
+    expect(session.getState().status).toBe("read-only");
+  });
+
+  it("checks a pending save's current permission before retrying", async () => {
+    const draft = accountRecord(); draft.account!.pendingSave = { document: document("Draft"), expectedRevision: 2 };
+    startAccount(draft);
+    vi.mocked(getServerBoardDocument).mockResolvedValue({ ...remote(document("Saved"), 2), role: "viewer" });
+    await session.save();
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    expect(useBoardStore.getState().account?.pendingSave).toEqual(draft.account!.pendingSave);
+    expect(session.getState().status).toBe("read-only");
+  });
   it("reconciles an accepted pending submission without writing it again", async () => {
     const submitted = document("Submitted");
     const record = accountRecord(submitted);

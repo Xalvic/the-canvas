@@ -21,6 +21,7 @@ import {
 } from "../icons";
 import { useUiStore, type ActiveTool } from "../../store/uiStore";
 import { useSelectionStore } from "../../store/selectionStore";
+import { useBoardStore } from "../../store/boardStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
 import {
@@ -133,6 +134,7 @@ function ToolButton({
   mobile?: boolean;
   onSelect: (tool: ActiveTool) => void;
 }) {
+  const readOnly = useBoardStore((state) => state.readOnly);
   return (
     <div className={`tool-slot${mobile ? " mobile-tool-slot" : ""}`}>
       <button
@@ -141,6 +143,7 @@ function ToolButton({
         aria-label={`${label} tool`}
         aria-keyshortcuts={shortcut}
         aria-describedby={mobile ? undefined : `tooltip-${id}`}
+        disabled={readOnly && id !== "select" && id !== "hand"}
         aria-pressed={activeTool === id}
         onClick={() => onSelect(id)}
       >
@@ -182,6 +185,7 @@ function SelectionAction({
 }
 
 export function Toolbar() {
+  const readOnly = useBoardStore((state) => state.readOnly);
   const activeTool = useUiStore((state) => state.activeTool);
   const setActiveTool = useUiStore((state) => state.setActiveTool);
   const isMultiSelectMode = useUiStore((state) => state.isMultiSelectMode);
@@ -203,7 +207,7 @@ export function Toolbar() {
     appearance: false,
   });
   const editable =
-    !isEditing &&
+    !readOnly && !isEditing &&
     activeTool === "select" &&
     (selectedObject?.type === "text" || selectedObject?.type === "stroke")
       ? selectedObject
@@ -343,6 +347,7 @@ export function Toolbar() {
                           type="button"
                           className={activeTool === id ? "is-active" : undefined}
                           aria-label={`${label} tool`}
+                          disabled={readOnly && id !== "select" && id !== "hand"}
                           aria-pressed={activeTool === id}
                           onClick={() => chooseTool(id)}
                         >
@@ -372,7 +377,7 @@ export function Toolbar() {
         </div>
       </div>
 
-      {!isEditing && activeTool === "select" && selectedIds.size > 0 && (
+      {!readOnly && !isEditing && activeTool === "select" && selectedIds.size > 0 && (
         <div className="mobile-selection-actions" aria-label="Selection actions">
           <SelectionAction
             label="Multi-select"
@@ -417,7 +422,7 @@ export function Toolbar() {
         </div>
       )}
 
-      {(activeTool === "pen" || activeTool === "text") && (
+      {!readOnly && (activeTool === "pen" || activeTool === "text") && (
         <ToolOptions
           key={activeTool}
           tool={activeTool}

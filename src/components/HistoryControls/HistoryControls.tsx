@@ -1,8 +1,10 @@
 import { performRedo, performUndo } from "../../history/historyCommands";
 import { useDocumentStore } from "../../store/documentStore";
+import { useBoardStore } from "../../store/boardStore";
 import { RedoIcon, UndoIcon } from "../icons";
 
 export function HistoryControls() {
+  const readOnly = useBoardStore((state) => state.readOnly);
   const undoLabel = useDocumentStore((state) => state.past.at(-1)?.label);
   const redoLabel = useDocumentStore((state) => state.future.at(-1)?.label);
 
@@ -12,7 +14,7 @@ export function HistoryControls() {
         className="icon-button"
         type="button"
         onClick={performUndo}
-        disabled={!undoLabel}
+        disabled={readOnly || !undoLabel}
         aria-label={undoLabel ? `Undo ${undoLabel}` : "Nothing to undo"}
         title={undoLabel ? `Undo ${undoLabel} (Ctrl/⌘ Z)` : "Nothing to undo"}
       >
@@ -22,7 +24,7 @@ export function HistoryControls() {
         className="icon-button"
         type="button"
         onClick={performRedo}
-        disabled={!redoLabel}
+        disabled={readOnly || !redoLabel}
         aria-label={redoLabel ? `Redo ${redoLabel}` : "Nothing to redo"}
         title={
           redoLabel

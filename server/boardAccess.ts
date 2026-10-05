@@ -21,6 +21,7 @@ export function requireBoardSession(auth?: AuthDependencies): RequestHandler {
     }
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) verifyMutationOrigin(req, auth);
     res.locals.ownerId = session.user.id;
+    res.locals.userEmail = session.user.email;
     next();
   };
 }

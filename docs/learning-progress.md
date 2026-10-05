@@ -23,15 +23,15 @@ the schema migration authority. No individual understanding assessments recorded
 | --- | --- |
 | Local editor foundation | Custom React/TypeScript/Vite/Zustand canvas, history, selection, IndexedDB boards/assets |
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
-| 2. PostgreSQL persistence | Metadata/documents/auth persisted on Docker; Prisma Client integrated against migrations 1/2/3/4 with SQL owning schema changes; SQL practice remains |
+| 2. PostgreSQL persistence | Metadata/documents/auth/sharing/assets persisted on Docker; Prisma maps SQL migrations 1–6; SQL practice remains |
 | 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live sign-in/reload/sign-out user-verified in Chrome |
-| 4. Authorization/sharing | Owner-only metadata/documents implemented; sharing/roles pending |
+| 4. Authorization/sharing | Owner/editor/viewer enforcement, Google-email invitations and explicit acceptance implemented |
 | 5. TanStack Query/server state | Owner-scoped account queries/mutations, caching, invalidation, refresh/recovery implemented; editor stays in Zustand |
-| 6. Cloud assets | Local image storage exists; cloud storage not started |
+| 6. Cloud assets | ImageKit backend upload/read/signing, PostgreSQL metadata, document references, quotas and delayed cleanup implemented; frontend integration pending |
 | 7. Real-time collaboration | Not started |
 | 8. Docker | Express connected to Docker PostgreSQL; actual DB restart checks pending |
 | 9. Testing | Existing editor tests plus HTTP/config tests |
-| 10. Production engineering | Frontend/backend builds exist; deployment/CI/operations not configured in the repository |
+| 10. Production engineering | Frontend deployed through Cloudflare Worker; Express/Neon deployment, CI and operations remain pending |
 
 ## Verification and limits
 
@@ -225,5 +225,46 @@ Verified 382 fast tests, 41 real DB checks, server typecheck, both builds,
 schema equality and both API entrypoint smoke checks. Browser tests were not
 rerun for this backend-only change. Guide: [prisma.md](prisma.md).
 
-Next session: review Prisma, then sharing and roles. Commit requires fresh approval.
+Sharing and roles milestone (2026-10-05, implementation only): owner/editor/viewer
+permissions on all metadata/document/sharing routes, explicit Google-email invites
+and acceptance/decline, owner role management/removal and cancellation. Invitations
+last seven days; owners copy links, with no email delivery service. SQL migration 5
+and Prisma mappings preserve existing normal rows/constraints/indexes. Saves and
+permission changes share a board lock, retaining atomic revision conflicts. Viewer
+canvas guards block durable edits, title changes and history replay while allowing
+navigation/selection/copy. Active access checks preserve drafts after downgrade or
+removal; opening a viewer snapshot backs up an old editable draft. Guest IndexedDB
+and explicit upload remain unchanged. Verified 386 fast tests, 57 real PostgreSQL
+checks, 41 browser scenarios across full/targeted runs, typechecks, both builds and
+Prisma schema equality. Browser account HTTP is mocked; manual two-account Google
+sharing remains unverified. API collection: 101 requests / 325 assertions; v3 lint
+101 requests without issues. Guide: [sharing.md](sharing.md). No lesson assessments
+recorded. Prisma committed as `c092b74`; sharing is included in the combined
+sharing/backend-image commit authorized on 2026-10-05.
+
+Backend cloud-image milestone (2026-10-05, implementation only): ImageKit
+private uploads and five-minute signed reads, Google-session board permissions,
+fully decoded/normalized static JPEG/PNG/WebP validation, PostgreSQL asset
+reservations and Prisma mappings. SQL migration 6 is applied to Docker 5434;
+all existing rows/columns/constraints/indexes remain unchanged. Backend documents
+accept ready same-board image references under the existing revision/permission
+lock. Failed saves roll asset retention back; failed/uncertain uploads retain
+cleanup metadata/quota. Saved-once assets are retained indefinitely; only
+never-saved uploads can be cleaned after 24 hours and confirmed provider absence
+or deletion. Storage/request/issuance budgets are conservative application limits,
+not a strict cap on CDN reuse. The actual restricted key passed live upload,
+read/signing and deletion; unsigned/expired delivery was blocked. A separate
+isolated-schema live HTTP/DB/ImageKit proof passed; disposable files were deleted.
+Verified 438 fast tests, 76 isolated real DB checks, typecheck, both builds and
+Prisma equality. The fetched-back Postman collection passes 138 requests /
+466 assertions with a clean v3 mirror, retaining all existing IDs/manual content.
+Details: [implementation-status.md](implementation-status.md).
+Browser code/tests were not changed for this backend-only milestone. Implementation
+does not imply lesson coverage. Guide: [cloud-images.md](cloud-images.md).
+
+Next session: frontend cloud-image integration and recovery; deployment remains
+pending. Guest IndexedDB and explicit guest upload stay separate; login never
+uploads a board. Sharing and backend assets are included in the combined commit
+authorized on 2026-10-05; check `git log` for its revision. Future commits need
+fresh approval. No push authorized.
 Queue: [implementation-status.md](implementation-status.md).

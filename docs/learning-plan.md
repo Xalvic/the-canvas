@@ -146,7 +146,8 @@ implemented and verified against Docker PostgreSQL, including revision conflicts
 and an API restart. Account save/open and autosave are implemented against the
 local backend. Prisma Client now maps the existing schema while SQL migrations
 remain the only schema-change authority (2026-10-05); see [Prisma](prisma.md).
-Deployment and cloud image assets remain pending.
+Backend cloud-image support is implemented; frontend image integration and
+API/database deployment remain pending.
 
 Design the save flow: what is persisted, when saving happens, save indicators, failures, retry behavior, and protection against an older save overwriting a newer edit. Explain the initial concurrency guarantees and their limits.
 
@@ -177,6 +178,11 @@ Compare server-backed sessions and token-based authentication for this browser-f
 
 **Build:** Ownership checks first, then sharing and roles where useful. Enforce permissions on the server for reads and mutations; hiding a UI control is insufficient.
 
+Implemented 2026-10-05: owner/editor/viewer enforcement, explicit Google-email
+invitation acceptance, owner-managed role changes/removal, viewer canvas guards
+and preserved drafts after access changes. SQL migration 5 preserves existing
+data. See [sharing.md](sharing.md); understanding remains separate from implementation.
+
 Explain the request path through authentication, authorization, validation, business logic, database, and response. Adapt the exact order where needed to safely resolve the resource and permission. Distinguish unauthenticated and forbidden responses.
 
 **Checkpoint:** Another user cannot access a private board by changing an ID. A viewer can read permitted content but cannot mutate it. I can explain where each permission check happens.
@@ -201,7 +207,14 @@ Keep high-frequency pointer movement and editor interaction state out of React Q
 Validate file → upload to object storage → save metadata → reference asset from canvas
 ```
 
-Cloudflare R2 is an option if the existing project setup supports it; verify that setup first. Explain client versus server validation, credential handling, private-asset access, and what happens if upload succeeds but metadata saving fails. Show pending, failed, and completed upload states.
+Chosen provider: ImageKit with private files and five-minute signed reads.
+Backend implemented 2026-10-05: configuration/storage adapter, full content
+validation, SQL migration 6/Prisma metadata, current board permissions, safe
+document references, upload reservations, delayed cleanup and conservative
+budgets. See [cloud-images.md](cloud-images.md). Frontend paste/drop upload,
+pending/failed/completed states, signed-URL refresh and deployment remain pending.
+Explain client versus server validation, credential handling and recovery when
+the file upload succeeds but the metadata transaction or response fails.
 
 **Checkpoint:** Images load after refresh, failed uploads are recoverable, and I can explain how file data, metadata, and canvas references relate.
 

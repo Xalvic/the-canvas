@@ -141,5 +141,5 @@ test("shows actual storage failures and cancels unfinished creation without hist
     };
   });
   await page.getByLabel("Board title").fill("Changed title");
-  await expect(page.getByRole("alert")).toContainText("Save failed");
+  await expect(page.locator(".board-save-status[role=alert]")).toContainText("Save failed");
 });

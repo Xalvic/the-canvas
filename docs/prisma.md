@@ -74,9 +74,12 @@ creation/revocation and flow creation use typed model methods.
 ## One migration authority
 
 The existing `db/*.sql` files and `server/migrations.ts` remain the only authority
-for changing database structure. `schema_migrations` stays at versions 1/2/3/4;
-its mapped model is excluded from Prisma Client. No new migration or Prisma
-migration ledger was created by this integration.
+for changing database structure. The Prisma integration itself left versions
+1/2/3/4 unchanged. Sharing subsequently adds SQL migration 5 and maps its new
+membership/invitation tables; backend images add SQL migration 6 with asset
+metadata and request budgets. See [cloud-images.md](cloud-images.md).
+The ledger model is excluded from Prisma
+Client; no Prisma migration ledger exists. See [sharing.md](sharing.md).
 
 Prisma's schema describes the existing UUIDs, JSONB, timestamp precision,
 defaults, foreign keys, delete/update actions and partial owner index. The

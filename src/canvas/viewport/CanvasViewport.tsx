@@ -198,7 +198,9 @@ export function CanvasViewport() {
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const [canvasNotice, setCanvasNotice] = useState<string | null>(null);
-  const activeTool = useUiStore((state) => state.activeTool);
+  const readOnly = useBoardStore((state) => state.readOnly);
+  const selectedTool = useUiStore((state) => state.activeTool);
+  const activeTool = readOnly && selectedTool !== "select" && selectedTool !== "hand" ? "select" : selectedTool;
   const isEditingText = useInteractionStore(
     (state) => state.mode === "editingText",
   );
@@ -251,7 +253,7 @@ export function CanvasViewport() {
     source: "paste" | "drop",
     clientPoint?: Point,
   ) => {
-    if (files.length === 0) return;
+    if (useBoardStore.getState().readOnly || files.length === 0) return;
     const insertionPoint = getImageInsertionPoint(clientPoint);
     if (!insertionPoint) return;
 
@@ -263,7 +265,7 @@ export function CanvasViewport() {
       result.status === "rejected" ? [result.reason] : [],
     );
 
-    if (imported.length > 0) {
+    if (imported.length > 0 && !useBoardStore.getState().readOnly) {
       const documentStore = useDocumentStore.getState();
       const firstZIndex = documentStore.getNextZIndex();
       const imageObjects = imported.map((asset, index) =>
@@ -494,6 +496,13 @@ export function CanvasViewport() {
       const commandKey = event.ctrlKey || event.metaKey;
       const shortcut = event.key.toLowerCase();
       if (isTypingTarget(event.target)) return;
+      const editingShortcut = commandKey
+        ? ["g", "z", "y", "d"].includes(shortcut)
+        : ["a", "m", "n", "t", "c", "f", "p", "delete", "backspace"].includes(shortcut);
+      if (useBoardStore.getState().readOnly && editingShortcut) {
+        event.preventDefault();
+        return;
+      }
 
       if (commandKey && !event.altKey) {
         if (shortcut === "g") {
@@ -673,6 +682,7 @@ export function CanvasViewport() {
     clientPoint: Point,
     suppressFollowingDoubleClick = false,
   ) => {
+    if (useBoardStore.getState().readOnly) return;
     const element = surfaceRef.current;
     if (!element) return;
     const rect = element.getBoundingClientRect();
@@ -978,7 +988,7 @@ export function CanvasViewport() {
   const beginConnectorInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ): boolean => {
-    if (event.button !== 0 || !(event.target instanceof Element)) return false;
+    if (useBoardStore.getState().readOnly || event.button !== 0 || !(event.target instanceof Element)) return false;
     const target = event.target;
     const endpointHandle = target.closest<SVGElement>(
       "[data-connector-endpoint]",
@@ -1147,6 +1157,14 @@ export function CanvasViewport() {
     }
     useInteractionStore.getState().endInteraction();
   };
+
+  useEffect(() => {
+    if (readOnly) {
+      clearStrokePreview();
+      clearFramePreview();
+      clearConnectorPreview();
+    }
+  }, [readOnly]);
 
   const handleViewportPointerDownCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
@@ -1592,6 +1610,7 @@ export function CanvasViewport() {
     };
 
     const handlePaste = (event: ClipboardEvent) => {
+      if (useBoardStore.getState().readOnly && !isTypingTarget(event.target)) { event.preventDefault(); return; }
       const isEditingText = isTypingTarget(event.target);
       const imageFiles = getClipboardImageFiles(event.clipboardData);
       if (imageFiles.length > 0) {
@@ -1766,7 +1785,8 @@ export function CanvasViewport() {
       </div>
 
       <aside className="canvas-hint" aria-label="Canvas navigation help">
-        {activeTool === "select" && (
+        {readOnly && <span><strong>Read-only</strong> · Select and copy · Space-drag to pan</span>}
+        {!readOnly && activeTool === "select" && (
           <>
             {selectedCount === 1 && selectedConnectorIds.length === 1 ? (
               <>

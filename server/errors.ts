@@ -50,8 +50,8 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
     return;
   }
   if (parserType === "entity.too.large") {
-    const limit = typeof error === "object" && error !== null && "limit" in error && error.limit === 1024 * 1024
-      ? "1 MB" : "16 KB";
+    const bytes = typeof error === "object" && error !== null && "limit" in error ? error.limit : null;
+    const limit = bytes === 5 * 1024 * 1024 ? "5 MiB" : bytes === 1024 * 1024 ? "1 MB" : "16 KB";
     res.status(413).json({
       error: { code: "PAYLOAD_TOO_LARGE", message: `Request body exceeds the ${limit} limit` },
     });

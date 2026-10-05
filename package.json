@@ -18,6 +18,8 @@
     "db:setup": "node scripts/setup-postgres.mjs",
     "db:stop": "node scripts/local-postgres.mjs stop",
     "db:status": "node scripts/local-postgres.mjs status",
+    "assets:cleanup": "tsx --env-file-if-exists=.env server/cleanupAssets.ts",
+    "assets:cleanup:docker": "tsx --env-file=.env.docker server/cleanupAssets.ts",
     "test:database": "node --env-file-if-exists=.env scripts/test-database.mjs",
     "test:database:docker": "node --env-file=.env.docker scripts/test-database.mjs",
     "build": "tsc -b && vite build",
@@ -30,6 +32,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@imagekit/nodejs": "^7.12.1",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@tanstack/react-query": "^5.104.1",
@@ -39,6 +42,7 @@
     "pg": "^8.23.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5",
     "zustand": "^5.0.8"
   },

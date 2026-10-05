@@ -4,6 +4,59 @@ Updated: 2026-10-05. Implementation only; lesson topics are excluded.
 
 ## Completed milestones
 
+- Backend cloud-image assets: ImageKit private immutable uploads, validated static
+  JPEG/PNG/WebP, board-scoped access and five-minute signed reads; SQL migration 6
+  and Prisma asset/budget mappings. Ready same-board image references participate
+  in revision-checked saves. Failed saves roll retention back; upload failures
+  preserve reservations for delayed cleanup. Saved-once files are retained
+  indefinitely, including after image removal or board deletion. Never-saved
+  assets become cleanup candidates after 24 hours; provider deletion/absence must
+  be confirmed before releasing quota. Guide: [cloud-images.md](cloud-images.md).
+- Migration 6 applied to Docker PostgreSQL on 5434; pre-existing row, column,
+  constraint and index fingerprints unchanged. Prisma reports no drift. Portable
+  PostgreSQL is unchanged. Provider credentials remain backend-only in ignored
+  `.env.docker`. The restricted key actually passed upload/read/delete/signing;
+  signed delivery returned 200, unsigned and expired delivery 401. No subscription
+  change; the active free-plan dashboard remains independently unverified.
+
+Backend asset validation: 438 fast tests, 76 isolated-schema PostgreSQL tests,
+server typecheck and both builds passed. Tests cover permission downgrade/
+revocation, invalid uploads, pending/missing/cross-board references, concurrent
+quota/signing limits, cleanup/save races and forced save rollback. A separate
+real HTTP/Prisma/PostgreSQL/ImageKit proof passed owner/editor uploads, viewer
+read/upload denial, image save/read and revocation; its two files were deleted.
+Provider adapter proofs used five tiny disposable files, all deleted; the
+existing user image was preserved. Frontend browser tests were not rerun here.
+The maintained cloud Scribble API collection passes 138 requests / 466
+assertions against the real Express/Prisma/PostgreSQL paths with fake provider
+storage in an isolated schema. Its fetched-back v3 mirror lints 138 requests
+without issues. All 208 pre-existing folder/request/example IDs and 100 unrelated
+request/script/example payloads are preserved. Compiled startup/health and
+private-asset route checks passed; built frontend files contain no backend secrets.
+
+- Sharing and roles: explicit Google-email invitations, acceptance/decline,
+  owner-managed role changes/removal and pending-invite cancellation. Owners
+  alone manage sharing/deletion; editors edit/rename; viewers read. Links are
+  copied by the owner; no email service. Shared boards include the caller role.
+- SQL migration 5 applied to Docker PostgreSQL and mapped in Prisma. All original
+  rows, constraints and indexes match their pre-migration fingerprints; no
+  existing users were granted access and portable PostgreSQL is unchanged.
+- Permission changes and saves use the same parent lock, rechecking access before
+  revision disclosure or writes. Viewer canvas guards cover creation, keyboard,
+  paste, editing, drag/resize, title and undo/redo. Focus/30-second access checks
+  preserve drafts; opening as viewer backs up old editable drafts. See
+  [sharing.md](sharing.md). Prisma committed as `c092b74`; sharing and backend
+  assets are included in the combined commit authorized on 2026-10-05.
+
+Sharing validation: 386 fast tests, 57 isolated-schema real PostgreSQL tests,
+41 browser scenarios across full/targeted runs, typechecks, both builds and
+Prisma schema equality. The API collection verifies 101 requests / 325 assertions
+against the compiled API with temporary accounts/schemas; its v3 mirror lints
+101 requests without issues. The fetched-back cloud copy passes the same run;
+all existing request/example IDs and tests are preserved. Browser account APIs
+remain mocked; two real Google
+accounts have not manually exercised the new sharing flow.
+
 - Prisma Client 7.10.0 against the existing PostgreSQL schema. Typed model
   queries handle routine board/auth operations; parameterized SQL inside Prisma
   retains locks, revision checks, database-clock expiry and exact timestamps.
@@ -39,8 +92,8 @@ Updated: 2026-10-05. Implementation only; lesson topics are excluded.
   endpoints, schema migrations or collection changes were needed for this UI.
 - Private board ownership for metadata CRUD and document GET/PUT. Every board
   route requires a persisted session; creation takes its owner from that session.
-- Owner filters inside PostgreSQL reads/writes. Document saves check ownership
-  while locking the parent row, before checking or disclosing save revisions.
+- Owner/membership filters inside PostgreSQL reads. Document saves check editing
+  permission while locking the parent row before checking/disclosing revisions.
 - Mutation protection through `X-Scribble-Request: 1`, origin checks and browser
   fetch metadata. Public health and Google sign-in routes remain available.
 - Migration 4 applied to Docker PostgreSQL on port 5434. The existing demo board
@@ -75,24 +128,31 @@ were user-verified; an automated real browser/API/DB fixture remains pending. Se
 
 ## Pending implementation queue
 
-1. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
-   sharing flow, with server enforcement on every read and mutation.
-2. **Cloud image assets:** durable private storage, validated uploads, access
-   checks, recoverable failures, deletion and orphan cleanup.
-3. **Real-time collaboration:** authorized connections, presence/cursors,
+1. **Frontend cloud image assets:** explicit upload from guest/account drafts,
+   cloud-reference adapters, pending/failure/retry UI, expiring signed-image
+   refresh and meaningful browser verification. Backend support is implemented.
+   Saved-asset reclamation and a scheduled deployment cleanup job remain pending;
+   saved assets currently retain storage even after board deletion.
+2. **Real-time collaboration:** authorized connections, presence/cursors,
    synchronized edits, reconnect handling and tested concurrent-edit behavior.
-4. **PWA and local reliability:** installation/offline loading and cross-tab
+3. **PWA and local reliability:** installation/offline loading and cross-tab
    coordination for local saves; preserve stored guest data compatibility.
-5. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
+4. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
    document fresh setup, and verify an actual Docker database-process restart.
-6. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
-    assets, CI checks, HTTPS/configuration, logs/error monitoring, deployment
+5. **Production delivery:** frontend already runs through a Cloudflare Worker
+   at `https://milanputhukkudy.com/scribble/`; deploy the local Express API and
+   PostgreSQL (Neon planned), connect the frontend, and add CI checks,
+   HTTPS/configuration, logs/error monitoring, deployment
     rate limiting, backups, restore verification and operational runbooks.
-7. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
+6. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
    the completed user live-Google account save/open verification, then repeat on
    deployment. Sharing/assets/collaboration paths follow as those features
    become available.
 
-Next session: review Prisma, then sharing and roles. Non-image account
-boards are implemented against local API/PostgreSQL; deployment and image assets
-follow later. Preserve guest use and explicit upload.
+Next session: frontend cloud-image integration. The backend is local and ready;
+API/Neon deployment, scheduled cleanup and actual CDN usage monitoring remain
+pending. ImageKit budgets limit application storage and URL issuance; reused
+signed URLs can consume additional bandwidth during their five-minute validity.
+Preserve guest use and explicit upload. Sharing and backend assets are included
+in the combined commit authorized on 2026-10-05; check `git log` for its revision.
+Future commits need fresh approval. No push or deployment is authorized.

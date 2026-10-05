@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useBoardStore } from "./boardStore";
 import {
   isCanvasSpatialObject,
   isConnectorObject,
@@ -72,6 +73,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   addObjects: (objects, label = "Add objects") =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       if (objects.length === 0) return state;
       const nextObjects = { ...state.objects };
       for (const object of objects) nextObjects[object.id] = object;
@@ -85,6 +87,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   updateObject: (id, updates, label = "Edit object") =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const object = state.objects[id];
       if (!object) return state;
       const changed = Object.entries(updates).some(
@@ -109,6 +112,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   updateObjectPositions: (positions, label = "Move selection") =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const nextObjects = { ...state.objects };
       const updatedAt = Date.now();
       let changed = false;
@@ -151,6 +155,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   setObjectGroup: (ids, groupId, label = "Group objects") =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const nextObjects = { ...state.objects };
       const updatedAt = Date.now();
       let changed = false;
@@ -181,6 +186,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   deleteObjects: (ids, label = "Delete selection") =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const nextObjects = { ...state.objects };
       const deletedIds = new Set(ids);
       for (const object of Object.values(state.objects)) {
@@ -211,6 +217,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   undo: () =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const entry = state.past.at(-1);
       if (!entry) return state;
 
@@ -226,6 +233,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   redo: () =>
     set((state) => {
+      if (useBoardStore.getState().readOnly) return state;
       const entry = state.future.at(-1);
       if (!entry) return state;
 

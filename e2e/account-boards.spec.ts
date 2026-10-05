@@ -7,7 +7,7 @@ const guest = { error: { code: "UNAUTHENTICATED", message: "Sign in to use accou
 const firstId = "22222222-2222-4222-8222-222222222222";
 const secondId = "33333333-3333-4333-8333-333333333333";
 
-type Metadata = { id: string; title: string; createdAt: number; updatedAt: number };
+type Metadata = { id: string; title: string; createdAt: number; updatedAt: number; role?: "owner" | "editor" | "viewer" };
 type SavedBoard = Metadata & { document: BoardDocument | null };
 type Mutation = { method: string; path: string; body: any };
 
@@ -35,6 +35,7 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     listStarted: null as (() => void) | null,
   };
   let nextId = 4;
+  await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: [] } }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user } : guest }));
   await page.route("**/api/auth/logout", (route) => {
     cloud.signedIn = false;
@@ -144,6 +145,108 @@ async function openBoard(page: Page, title: string) {
 function documentWrites(cloud: Awaited<ReturnType<typeof mockAccount>>) {
   return cloud.mutations.filter((mutation) => mutation.method === "PUT");
 }
+
+test("viewers can navigate and copy but cannot change the canvas, title or history", async ({ page }) => {
+  const board = savedBoard(firstId, "Viewer drawing"); board.role = "viewer"; board.document!.role = "viewer";
+  const cloud = await mockAccount(page, [board]);
+  await page.goto("/scribble/"); await openBoard(page, board.title);
+  await expect(page.getByText("Viewer access. This board is read-only.")).toBeVisible();
+  await expect(page.getByLabel("Board title")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
+  const before = await canvasState(page);
+  await page.mouse.dblclick(600, 500);
+  await page.keyboard.press("n"); await page.mouse.click(610, 510);
+  await page.mouse.move(350, 490); await page.mouse.down(); await page.mouse.move(450, 540); await page.mouse.up();
+  await page.keyboard.press("Control+c");
+  const copied = await page.evaluate(async () => {
+    const { useClipboardStore } = await import(/* @vite-ignore */ "/scribble/src/store/clipboardStore.ts");
+    return useClipboardStore.getState().objects;
+  });
+  expect(copied).toHaveLength(1);
+  await page.keyboard.press("Control+v");
+  await page.keyboard.press("Delete"); await page.keyboard.press("Control+d"); await page.keyboard.press("Control+z");
+  const after = await canvasState(page);
+  expect(after.objects).toEqual(before.objects); expect(after.past).toEqual(before.past); expect(after.future).toEqual(before.future);
+  expect(cloud.mutations).toEqual([]);
+  const row = page.getByRole("listitem").filter({ has: page.getByText(board.title, { exact: true }) });
+  await expect(row.getByRole("button", { name: "Rename", exact: true })).toBeDisabled();
+  await expect(row.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await createNote(page, "Guest still editable");
+});
+
+test("editors save changes and a later downgrade stops edits while retaining the local draft", async ({ page }) => {
+  const board = savedBoard(firstId, "Editor drawing"); board.role = "editor"; board.document!.role = "editor";
+  const cloud = await mockAccount(page, [board]);
+  await page.goto("/scribble/"); await openBoard(page, board.title);
+  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await editNote(page, board.title, "Editor saved this");
+  await expect.poll(() => documentWrites(cloud).length).toBe(1);
+  await page.evaluate(async () => {
+    const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
+    useDocumentStore.getState().updateObject(Object.keys(useDocumentStore.getState().objects)[0], { body: "Unsent draft" });
+  });
+  const current = cloud.boards.get(firstId)!; current.role = "viewer"; current.document!.role = "viewer";
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByLabel("Board title")).toBeDisabled();
+  await page.waitForTimeout(800);
+  expect(documentWrites(cloud)).toHaveLength(1);
+  expect(Object.values((await canvasState(page)).objects)[0]).toMatchObject({ body: "Unsent draft" });
+  cloud.boards.delete(firstId);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByText("Access removed. This local draft is read-only.")).toBeVisible();
+});
+
+test("owners create link invitations, change roles and remove members", async ({ page }) => {
+  await mockAccount(page, [savedBoard(firstId, "Owner drawing")]);
+  const sharing = { members: [{ userId: secondId, email: "member@example.com", displayName: "Member", role: "viewer" }], invitations: [] as { id: string; email: string; role: string; expiresAt: number }[] };
+  await page.route(/\/api\/boards\/[^/]+\/(sharing|invitations|members)(\/[^/]+)?$/, async (route) => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    if (req.method() === "GET") { await route.fulfill({ json: sharing }); return; }
+    expect(req.headers()["x-scribble-request"]).toBe("1");
+    if (req.method() === "POST") {
+      const invitation = { id: "44444444-4444-4444-8444-444444444444", ...req.postDataJSON(), expiresAt: Date.now() + 86400000 };
+      sharing.invitations.push(invitation); await route.fulfill({ status: 201, json: { invitation } }); return;
+    }
+    if (req.method() === "PATCH") sharing.members[0].role = req.postDataJSON().role;
+    else if (path.includes("/members/")) sharing.members = [];
+    else sharing.invitations = [];
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto("/scribble/"); await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.getByLabel("Google email").fill("friend@example.com");
+  await page.getByLabel("Invite role").selectOption("editor");
+  await page.getByRole("button", { name: "Create invitation", exact: true }).click();
+  await expect(page.getByText(/friend@example.com · editor/)).toBeVisible();
+  await page.getByRole("button", { name: "Copy invitation link", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: /Invitation link copied|Copy this invitation link/ })).toBeVisible();
+  await page.getByLabel("Role for member@example.com").selectOption("editor");
+  await expect.poll(() => sharing.members[0].role).toBe("editor");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove access", exact: true }).click();
+  await expect(page.getByText("No invited members yet.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel invitation", exact: true }).click();
+  await expect(page.getByText("No pending invitations.", { exact: true })).toBeVisible();
+});
+
+test("recipients explicitly accept an invitation before its shared board appears", async ({ page }) => {
+  const cloud = await mockAccount(page);
+  const id = "44444444-4444-4444-8444-444444444444";
+  let pending = true;
+  await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: pending ? [{ id, email: user.email, role: "viewer", expiresAt: Date.now() + 86400000, boardId: firstId, boardTitle: "Invited drawing", ownerEmail: "friend@example.com" }] : [] } }));
+  await page.route(`**/api/invitations/${id}/accept`, (route) => {
+    expect(route.request().headers()["x-scribble-request"]).toBe("1");
+    pending = false; const board = savedBoard(firstId, "Invited drawing"); board.role = "viewer"; board.document!.role = "viewer"; cloud.boards.set(firstId, board);
+    return route.fulfill({ json: { board } });
+  });
+  await page.goto(`/scribble/?invite=${id}`);
+  await expect(page.getByRole("list", { name: "Boards from server" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Accept invitation", exact: true }).click();
+  await openBoard(page, "Invited drawing");
+  await expect(page.getByLabel("Board title")).toBeDisabled();
+  expect(cloud.mutations).toEqual([]);
+});
 
 test("signing in lists owned boards without uploading or changing guest IndexedDB", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Account sketch")]);

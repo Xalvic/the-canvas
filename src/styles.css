@@ -211,6 +211,29 @@ button {
   cursor: wait;
 }
 
+.board-sharing {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+.board-sharing form, .sharing-person {
+  display: grid;
+  gap: 6px;
+}
+.board-sharing label { display: grid; gap: 4px; }
+.board-sharing input, .board-sharing select, .board-sharing button {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+}
+.board-sharing button { cursor: pointer; }
+.board-sharing button:disabled { opacity: .5; cursor: default; }
+.sharing-person { padding: 8px 0; overflow-wrap: anywhere; }
+
 .server-boards summary:focus-visible,
 .server-boards-refresh:focus-visible {
   outline: 2px solid var(--accent);

@@ -6,6 +6,7 @@ import {
 
 export function BoardIdentity() {
   const title = useBoardStore((state) => state.title);
+  const readOnly = useBoardStore((state) => state.readOnly);
   const isHydrated = useBoardStore((state) => state.isHydrated);
   const saveStatus = useBoardStore((state) => state.saveStatus);
   const saveError = useBoardStore((state) => state.saveError);
@@ -33,7 +34,7 @@ export function BoardIdentity() {
           className="board-title-input"
           aria-label="Board title"
           value={title}
-          disabled={!isHydrated}
+          disabled={!isHydrated || readOnly}
           maxLength={80}
           size={Math.min(18, Math.max(8, title.length))}
           onChange={(event) => setTitle(event.target.value)}

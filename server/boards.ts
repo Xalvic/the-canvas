@@ -9,11 +9,13 @@ export const renameBoardSchema = createBoardSchema;
 
 export const boardIdSchema = z.uuid();
 
+export type BoardRole = "owner" | "editor" | "viewer";
 export type BoardMetadata = {
   id: string;
   title: string;
   createdAt: number;
   updatedAt: number;
+  role?: BoardRole;
 };
 
 // HTTP handlers await either the test fixture or the PostgreSQL implementation.
@@ -35,11 +37,12 @@ export function createBoardStore() {
     get: (id: string, ownerId: string) => owners.get(id) === ownerId ? boards.get(id) : undefined,
     create: (title: string, ownerId: string): BoardMetadata => {
       const timestamp = Date.now();
-      const board = {
+      const board: BoardMetadata = {
         id: randomUUID(),
         title,
         createdAt: timestamp,
         updatedAt: timestamp,
+        role: "owner",
       };
       boards.set(board.id, board);
       owners.set(board.id, ownerId);

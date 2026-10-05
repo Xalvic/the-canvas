@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  BoardApiError, BoardSignInRequired,
+  BoardApiError, BoardSignInRequired, getServerBoard, type BoardRole,
   type ServerBoard,
 } from "../api/boards";
 import { AccountBoardQueries } from "../api/accountBoardQueries";
@@ -11,6 +11,8 @@ import { useViewportStore, initialViewport } from "../store/viewportStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useInteractionStore } from "../store/interactionStore";
 import { useAppearancePreviewStore } from "../store/appearancePreviewStore";
+import { useUiStore } from "../store/uiStore";
+import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "../canvas/viewport/pointerInteractionEvents";
 import { deserializeCanvasDocument, serializeDocumentSnapshot } from "./canvasDocumentAdapters";
 import type { CanvasDocument } from "./canvasDocument";
 import {
@@ -20,7 +22,7 @@ import {
 import { captureLocalBoard } from "./useLocalBoardPersistence";
 import { waitForLocalBoardSave } from "./waitForLocalBoardSave";
 
-type CloudStatus = "local" | "saved" | "unsaved" | "saving" | "conflict" | "error" | "signed-out";
+type CloudStatus = "local" | "saved" | "unsaved" | "saving" | "conflict" | "error" | "signed-out" | "read-only";
 type SessionState = {
   userId: string | null;
   busy: boolean;
@@ -61,7 +63,7 @@ export class AccountBoardSession {
   start() {
     const changed = () => {
       const board = useBoardStore.getState();
-      if (!board.isHydrated || !board.account) return;
+      if (!board.isHydrated || !board.account || board.readOnly) return;
       if (this.state.userId !== board.account.ownerId) { this.update({ status: "signed-out" }); return; }
       if (["conflict", "error"].includes(this.state.status)) return;
       this.update({ status: "unsaved" });
@@ -92,7 +94,7 @@ export class AccountBoardSession {
       // Keep the scoped draft before returning to the guest canvas.
       this.returnToGuest = this.state.busy;
       if (!this.state.busy) void this.back();
-    } else if (account) {
+    } else if (account && !useBoardStore.getState().readOnly) {
       this.update({ status: account.pendingSave ? "error" : "unsaved" });
       if (!account.pendingSave) void this.save();
     }
@@ -101,6 +103,40 @@ export class AccountBoardSession {
   expire = () => {
     this.setUser(null);
     this.update({ accountVersion: this.state.accountVersion + 1 });
+  };
+
+  private access(role: BoardRole | "none") {
+    const board = useBoardStore.getState();
+    const wasReadOnly = board.readOnly;
+    board.setAccessRole(role);
+    if (role === "viewer" || role === "none") {
+      this.clearTimer();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(CANCEL_TOUCH_INTERACTIONS_EVENT));
+      useInteractionStore.getState().endInteraction();
+      useAppearancePreviewStore.getState().cancel();
+      useUiStore.getState().setActiveTool("select");
+      this.update({ status: "read-only", error: role === "none" ? "Access was removed. Your draft stays on this device." : null });
+    } else if (wasReadOnly) {
+      // Reopening checks revisions and preserves drafts before editing resumes.
+      this.update({ status: "error", error: "Editing access restored. Reload the account version before saving." });
+    }
+  }
+
+  refreshAccess = async () => {
+    const board = useBoardStore.getState();
+    if (!board.account || board.account.ownerId !== this.state.userId || this.state.busy) return;
+    const id = board.id, version = board.sessionVersion, userId = this.state.userId;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const current = () => useBoardStore.getState().id === id && useBoardStore.getState().sessionVersion === version && this.state.userId === userId;
+    try {
+      const metadata = await getServerBoard(board.account.boardId, controller.signal);
+      if (current() && board.accessRole === "none" && this.state.status === "local") await this.open(metadata);
+      else if (current()) this.access(metadata.role ?? "owner");
+    } catch (error) {
+      if (current() && error instanceof BoardSignInRequired) this.expire();
+      else if (current() && error instanceof BoardApiError && error.code === "BOARD_NOT_FOUND") this.access("none");
+    } finally { clearTimeout(timeout); }
   };
 
   private fail(error: unknown) {
@@ -113,7 +149,7 @@ export class AccountBoardSession {
     if (useInteractionStore.getState().mode !== "idle") throw new Error("Finish the current canvas interaction before switching boards.");
   }
 
-  private applyRecord(record: LocalBoardRecord, signal: AbortSignal, persist = false) {
+  private applyRecord(record: LocalBoardRecord, signal: AbortSignal, persist = false, role: BoardRole | "none" = "owner") {
     if (signal.aborted) throw new Error("Board switch cancelled.");
     if (useBoardStore.getState().sessionVersion !== this.operationSession) throw new Error("The active board changed. Please open the board again.");
     this.assertIdle();
@@ -126,17 +162,19 @@ export class AccountBoardSession {
       id: record.id, title: record.title, createdAt: record.createdAt,
       updatedAt: record.updatedAt, account: record.account,
     }, true);
+    useBoardStore.getState().setAccessRole(record.account ? role : null);
+    if (record.account && (role === "viewer" || role === "none")) this.access(role);
     this.operationSession = useBoardStore.getState().sessionVersion;
     // Loaded remote/recovery content uses the same serial local autosave queue.
     if (persist && record.account) useBoardStore.getState().setAccount({ ...record.account });
   }
 
-  private async replace(record: LocalBoardRecord, signal: AbortSignal, persist = false) {
+  private async replace(record: LocalBoardRecord, signal: AbortSignal, persist = false, role: BoardRole | "none" = "owner") {
     await waitForLocalBoardSave(signal);
-    this.applyRecord(record, signal, persist);
+    this.applyRecord(record, signal, persist, role);
   }
 
-  private async preserveAndReplace(record: LocalBoardRecord, signal: AbortSignal) {
+  private async preserveAndReplace(record: LocalBoardRecord, signal: AbortSignal, role: BoardRole | "none" = "owner") {
     // A user can edit while the remote read or IndexedDB backup is pending.
     // Repeat the backup until it covers the exact state we are about to replace.
     while (!signal.aborted) {
@@ -148,7 +186,7 @@ export class AccountBoardSession {
       await waitForLocalBoardSave(signal);
       if (useDocumentStore.getState().objects !== recovery.objects ||
           titleNow() !== recovery.title || useViewportStore.getState().viewport !== recovery.viewport) continue;
-      this.applyRecord({ ...record, viewport: recovery.viewport }, signal, true);
+      this.applyRecord({ ...record, viewport: recovery.viewport }, signal, true, role);
       return;
     }
   }
@@ -184,7 +222,10 @@ export class AccountBoardSession {
     if (!ownerId) throw new BoardSignInRequired();
     try { return await this.queries.document(ownerId, boardId, signal); }
     catch (error) {
-      if (error instanceof BoardApiError && error.code === "DOCUMENT_NOT_FOUND") return { ...blankDocument(), boardId, revision: 0, updatedAt: Date.now() };
+      if (error instanceof BoardApiError && error.code === "DOCUMENT_NOT_FOUND") {
+        const metadata = await getServerBoard(boardId, signal);
+        return { ...blankDocument(), boardId, revision: 0, updatedAt: Date.now(), role: metadata.role };
+      }
       throw error;
     }
   }
@@ -192,7 +233,7 @@ export class AccountBoardSession {
   open = (board: ServerBoard) => this.operation(async (signal) => {
     const ownerId = this.state.userId;
     if (!ownerId) throw new BoardSignInRequired();
-    if (useBoardStore.getState().account?.boardId === board.id && useBoardStore.getState().account?.ownerId === ownerId) return;
+    if (useBoardStore.getState().account?.boardId === board.id && useBoardStore.getState().account?.ownerId === ownerId && !useBoardStore.getState().readOnly) return;
     this.assertIdle();
     const id = accountBoardStorageId(ownerId, board.id);
     const draft = await loadLocalBoard(id);
@@ -211,7 +252,8 @@ export class AccountBoardSession {
     );
     let record: LocalBoardRecord;
     let status: CloudStatus = "saved";
-    if (dirty && draft?.account) {
+    if (remote.role === "viewer" && dirty && draft) await saveLocalBoard({ ...draft, id: `${id}:recovery` });
+    if (dirty && draft?.account && remote.role !== "viewer") {
       record = draft;
       const pending = draft.account.pendingSave;
       // A lost response can be confirmed after a reload without another write.
@@ -230,8 +272,8 @@ export class AccountBoardSession {
     }
     await saveLocalBoard(record);
     const recovery = await loadLocalBoard(`${id}:recovery`);
-    await this.replace(record, signal);
-    if (!signal.aborted) this.update({ status: remote.revision === 0 && status === "saved" ? "unsaved" : status, hasRecovery: recovery !== null,
+    await this.replace(record, signal, false, remote.role ?? "owner");
+    if (!signal.aborted) this.update({ status: remote.role === "viewer" ? "read-only" : remote.revision === 0 && status === "saved" ? "unsaved" : status, hasRecovery: recovery !== null,
       error: unsupportedDraft ? "Image-containing documents are unsupported for account saves until durable asset storage is available. Your draft is kept on this device." : null });
   });
 
@@ -274,7 +316,7 @@ export class AccountBoardSession {
   save = async (force = false, operationSignal?: AbortSignal): Promise<void> => {
     if (this.saving) return this.saving;
     const account = useBoardStore.getState().account;
-    if (!account || this.state.userId !== account.ownerId || (!force && this.state.busy)) return;
+    if (!account || useBoardStore.getState().readOnly || this.state.userId !== account.ownerId || (!force && this.state.busy)) return;
     const controller = operationSignal ? null : new AbortController();
     const signal = operationSignal ?? controller!.signal;
     if (controller) this.request = controller;
@@ -289,6 +331,7 @@ export class AccountBoardSession {
         if (link.pendingSave) {
           const remote = await this.readDocument(link.boardId, signal);
           if (!current()) return;
+          if (remote.role === "viewer") { this.access("viewer"); return; }
           const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
           if (remote.revision === link.pendingSave.expectedRevision + 1 && sameDocument(document, link.pendingSave.document)) {
             link = { ...link, revision: remote.revision, savedDocument: document, pendingSave: undefined };
@@ -304,12 +347,14 @@ export class AccountBoardSession {
           // Persist the submission marker before sending a write with an uncertain outcome.
           await waitForLocalBoardSave(signal);
           if (!current()) return;
+          if (useBoardStore.getState().readOnly) return;
           const remote = await this.queries.save(account.ownerId, link.boardId, document, link.revision, signal);
           if (!current()) return;
           link = { ...link, revision: remote.revision, savedDocument: { schemaVersion: remote.schemaVersion, content: remote.content }, pendingSave: undefined };
           useBoardStore.getState().setAccount(link);
         }
         if (title !== link.savedTitle) {
+          if (useBoardStore.getState().readOnly) return;
           const renamed = await this.queries.rename(account.ownerId, link.boardId, title, signal);
           if (!current()) return;
           link = { ...link, savedTitle: renamed.title };
@@ -317,9 +362,10 @@ export class AccountBoardSession {
         }
         if (!current()) return;
         const dirty = titleNow() !== link.savedTitle || !sameDocument(serializeDocumentSnapshot(useDocumentStore.getState().objects), link.savedDocument);
-        this.update({ status: dirty ? "unsaved" : "saved" });
+        if (!useBoardStore.getState().readOnly) this.update({ status: dirty ? "unsaved" : "saved" });
       } catch (error) {
-        if (current()) this.fail(error);
+        if (current() && error instanceof BoardApiError && ["BOARD_FORBIDDEN", "BOARD_NOT_FOUND"].includes(error.code)) this.access(error.code === "BOARD_FORBIDDEN" ? "viewer" : "none");
+        else if (current()) this.fail(error);
         else if (signal.aborted && useBoardStore.getState().id === id && this.state.userId === account.ownerId) this.update({ status: "error", error: "The save was interrupted. Retry to check whether it reached your account." });
       }
     })();
@@ -342,9 +388,9 @@ export class AccountBoardSession {
       account: { ...board.account, revision: remote.revision, savedDocument: document, savedTitle: metadata.title, pendingSave: undefined },
     };
     // Keep the current draft intact until its backup and remote read succeed.
-    await this.preserveAndReplace(record, signal);
+    await this.preserveAndReplace(record, signal, remote.role ?? "owner");
     if (!signal.aborted) {
-      this.update({ status: "saved", hasRecovery: true });
+      this.update({ status: remote.role === "viewer" ? "read-only" : "saved", hasRecovery: true });
     }
   });
 
@@ -354,14 +400,15 @@ export class AccountBoardSession {
     const recovery = await loadLocalBoard(`${board.id}:recovery`);
     if (!recovery) throw new Error("No previous draft is available on this device.");
     const record = { ...recovery, id: board.id };
-    await this.preserveAndReplace(record, signal);
-    if (!signal.aborted) this.update({ status: "conflict", hasRecovery: true });
+    await this.preserveAndReplace(record, signal, board.accessRole ?? "none");
+    if (!signal.aborted) this.update({ status: board.readOnly ? "read-only" : "conflict", hasRecovery: true });
   });
 
   rename = (board: ServerBoard, title: string) => this.operation(async (signal) => {
     const ownerId = this.state.userId;
     if (!ownerId) throw new BoardSignInRequired();
     if (useBoardStore.getState().account?.boardId === board.id) {
+      if (useBoardStore.getState().readOnly) return;
       useBoardStore.getState().setTitle(title);
       if (!["conflict", "error"].includes(this.state.status)) this.update({ status: "unsaved" });
     } else await this.queries.rename(ownerId, board.id, title, signal);
