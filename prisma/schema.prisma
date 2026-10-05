@@ -1,0 +1,83 @@
+// Database structure is owned by db/*.sql and server/migrations.ts.
+// This schema maps the existing tables for Prisma Client; it is not a migration source.
+generator client {
+  provider            = "prisma-client"
+  output              = "../server/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// CHECK constraints stay enforced by PostgreSQL and defined in db/*.sql.
+model Board {
+  id        String         @id @db.Uuid
+  title     String
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
+  ownerId   String?        @map("owner_id") @db.Uuid
+  owner     User?          @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  document  BoardDocument?
+
+  @@index([ownerId, createdAt, id], map: "boards_owner_created_idx", where: raw("(owner_id IS NOT NULL)"))
+  @@map("boards")
+}
+
+model BoardDocument {
+  boardId       String   @id @map("board_id") @db.Uuid
+  schemaVersion Int      @map("schema_version")
+  revision      Int
+  content       Json     @db.JsonB
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  board         Board    @relation(fields: [boardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("board_documents")
+}
+
+model User {
+  id            String        @id @db.Uuid
+  googleSubject String        @unique(map: "users_google_subject_key") @map("google_subject")
+  email         String
+  displayName   String?       @map("display_name")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  sessions      AuthSession[]
+  boards        Board[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  tokenHash String   @id @map("token_hash")
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime @default(dbgenerated("(clock_timestamp() + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId], map: "auth_sessions_user_id_idx")
+  @@index([expiresAt], map: "auth_sessions_expires_at_idx")
+  @@map("auth_sessions")
+}
+
+model GoogleAuthFlow {
+  stateHash    String   @id @map("state_hash")
+  browserHash  String   @map("browser_hash")
+  nonce        String
+  codeVerifier String   @map("code_verifier")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt    DateTime @default(dbgenerated("(clock_timestamp() + '00:10:00'::interval)")) @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt], map: "google_auth_flows_expires_at_idx")
+  @@map("google_auth_flows")
+}
+
+// Only the SQL migration runner writes the ledger; omit it from Prisma Client.
+model SchemaMigration {
+  version   Int      @id
+  appliedAt DateTime @default(now()) @map("applied_at") @db.Timestamptz(6)
+
+  @@ignore
+  @@map("schema_migrations")
+}

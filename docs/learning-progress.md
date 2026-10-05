@@ -1,6 +1,6 @@
 # Scribble learning progress
 
-Updated: 2026-10-04. Record milestones and substantial implementation changes
+Updated: 2026-10-05. Record milestones and substantial implementation changes
 only. No individual questions, answers, or understanding assessments.
 
 Start with [the compact checkpoint](learning-checkpoint.md). Use relevant
@@ -13,13 +13,17 @@ Node.js, Express, TypeScript, HTTP methods/endpoints/request-response flow,
 JSON parsing versus Zod runtime validation, error responses, and in-memory
 storage. This records coverage; it does not claim every planned endpoint exists.
 
+Prisma introduction: its role between Express and PostgreSQL, schema-to-client
+generation, typed model queries and the purpose of transactions. SQL remains
+the schema migration authority. No individual understanding assessments recorded.
+
 ## Implementation roadmap
 
 | Milestone | Current implementation |
 | --- | --- |
 | Local editor foundation | Custom React/TypeScript/Vite/Zustand canvas, history, selection, IndexedDB boards/assets |
 | 1. Backend and HTTP | Prototype metadata CRUD complete: health, create/list/read/rename/delete, validation, configuration, errors, tests |
-| 2. PostgreSQL persistence | Metadata CRUD, document validation/adapters, migration 2, and local document GET/PUT verified on Docker; SQL practice and Prisma pending |
+| 2. PostgreSQL persistence | Metadata/documents/auth persisted on Docker; Prisma Client integrated against migrations 1/2/3/4 with SQL owning schema changes; SQL practice remains |
 | 3. Authentication | Google-only OAuth/session API and optional account UI implemented; live sign-in/reload/sign-out user-verified in Chrome |
 | 4. Authorization/sharing | Owner-only metadata/documents implemented; sharing/roles pending |
 | 5. TanStack Query/server state | Owner-scoped account queries/mutations, caching, invalidation, refresh/recovery implemented; editor stays in Zustand |
@@ -210,5 +214,16 @@ tests, 37 browser scenarios, typechecks and both builds. No endpoint/schema chan
 or Postman update. The user confirmed completed live Google account save/open;
 automated real browser/API/DB verification remains pending. No lessons recorded.
 
-Next session: review TanStack Query, then Prisma with a single migration authority.
+Prisma milestone (2026-10-05): generated Client 7.10.0 maps the existing SQL
+schema, with routine metadata/auth queries using typed model methods. Saves
+and sign-in use Prisma transactions; parameterized SQL preserves owner locks,
+revision conflicts, database-clock expiry and exact microsecond timestamps.
+The existing bounded pg pool is shared; SQL migrations remain the sole authority.
+No normal rows, constraints, indexes, migration versions or portable data changed.
+Verified 382 fast tests, 41 real DB checks, server typecheck, both builds,
+69 Postman requests / 228 assertions, clean installation/client generation,
+schema equality and both API entrypoint smoke checks. Browser tests were not
+rerun for this backend-only change. Guide: [prisma.md](prisma.md).
+
+Next session: review Prisma, then sharing and roles. Commit requires fresh approval.
 Queue: [implementation-status.md](implementation-status.md).

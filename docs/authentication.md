@@ -163,7 +163,8 @@ local backend. TanStack Query now caches account server state and clears private
 snapshots on logout/expiry/account changes; draft recovery stays in IndexedDB and
 canvas/editor state stays in Zustand. Automated account browser scenarios use
 mocked HTTP; a real browser/API/DB fixture and deployment verification remain.
-Next: Prisma with one migration authority; non-image account documents remain
+Prisma is integrated with SQL as the migration authority; see [prisma.md](prisma.md).
+Next: sharing and roles; non-image account documents remain
 the scope until durable cloud assets exist. Queue: [implementation-status.md](implementation-status.md).
 Keep the guest-upload choice explicit. The user authorized committing and pushing this
 slice with the completed storage work at the end of 2026-10-02. Future commits

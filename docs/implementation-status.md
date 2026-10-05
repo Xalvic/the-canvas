@@ -1,8 +1,16 @@
 # Scribble implementation status
 
-Updated: 2026-10-04. Implementation only; lesson topics are excluded.
+Updated: 2026-10-05. Implementation only; lesson topics are excluded.
 
 ## Completed milestones
+
+- Prisma Client 7.10.0 against the existing PostgreSQL schema. Typed model
+  queries handle routine board/auth operations; parameterized SQL inside Prisma
+  retains locks, revision checks, database-clock expiry and exact timestamps.
+  One client reuses the existing bounded pool. SQL migrations remain the only
+  schema-change authority, with no new migration or data rewrite. Client
+  generation, schema validation and read-only drift checks are documented in
+  [prisma.md](prisma.md). Normal data/constraints/index fingerprints match.
 
 - TanStack Query v5 for owner-scoped account metadata/document queries and
   mutations, with one app QueryClient/provider. Lists stay fresh for 30 seconds,
@@ -53,10 +61,13 @@ Updated: 2026-10-04. Implementation only; lesson topics are excluded.
   Verification sessions/accounts live only in a temporary random DB schema;
   the environment file and schema are removed after the run.
 
-Validation: 382 fast tests (22 new query cases), 39 real Docker PostgreSQL tests,
-and 37 browser scenarios (five new cache/refresh/recovery cases plus account,
-authentication, private-list and canvas regressions), frontend/server typechecks
-and both production builds.
+Prisma validation: 382 fast tests, 41 real Docker PostgreSQL tests (two new
+integration cases plus stronger timestamp-precision assertions), server
+typecheck, both production builds, clean npm install/client generation, and
+69 Postman requests / 228 assertions passed. Development and compiled API
+entrypoints passed startup/health/private-route checks. Existing 37 browser
+scenarios were last verified for TanStack Query and were not rerun for this
+backend-only change.
 Account browser scenarios use mocked HTTP; database/API contracts run separately
 in isolated schemas. Live Google sign-in/reload/sign-out and account save/open
 were user-verified; an automated real browser/API/DB fixture remains pending. Setup:
@@ -64,26 +75,24 @@ were user-verified; an automated real browser/API/DB fixture remains pending. Se
 
 ## Pending implementation queue
 
-1. **Prisma:** integrate against the existing schema while preserving data,
-   constraints, transaction behavior and a single migration authority.
-2. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
+1. **Sharing and roles:** owner/editor/viewer permissions and a user-facing
    sharing flow, with server enforcement on every read and mutation.
-3. **Cloud image assets:** durable private storage, validated uploads, access
+2. **Cloud image assets:** durable private storage, validated uploads, access
    checks, recoverable failures, deletion and orphan cleanup.
-4. **Real-time collaboration:** authorized connections, presence/cursors,
+3. **Real-time collaboration:** authorized connections, presence/cursors,
    synchronized edits, reconnect handling and tested concurrent-edit behavior.
-5. **PWA and local reliability:** installation/offline loading and cross-tab
+4. **PWA and local reliability:** installation/offline loading and cross-tab
    coordination for local saves; preserve stored guest data compatibility.
-6. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
+5. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
    document fresh setup, and verify an actual Docker database-process restart.
-7. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
+6. **Production delivery:** choose/configure hosting, deploy frontend/API/DB/
     assets, CI checks, HTTPS/configuration, logs/error monitoring, deployment
     rate limiting, backups, restore verification and operational runbooks.
-8. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
+7. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
    the completed user live-Google account save/open verification, then repeat on
    deployment. Sharing/assets/collaboration paths follow as those features
    become available.
 
-Next session: review TanStack Query, then Prisma. Non-image account
+Next session: review Prisma, then sharing and roles. Non-image account
 boards are implemented against local API/PostgreSQL; deployment and image assets
 follow later. Preserve guest use and explicit upload.

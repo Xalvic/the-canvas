@@ -139,11 +139,14 @@ Compare three canvas persistence models before choosing:
 
 Evaluate queryability, write frequency, collaboration, migrations, performance, object-level permissions, and simplicity. Document the choice.
 
-Current proposal: [canvas document storage design](canvas-document-storage.md)
+Current design: [canvas document storage design](canvas-document-storage.md)
 compares these models and recommends relational board metadata plus a versioned
-JSONB snapshot. Validation/adapters, migration 2, and local pg document GET/PUT are
+JSONB snapshot. Validation/adapters, migration 2, and local document GET/PUT are
 implemented and verified against Docker PostgreSQL, including revision conflicts
-and an API restart. Frontend cloud saves and Prisma remain separate pending slices.
+and an API restart. Account save/open and autosave are implemented against the
+local backend. Prisma Client now maps the existing schema while SQL migrations
+remain the only schema-change authority (2026-10-05); see [Prisma](prisma.md).
+Deployment and cloud image assets remain pending.
 
 Design the save flow: what is persisted, when saving happens, save indicators, failures, retry behavior, and protection against an older save overwriting a newer edit. Explain the initial concurrency guarantees and their limits.
 
@@ -157,7 +160,7 @@ Design the save flow: what is persisted, when saving happens, save indicators, f
 request; no password signup/login. OAuth code flow, server sessions, me/logout and
 optional account UI and protected board/document ownership are implemented.
 Live Google sign-in, reload persistence and sign-out were user-verified in Chrome
-on 2026-10-04. Next: explicit account board save/open. See
+on 2026-10-04. Account board save/open is implemented and user-verified. See
 [authentication](authentication.md). Focus on implementation for now.
 
 **Build:** Provider sign-in, logout, current-user endpoint, a documented

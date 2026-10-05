@@ -10,24 +10,28 @@ import { createPostgresDocumentStore } from "./postgresDocuments.js";
 import { createApp } from "./app.js";
 import { FLOW_COOKIE, SESSION_COOKIE, hashToken, randomToken, type GoogleFlow } from "./auth.js";
 import { documentInput } from "./testFixtures/document.js";
+import { createPrismaClient } from "./prisma.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const identity = { subject: "google-account", email: "artist@example.com", displayName: "Artist" };
 describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
   const admin = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
   let schema: string, pool: pg.Pool;
+  let prisma: PrismaClient;
   beforeEach(async () => {
     schema = `scribble_auth_test_${randomUUID().replaceAll("-", "")}`;
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
     await migrateDatabase(pool);
+    prisma = createPrismaClient(pool, schema);
   });
-  afterEach(async () => { await pool?.end(); await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); });
+  afterEach(async () => { await prisma?.$disconnect(); await pool?.end(); await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); });
   afterAll(async () => { await admin.end(); });
-  function store() { return createPostgresAuthStore(pool); }
+  function store() { return createPostgresAuthStore(prisma); }
   function flow(): GoogleFlow { return { stateHash: hashToken(randomToken()), browserHash: hashToken(randomToken()), nonce: randomToken(), codeVerifier: randomToken() }; }
   function app() {
-    return createApp(createPostgresBoardStore(pool), createPostgresDocumentStore(pool), {
+    return createApp(createPostgresBoardStore(prisma), createPostgresDocumentStore(prisma), {
       store: store(), secureCookies: false, frontendUrl: "http://127.0.0.1:5173/scribble/",
       provider: { authorizationUrl: (value) => `https://accounts.google.com/auth?${new URLSearchParams(value)}`, verifyCode: async () => identity },
     });
@@ -99,9 +103,9 @@ describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
   it("rolls back user/profile/session revocation if a new session cannot be inserted", async () => {
     const auth = store(), previous = hashToken(randomToken()); await auth.signIn(identity, previous);
     const before = (await pool.query("SELECT * FROM users")).rows;
-    await expect(auth.signIn({ ...identity, email: "changed@example.com" }, "invalid-hash", previous)).rejects.toMatchObject({ code: "23514" });
+    await expect(auth.signIn({ ...identity, email: "changed@example.com" }, "invalid-hash", previous)).rejects.toMatchObject({ code: "P2039" });
     expect((await pool.query("SELECT * FROM users")).rows).toEqual(before); expect(await auth.getSession(previous)).toBeDefined();
-    await expect(auth.signIn({ ...identity, subject: "new-user" }, "invalid-hash")).rejects.toMatchObject({ code: "23514" });
+    await expect(auth.signIn({ ...identity, subject: "new-user" }, "invalid-hash")).rejects.toMatchObject({ code: "P2039" });
     expect((await pool.query("SELECT * FROM users")).rows).toEqual(before);
   });
 
@@ -120,11 +124,13 @@ describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
     const start = await agent.get("/api/auth/google").expect(302);
     const state = new URL(start.headers.location).searchParams.get("state")!;
     const browser = (start.headers["set-cookie"] as unknown as string[]).find((value) => value.startsWith(`${FLOW_COOKIE}=`))!.split(";")[0];
-    await pool.end(); pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
+    await prisma.$disconnect(); await pool.end(); pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
+    prisma = createPrismaClient(pool, schema);
     const callback = await request(app()).get("/api/auth/google/callback").set("Cookie", browser).query({ state, code: "verified-test-code" }).expect(303);
     const cookie = (callback.headers["set-cookie"] as unknown as string[]).find((value) => value.startsWith(`${SESSION_COOKIE}=`))!.split(";")[0];
     const before = (await request(app()).get("/api/auth/me").set("Cookie", cookie).expect(200)).body;
-    await pool.end(); pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
+    await prisma.$disconnect(); await pool.end(); pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
+    prisma = createPrismaClient(pool, schema);
     expect((await request(app()).get("/api/auth/me").set("Cookie", cookie).expect(200)).body).toEqual(before);
     await request(app()).post("/api/auth/logout").set("Cookie", cookie).set("X-Scribble-Request", "1").expect(204);
     await request(app()).get("/api/auth/me").set("Cookie", cookie).expect(401);

@@ -1,10 +1,23 @@
 # Scribble: resume here
 
-Updated: 2026-10-04. Read once per new project session.
+Updated: 2026-10-05. Read once per new project session.
 
 ## Current handoff
 
 The user requested implementing pending items one by one, without lessons.
+Latest request: implement Prisma, then explain it simply. Prisma Client 7.10.0
+is now integrated against the existing schema, using typed model queries for
+routine operations and parameterized SQL in Prisma transactions for exact save/
+auth behavior. The existing pg pool is shared. SQL migrations remain the only
+schema-change authority; ledger 1/2/3/4 and normal data/constraints/index
+fingerprints are unchanged. No new migration or Prisma migration ledger.
+Verified 382 fast tests, 41 real Docker DB checks, server typecheck, both builds,
+69 Postman requests / 228 assertions, schema equality, clean client generation
+and development/compiled API startup. Browser tests were not rerun. The stopped
+existing Docker container was started for validation; portable DB unchanged.
+Guide/commands: `docs/prisma.md`. The user authorized committing Prisma on
+2026-10-05; check git log for its revision. Subsequent commits need fresh approval.
+No push is authorized. Next: sharing and roles, now authorized for implementation.
 Account board save/open is committed as `7449241`. Live Google account save/open
 verification is complete, confirmed by the user on 2026-10-04.
 TanStack Query now manages owner-scoped account metadata/document reads,
@@ -15,10 +28,9 @@ refresh on stale focus/reconnect, and clear on logout/expiry/account changes.
 Opening/reloading/reconciling documents always checks the server. Background
 refresh never replaces the editor; canvas/editor state stays in Zustand.
 Guest IndexedDB, explicit upload, scoped drafts and recoverable conflicts remain.
-Next: review this milestone, then Prisma against the existing schema with one
-migration authority; see `docs/implementation-status.md`. The user authorized
-committing this milestone and handoff; check git log for its revision. Future
-commits need fresh approval. No push is authorized.
+TanStack Query and its handoff are committed as `fdd2228`; see
+`docs/implementation-status.md` for the remaining queue. Future commits need
+fresh approval. No push is authorized.
 Google OAuth settings are configured in ignored `.env.docker`. On 2026-10-04
 the user verified real Chrome sign-in, staying signed in after reload, and
 sign-out at `http://127.0.0.1:5173/scribble/`; see `docs/authentication.md`.
@@ -175,9 +187,10 @@ schemas, 37 browser scenarios (five new refresh/recovery cases), server typechec
 and both production builds. Browser HTTP remains mocked; live Google save/open
 is recorded as user-verified, not an automated real browser/API/DB proof.
 
-Next: review TanStack Query, then Prisma against the existing schema.
-Prisma and other implementation items are in `docs/implementation-status.md`;
-keep one migration authority. Private board/document access is now enforced.
+Prisma milestone (2026-10-05): integrated and verified; see the current handoff
+and `docs/prisma.md`. Review Prisma, then sharing and roles. Other implementation
+items are in `docs/implementation-status.md`; keep SQL as the only migration
+authority. Private board/document access is enforced.
 Ask permission to verify actual database-process restart persistence;
 ask separately before importing portable data. React/Express stay
 on npm initially. Ask before file edits, execution, installation, switching or
@@ -186,7 +199,7 @@ An unanswered question is not permission. Prior updates committed as `c2ca442`.
 Commit future changes only after explicit user authorization, separately for each
 commit. The user prefers reviewing implementation before authorizing a commit.
 Another session may create a root Markdown file; leave unrelated work untouched.
-Phase 2: Prisma remains; document modeling and the local API proof are implemented.
+Phase 2: Prisma, document modeling and the local API proof are implemented.
 Phase 3: Google-only auth implemented; live login/reload/logout user-verified.
 Phase 4: ownership is implemented; sharing/roles remain pending.
 

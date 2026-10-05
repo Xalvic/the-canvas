@@ -20,6 +20,10 @@ for board metadata. Records persist in PostgreSQL; the guest canvas continues to
 use IndexedDB independently. Follow [database setup](docs/postgresql.md), start
 the database, and run `npm run db:migrate` before starting the API.
 
+The API now queries PostgreSQL through Prisma Client. Installation generates
+the client automatically; the existing SQL runner still owns schema migrations.
+See [Prisma integration and workflow](docs/prisma.md).
+
 See [the HTTP walkthrough](docs/backend.md) for browser requests and error cases,
 [architecture](docs/architecture.md) for the existing editor flow, and
 [learning progress](docs/learning-progress.md) for the roadmap and checkpoints.

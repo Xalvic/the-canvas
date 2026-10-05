@@ -8,6 +8,8 @@ import { MAX_DOCUMENT_REVISION } from "./documents.js";
 import { createPostgresBoardStore } from "./postgresBoards.js";
 import { createPostgresDocumentStore } from "./postgresDocuments.js";
 import { documentInput } from "./testFixtures/document.js";
+import { createPrismaClient } from "./prisma.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 import { deserializeCanvasDocument, serializeDocumentSnapshot } from "../src/persistence/canvasDocumentAdapters.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -16,6 +18,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
   const admin = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
   let schema: string;
   let pool: pg.Pool;
+  let prisma: PrismaClient;
 
   beforeEach(async () => {
     schema = `scribble_document_test_${randomUUID().replaceAll("-", "")}`;
@@ -23,16 +26,18 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
     await migrateDatabase(pool);
     await seedTestOwner(pool);
+    prisma = createPrismaClient(pool, schema);
   });
   afterEach(async () => {
     vi.restoreAllMocks();
+    await prisma?.$disconnect();
     await pool?.end();
     await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
   });
   afterAll(async () => { await admin.end(); });
 
-  function app() { return createApp(createPostgresBoardStore(pool), createPostgresDocumentStore(pool)); }
-  async function board() { return createPostgresBoardStore(pool).create("Keep the metadata title", TEST_OWNER_ID); }
+  function app() { return createApp(createPostgresBoardStore(prisma), createPostgresDocumentStore(prisma)); }
+  async function board() { return createPostgresBoardStore(prisma).create("Keep the metadata title", TEST_OWNER_ID); }
   async function rows() {
     return {
       boards: (await pool.query("SELECT * FROM boards ORDER BY id")).rows,
@@ -57,7 +62,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     const next = await request(api).put(url).send(documentInput(1, "Updated drawing")).expect(200);
     expect(next.body.document.revision).toBe(2);
     expect((await request(api).get(url).expect(200)).body).toEqual(next.body);
-    const after = await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID);
+    const after = await createPostgresBoardStore(prisma).get(metadata.id, TEST_OWNER_ID);
     expect(after).toEqual({ ...metadata, updatedAt: next.body.document.updatedAt });
     expect(after!.updatedAt).toBeGreaterThanOrEqual(metadata.updatedAt);
     expect((await pool.query("SELECT b.updated_at = d.updated_at AS timestamps_match FROM boards b JOIN board_documents d ON d.board_id = b.id")).rows).toEqual([{ timestamps_match: true }]);
@@ -73,7 +78,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     expect((await request(api).put(missing).send(documentInput()).expect(404)).body.error.code).toBe("BOARD_NOT_FOUND");
     expect((await request(api).put(url).send(documentInput(1)).expect(409)).body.error.details.currentRevision).toBe(0);
     expect((await pool.query("SELECT * FROM board_documents")).rows).toEqual([]);
-    expect(await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID)).toEqual(metadata);
+    expect(await createPostgresBoardStore(prisma).get(metadata.id, TEST_OWNER_ID)).toEqual(metadata);
   });
 
   it("preserves document and metadata on invalid requests, including JSONB-incompatible strings", async () => {
@@ -136,13 +141,15 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
 
   it.each([false, true])("rolls back document writes when the metadata update fails (replacement: %s)", async (replacement) => {
     const metadata = await board();
-    const documents = createPostgresDocumentStore(pool);
+    const documents = createPostgresDocumentStore(prisma);
     if (replacement) await documents.save(metadata.id, documentInput(), TEST_OWNER_ID);
     const before = await rows();
     // Fault injection is restricted to this newly created test schema.
     await pool.query("CREATE FUNCTION reject_metadata_update() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test metadata write failure'; END $$");
     await pool.query("CREATE TRIGGER fail_metadata BEFORE UPDATE ON boards FOR EACH ROW EXECUTE FUNCTION reject_metadata_update()");
-    await expect(documents.save(metadata.id, documentInput(replacement ? 1 : 0, "Rollback"), TEST_OWNER_ID)).rejects.toMatchObject({ code: "P0001" });
+    await expect(documents.save(metadata.id, documentInput(replacement ? 1 : 0, "Rollback"), TEST_OWNER_ID)).rejects.toMatchObject({
+      code: "P2010", meta: { driverAdapterError: { cause: { originalCode: "P0001" } } },
+    });
     expect(await rows()).toEqual(before);
     await pool.query("DROP TRIGGER fail_metadata ON boards");
     expect((await documents.save(metadata.id, documentInput(replacement ? 1 : 0), TEST_OWNER_ID)).status).toBe("saved");
@@ -152,8 +159,10 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
     const metadata = await board();
     const url = `/api/boards/${metadata.id}/document`;
     const accepted = await request(app()).put(url).send(documentInput()).expect(201);
+    await prisma.$disconnect();
     await pool.end();
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, connectionTimeoutMillis: 5000 });
+    prisma = createPrismaClient(pool, schema);
     expect((await request(app()).get(url).expect(200)).body).toEqual(accepted.body);
   });
 
@@ -170,8 +179,8 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
 
   it("can refetch a committed snapshot after its response path fails, without writing a duplicate", async () => {
     const metadata = await board();
-    const documents = createPostgresDocumentStore(pool);
-    const api = createApp(createPostgresBoardStore(pool), {
+    const documents = createPostgresDocumentStore(prisma);
+    const api = createApp(createPostgresBoardStore(prisma), {
       get: documents.get,
       async save(id, input, ownerId) {
         await documents.save(id, input, ownerId);
@@ -209,15 +218,17 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document API", () => {
 
   it("keeps timestamps monotonic even when existing metadata/document timestamps are ahead of the clock", async () => {
     const metadata = await board();
-    await pool.query("UPDATE boards SET updated_at = '2099-01-01T00:00:00Z' WHERE id = $1", [metadata.id]);
+    await pool.query("UPDATE boards SET updated_at = '2099-01-01T00:00:00.123456Z' WHERE id = $1", [metadata.id]);
     const api = app();
     const url = `/api/boards/${metadata.id}/document`;
     const first = await request(api).put(url).send(documentInput()).expect(201);
-    expect(first.body.document.updatedAt).toBe(Date.parse("2099-01-01T00:00:00Z"));
-    await pool.query("UPDATE board_documents SET updated_at = '2100-01-01T00:00:00Z' WHERE board_id = $1", [metadata.id]);
+    expect(first.body.document.updatedAt).toBe(Date.parse("2099-01-01T00:00:00.123456Z"));
+    expect((await pool.query("SELECT b.updated_at = d.updated_at AS exact_match FROM boards b JOIN board_documents d ON d.board_id = b.id")).rows).toEqual([{ exact_match: true }]);
+    await pool.query("UPDATE board_documents SET updated_at = '2100-01-01T00:00:00.654321Z' WHERE board_id = $1", [metadata.id]);
     const next = await request(api).put(url).send(documentInput(1)).expect(200);
-    expect(next.body.document.updatedAt).toBe(Date.parse("2100-01-01T00:00:00Z"));
-    expect((await createPostgresBoardStore(pool).get(metadata.id, TEST_OWNER_ID))!.updatedAt).toBe(next.body.document.updatedAt);
+    expect(next.body.document.updatedAt).toBe(Date.parse("2100-01-01T00:00:00.654321Z"));
+    expect((await createPostgresBoardStore(prisma).get(metadata.id, TEST_OWNER_ID))!.updatedAt).toBe(next.body.document.updatedAt);
+    expect((await pool.query("SELECT b.updated_at = d.updated_at AS exact_match FROM boards b JOIN board_documents d ON d.board_id = b.id")).rows).toEqual([{ exact_match: true }]);
   });
 
   it("handles the last representable revision increment and rejects a save that would overflow", async () => {

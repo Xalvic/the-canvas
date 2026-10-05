@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:check": "node --env-file-if-exists=.env node_modules/prisma/build/index.js migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
+    "db:check:docker": "node --env-file=.env.docker node_modules/prisma/build/index.js migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
     "dev": "vite",
     "dev:server": "tsx watch --env-file-if-exists=.env server/index.ts",
     "dev:server:docker": "tsx watch --env-file=.env.docker server/index.ts",
@@ -25,6 +30,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "@tanstack/react-query": "^5.104.1",
     "express": "^5.2.1",
     "google-auth-library": "^11.1.0",
@@ -35,6 +42,10 @@
     "zod": "^4.6.5",
     "zustand": "^5.0.8"
   },
+  "overrides": {
+    "@prisma/config": { "deepmerge-ts": "8.0.2" },
+    "prisma": { "mysql2": "3.24.5" }
+  },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/express": "^5.0.6",
@@ -44,6 +55,7 @@
     "@types/react-dom": "^19.1.9",
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^5.0.2",
+    "prisma": "7.10.0",
     "supertest": "^7.3.0",
     "tsx": "^4.23.15",
     "typescript": "~5.8.3",

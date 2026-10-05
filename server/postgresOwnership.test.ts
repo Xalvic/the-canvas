@@ -9,22 +9,26 @@ import { createPostgresBoardStore } from "./postgresBoards.js";
 import { createPostgresDocumentStore } from "./postgresDocuments.js";
 import { createPostgresAuthStore } from "./postgresAuth.js";
 import { documentInput } from "./testFixtures/document.js";
+import { createPrismaClient } from "./prisma.js";
+import type { PrismaClient } from "./generated/prisma/client.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 describe.skipIf(!databaseUrl)("real PostgreSQL board ownership", () => {
   const admin = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
   let schema: string, pool: pg.Pool;
+  let prisma: PrismaClient;
   beforeEach(async () => {
     schema = `scribble_ownership_test_${randomUUID().replaceAll("-", "")}`;
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}`, application_name: schema, connectionTimeoutMillis: 5000 });
     await migrateDatabase(pool);
+    prisma = createPrismaClient(pool, schema);
   });
-  afterEach(async () => { await pool?.end(); await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); });
+  afterEach(async () => { await prisma?.$disconnect(); await pool?.end(); await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); });
   afterAll(async () => { await admin.end(); });
 
   async function setup() {
-    const auth = createPostgresAuthStore(pool), boards = createPostgresBoardStore(pool), documents = createPostgresDocumentStore(pool);
+    const auth = createPostgresAuthStore(prisma), boards = createPostgresBoardStore(prisma), documents = createPostgresDocumentStore(prisma);
     const firstToken = randomToken(), secondToken = randomToken();
     const first = await auth.signIn({ subject: "ownership-first", email: "first@example.com", displayName: null }, hashToken(firstToken));
     const second = await auth.signIn({ subject: "ownership-second", email: "second@example.com", displayName: null }, hashToken(secondToken));
@@ -98,7 +102,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL board ownership", () => {
 
   it("enforces the owner foreign key and prevents deleting an owner with boards", async () => {
     const { boards, first } = await setup();
-    await expect(boards.create("Missing owner", randomUUID())).rejects.toMatchObject({ code: "23503" });
+    await expect(boards.create("Missing owner", randomUUID())).rejects.toMatchObject({ code: "P2003" });
     const board = await boards.create("Keep owner", first.user.id);
     await expect(pool.query("DELETE FROM users WHERE id = $1", [first.user.id])).rejects.toMatchObject({ code: "23001" });
     expect(await boards.get(board.id, first.user.id)).toEqual(board);
