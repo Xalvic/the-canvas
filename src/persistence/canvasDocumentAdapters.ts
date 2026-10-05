@@ -6,16 +6,45 @@ import {
   type CanvasDocument,
 } from "./canvasDocument";
 
-export function serializeDocumentSnapshot(snapshot: DocumentSnapshot): CanvasDocument {
+export type SerializeDocumentOptions = {
+  boardId: string;
+  imageAssets?: Record<string, string>;
+};
+
+export function serializeDocumentSnapshot(
+  snapshot: DocumentSnapshot,
+  options?: SerializeDocumentOptions,
+): CanvasDocument {
   if (
     !snapshot || typeof snapshot !== "object" ||
     (Object.getPrototypeOf(snapshot) !== Object.prototype && Object.getPrototypeOf(snapshot) !== null)
   ) {
     throw new z.ZodError([{ code: "custom", path: [], message: "Expected an editor object map" }]);
   }
+  const objects = Object.values(snapshot).map((object, index) => {
+    if (!object || object.type !== "image") return object;
+    const mappedAsset = options?.imageAssets && Object.hasOwn(options.imageAssets, object.assetId)
+      ? options.imageAssets[object.assetId]
+      : undefined;
+    const sameBoardAsset = options && object.cloudAsset?.boardId === options.boardId
+      ? object.cloudAsset.assetId
+      : undefined;
+    const assetId = mappedAsset ?? sameBoardAsset;
+    if (!options || !assetId) {
+      throw new z.ZodError([{
+        code: "custom",
+        path: ["content", "objects", index, "assetId"],
+        message: object.cloudAsset
+          ? "This image belongs to another board and must be uploaded before saving this account board"
+          : "This image must be uploaded before saving this account board",
+      }]);
+    }
+    const { cloudAsset: _provenance, ...wireObject } = object;
+    return { ...wireObject, assetId };
+  });
   const document = canvasDocumentSchema.parse({
     schemaVersion: CANVAS_DOCUMENT_SCHEMA_VERSION,
-    content: { objects: Object.values(snapshot) },
+    content: { objects },
   });
   const keys = Object.keys(snapshot);
   const mismatchedIndex = document.content.objects.findIndex(
@@ -31,8 +60,13 @@ export function serializeDocumentSnapshot(snapshot: DocumentSnapshot): CanvasDoc
   return document;
 }
 
-export function deserializeCanvasDocument(value: unknown): DocumentSnapshot {
+export function deserializeCanvasDocument(value: unknown, boardId?: string): DocumentSnapshot {
   const document = canvasDocumentSchema.parse(value);
   // fromEntries creates own properties even for IDs such as '__proto__'.
-  return Object.fromEntries(document.content.objects.map((object) => [object.id, object]));
+  return Object.fromEntries(document.content.objects.map((object) => [
+    object.id,
+    object.type === "image" && boardId !== undefined
+      ? { ...object, cloudAsset: { boardId, assetId: object.assetId } }
+      : object,
+  ]));
 }

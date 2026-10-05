@@ -51,7 +51,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
   }
   if (parserType === "entity.too.large") {
     const bytes = typeof error === "object" && error !== null && "limit" in error ? error.limit : null;
-    const limit = bytes === 5 * 1024 * 1024 ? "5 MiB" : bytes === 1024 * 1024 ? "1 MB" : "16 KB";
+    const limit = bytes === 5 * 1024 * 1024 ? "5 MiB" : bytes === 2 * 1024 * 1024 ? "2 MB" : bytes === 1024 * 1024 ? "1 MB" : "16 KB";
     res.status(413).json({
       error: { code: "PAYLOAD_TOO_LARGE", message: `Request body exceeds the ${limit} limit` },
     });
@@ -64,7 +64,9 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, nex
     return;
   }
 
-  console.error("Unhandled API error:", error);
+  // Driver/provider exceptions can include SQL arguments, cookies, URLs, or
+  // tokens. Request status + generated ID is logged separately in production.
+  console.error("Unhandled API error");
   res.status(500).json({
     error: { code: "INTERNAL_ERROR", message: "An unexpected server error occurred" },
   });

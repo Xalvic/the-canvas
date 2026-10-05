@@ -143,8 +143,8 @@ npm run build
 The cloud Scribble API collection has Google authentication requests/examples/
 assertions; its verified cloud copy passed lint (46 requests, no issues) and a
 local run (46 requests, 145 assertions, zero failures), preserving existing items
-and variables. Run with redirects disabled: postman collection run <local mirror>
---ignore-redirects --no-report-events. No configured live Google login is claimed
+and variables. Collection maintenance was discontinued on 2026-10-05 by user
+request; those results are historical. No configured live Google login is claimed
 by its start/callback unavailable checks. Browser consent requires your client.
 
 Ownership verification (2026-10-04): 297 fast tests, 39 real DB tests, four

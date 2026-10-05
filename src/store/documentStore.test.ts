@@ -11,8 +11,106 @@ import {
 
 function resetDocumentStore() {
   useBoardStore.getState().setAccessRole(null);
-  useDocumentStore.setState({ objects: {}, past: [], future: [] });
+  useDocumentStore.setState({ objects: {}, past: [], future: [], historyError: null });
 }
+
+describe("collaborative history", () => {
+  beforeEach(resetDocumentStore);
+  const first = { ...createCardObject({ x: 10, y: 20 }, 1), id: "first" };
+  const second = { ...createCardObject({ x: 50, y: 60 }, 2), id: "second" };
+
+  it("preserves disjoint remote creates and edits through undo and redo without recording remote history", () => {
+    const store = useDocumentStore.getState();
+    store.loadDocument({ first, second });
+    store.updateObject(first.id, { title: "Local title" });
+    const edited = useDocumentStore.getState().objects.first;
+    const remoteSecond = { ...second, title: "Remote title", updatedAt: second.updatedAt + 10 };
+    const third = { ...second, id: "third" };
+    const history = useDocumentStore.getState().past;
+    store.applyRemoteDocument({ first: structuredClone(edited), second: remoteSecond, third });
+    expect(useDocumentStore.getState().past).toBe(history);
+    store.undo();
+    expect(useDocumentStore.getState().objects).toEqual({ first, second: remoteSecond, third });
+    const laterSecond = { ...remoteSecond, body: "Later remote edit" };
+    store.applyRemoteDocument({ first, second: laterSecond, third });
+    store.redo();
+    expect(useDocumentStore.getState().objects).toEqual({ first: edited, second: laterSecond, third });
+    expect(useDocumentStore.getState().historyError).toBeNull();
+  });
+
+  it("blocks a multi-object inverse atomically if any touched object changed remotely", () => {
+    const store = useDocumentStore.getState();
+    store.loadDocument({ first, second });
+    store.updateObjectPositions({ first: { x: 200, y: 250 }, second: { x: 350, y: 450 } });
+    const current = useDocumentStore.getState().objects;
+    store.applyRemoteDocument({ ...current, first: { ...current.first, updatedAt: Date.now() + 1 } });
+    const before = useDocumentStore.getState();
+    store.undo();
+    const after = useDocumentStore.getState();
+    expect(after.objects).toBe(before.objects);
+    expect(after.past).toBe(before.past);
+    expect(after.future).toBe(before.future);
+    expect(after.historyError).toContain("Undo blocked");
+  });
+
+  it("blocks redo when the undone object's current value changed remotely", () => {
+    const store = useDocumentStore.getState();
+    store.loadDocument({ first, second });
+    store.updateObject(first.id, { title: "Local edit" });
+    store.undo();
+    store.applyRemoteDocument({ first: { ...first, body: "Remote change" }, second });
+    const before = useDocumentStore.getState();
+    store.redo();
+    expect(useDocumentStore.getState().objects).toBe(before.objects);
+    expect(useDocumentStore.getState().future).toBe(before.future);
+    expect(useDocumentStore.getState().historyError).toContain("Redo blocked");
+  });
+
+  it("compares equivalent remote object fields structurally instead of key insertion order", () => {
+    const store = useDocumentStore.getState();
+    store.loadDocument({ first });
+    store.updateObject(first.id, { title: "Local edit" });
+    const edited = useDocumentStore.getState().objects.first;
+    const reordered = Object.fromEntries(Object.entries(edited).reverse()) as typeof edited;
+    store.applyRemoteDocument({ first: reordered });
+    store.undo();
+    expect(useDocumentStore.getState().objects.first).toEqual(first);
+  });
+
+  it("preserves a remote connector by blocking removal of its locally created endpoint", () => {
+    const store = useDocumentStore.getState();
+    store.loadDocument({ second });
+    store.addObject(first);
+    const connector = { ...createConnectorObject({ objectId: first.id, anchor: "right" }, { objectId: second.id, anchor: "left" }, 3), id: "remote-link" };
+    store.applyRemoteDocument({ first, second, [connector.id]: connector });
+    const before = useDocumentStore.getState().objects;
+    store.undo();
+    expect(useDocumentStore.getState().objects).toBe(before);
+    expect(useDocumentStore.getState().historyError).toContain("Undo blocked");
+  });
+
+  it("does not restore a connector when its other endpoint was remotely deleted", () => {
+    const store = useDocumentStore.getState();
+    const connector = { ...createConnectorObject({ objectId: first.id, anchor: "right" }, { objectId: second.id, anchor: "left" }, 3), id: "link" };
+    store.loadDocument({ first, second, link: connector });
+    store.deleteObjects([first.id]);
+    store.applyRemoteDocument({});
+    store.undo();
+    expect(useDocumentStore.getState().objects).toEqual({});
+    expect(useDocumentStore.getState().historyError).toContain("Undo blocked");
+  });
+  it("restores valid special object IDs as own entries during a selective inverse", () => {
+    const store = useDocumentStore.getState();
+    const special = { ...first, id: "__proto__" };
+    store.loadDocument(Object.fromEntries([[special.id, special], [second.id, second]]));
+    store.deleteObjects([special.id]);
+    store.applyRemoteDocument({ second: { ...second, body: "Remote edit" } });
+    store.undo();
+    expect(Object.hasOwn(useDocumentStore.getState().objects, special.id)).toBe(true);
+    expect(useDocumentStore.getState().objects[special.id]).toEqual(special);
+    expect(Object.getPrototypeOf(useDocumentStore.getState().objects)).toBe(Object.prototype);
+  });
+});
 
 function getNodeX(id: string): number {
   const object = useDocumentStore.getState().objects[id];

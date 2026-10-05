@@ -262,7 +262,38 @@ Details: [implementation-status.md](implementation-status.md).
 Browser code/tests were not changed for this backend-only milestone. Implementation
 does not imply lesson coverage. Guide: [cloud-images.md](cloud-images.md).
 
-Next session: frontend cloud-image integration and recovery; deployment remains
+Frontend cloud-image milestone (2026-10-05, implementation only): explicit uploads,
+durable completed-asset mappings, cloud adapters, signed rendering/expiry refresh,
+retry/reload/recovery and cross-board destination assets. Upload metadata stays
+outside undo history; guest blobs and drafts remain compatible. Completed assets
+are retained for offline drafts and undo, with unfinished-upload cleanup only.
+Six real browser/API/Prisma/PostgreSQL cases pass with controlled image provider
+fixtures and verified schema teardown. Builds and targeted API/cache/adapter/
+draft checks pass. No live provider or deployed browser validation is claimed.
+
+Real-time collaboration (2026-10-05, implementation): authorized SSE revision
+hints/presence, world-space cursors, per-object atomic changes and durable retry
+receipts, merge/reconnect and selective undo. Twelve real browser/API/DB cases
+pass across images and collaboration. Migration 7 preserves normal Docker data.
+Express container persistence passed 36 checks with disposable actual restarts.
+
+Scope change: the user cancelled PWA and Postman maintenance. Their local project
+tooling is removed. Cross-tab local save protection and production preparation
+continue; consolidated API documentation can wait until project completion.
+
+Cross-tab reliability and production preparation (2026-10-05, implementation):
+atomic IndexedDB leases, role-composed tab read-only, fresh takeover and separate
+recovery; upgrade preserves existing board/image bytes. Docker API persistence,
+production auth/TLS/origin guards, durable admission, bounded readiness and safe
+logs, CI/HTTPS/scheduler templates, encrypted backups and empty-target restore.
+Verified 579 fast tests, 95 real DB checks, 41 standard browser cases and 16 real
+browser/API/DB cases across full runs and affected-case repairs. Both builds and
+typechecks pass. Actual disposable Docker restart checks: 36; restore: 15;
+Caddy private-error-log checks: six. No existing data/images were deleted.
+Implementation does not imply lesson coverage or deployment. PWA and Postman
+remain cancelled. Next: local production configuration and external Worker review.
+
+Current implementation queue is complete within the revised local scope; deployment remains
 pending. Guest IndexedDB and explicit guest upload stay separate; login never
 uploads a board. Sharing and backend assets are included in the combined commit
 authorized on 2026-10-05; check `git log` for its revision. Future commits need

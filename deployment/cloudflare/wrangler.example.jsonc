@@ -1,0 +1,14 @@
+{
+  "name": "scribble-production-review",
+  "main": "worker.example.ts",
+  "compatibility_date": "2026-10-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": { "directory": "../../dist", "binding": "ASSETS", "run_worker_first": true },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://milanputhukkudy.com",
+    "API_ORIGIN": "https://REPLACE-WITH-API-ORIGIN.invalid"
+  }
+  // SCRIBBLE_PROXY_SECRET belongs in a Worker secret, never this vars block.
+  // Merge the API handler into the existing Worker before any deployment.
+}

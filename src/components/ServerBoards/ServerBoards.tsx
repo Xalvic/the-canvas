@@ -1,3 +1,5 @@
+import { BOARD_TAB_READ_ONLY_MESSAGE } from "../../persistence/boardTabCoordinator";
+import { reopenLocalBoard, restoreInterruptedLocalBoard } from "../../persistence/useLocalBoardPersistence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
@@ -7,6 +9,8 @@ import { Account } from "../Account/Account";
 import { useAccountBoardSession } from "../../persistence/accountBoardSession";
 import { useBoardStore } from "../../store/boardStore";
 import { useUiStore } from "../../store/uiStore";
+import { useDocumentStore } from "../../store/documentStore";
+import { useCollaborationCursor } from "../CollaborationPresence";
 import { BoardSharing, InvitationInbox } from "./Sharing";
 
 export function ServerBoards() {
@@ -15,7 +19,14 @@ export function ServerBoards() {
   const boards = useQuery({ ...accountBoardListOptions(userId ?? ""), enabled: !!userId });
   const activeAccount = useBoardStore((board) => board.account);
   const accessRole = useBoardStore((board) => board.accessRole);
+  const tabRecoveryId = useBoardStore((board) => board.tabRecoveryId);
+  const tabReadOnly = useBoardStore((board) => board.tabReadOnly);
   const readOnly = useBoardStore((board) => board.readOnly);
+  const objects = useDocumentStore((document) => document.objects);
+  const historyError = useDocumentStore((document) => document.historyError);
+  useCollaborationCursor(session.publishPresence, !!userId && !!activeAccount && accessRole !== "none");
+  const pendingImages = Object.values(objects).filter((object) => object.type === "image" &&
+    !Object.hasOwn(activeAccount?.imageAssets ?? {}, object.assetId) && object.cloudAsset?.boardId !== activeAccount?.boardId).length;
   const [sharingId, setSharingId] = useState<string | null>(null);
   const isHydrated = useBoardStore((board) => board.isHydrated);
   const localSaveStatus = useBoardStore((board) => board.saveStatus);
@@ -61,6 +72,19 @@ export function ServerBoards() {
         <p className="server-boards-description">
           {activeAccount ? "Account board. A draft is also kept on this device." : "Local board. Upload only when you choose; signing in keeps it on this device."}
         </p>
+        {tabReadOnly && <div role="status">
+          <p>{BOARD_TAB_READ_ONLY_MESSAGE}</p>
+          <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => {
+            if (activeAccount) {
+              const board = boards.data?.find((item) => item.id === activeAccount.boardId);
+              if (board) void session.open(board);
+            } else void reopenLocalBoard().catch((error: unknown) => useBoardStore.getState().markSaveError(error instanceof Error ? error.message : "Could not reopen the local board"));
+          }}>Reopen here</button>
+        </div>}
+        {tabRecoveryId && !readOnly && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => {
+          if (activeAccount) void session.restoreInterrupted();
+          else void restoreInterruptedLocalBoard().catch((error: unknown) => useBoardStore.getState().markSaveError(error instanceof Error ? error.message : "Could not restore the interrupted draft"));
+        }}>Restore interrupted draft</button>}
         {activeAccount && <>
           <p role="status" className={accountBoards.status === "conflict" ? "server-boards-error" : undefined}>
             {accountBoards.status === "read-only" && (accessRole === "none" ? "Access removed. This local draft is read-only." : "Viewer access. This board is read-only.")}
@@ -76,20 +100,23 @@ export function ServerBoards() {
             {accountBoards.status === "signed-out" && "Sign in to save this account board. Your draft stays on this device."}
           </p>
           <div className="server-board-actions">
+            {userId && !readOnly && pendingImages > 0 && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => void session.uploadImages()}>Upload pending images ({pendingImages})</button>}
             <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => void session.back()}>Back to local board</button>
             {userId && !readOnly && accountBoards.status === "error" && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => void session.save()}>Retry account save</button>}
             {userId && ["conflict", "error", "read-only"].includes(accountBoards.status) && <>
-              <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => {
+              <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || tabReadOnly} onClick={() => {
                 if (window.confirm("Reload the account version? Your current draft will be kept on this device.")) void session.reload();
               }}>Reload account version</button>
               <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => void session.saveCopy()}>Save as new account board</button>
             </>}
-            {userId && accountBoards.hasRecovery && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy} onClick={() => void session.restore()}>Restore previous draft</button>}
+            {userId && accountBoards.hasRecovery && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || tabReadOnly} onClick={() => void session.restore()}>Restore previous draft</button>}
           </div>
         </>}
-        {localSaveStatus === "error" && <p className="server-boards-error">Couldn’t save the draft on this device. {localSaveError}</p>}
+        {localSaveStatus === "error" && !tabReadOnly && <p className="server-boards-error">Couldn’t save the draft on this device. {localSaveError}</p>}
         {accountBoards.error && <p className="server-boards-error" role="alert">{accountBoards.error}</p>}
+        {historyError && <p className="server-boards-error" role="alert">{historyError}</p>}
         {accountBoards.busy && <p role="status">Updating boards…</p>}
+        {accountBoards.imageUpload && <p role="status">Uploading images… {accountBoards.imageUpload.completed}/{accountBoards.imageUpload.total}</p>}
         {userId && <div className="server-board-actions">
           {!activeAccount && <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => void session.upload()}>Upload local board</button>}
           <button className="server-boards-refresh" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => void session.createBlank()}>New account board</button>

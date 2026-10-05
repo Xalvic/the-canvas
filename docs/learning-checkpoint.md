@@ -4,6 +4,59 @@ Updated: 2026-10-05. Read once per new project session.
 
 ## Current handoff
 
+Active implementation queue (2026-10-05): frontend cloud images are implemented
+and locally verified with six actual browser/API/Prisma/PostgreSQL scenarios,
+controlled provider bytes/signatures and zero leftover schemas. Explicit uploads
+persist completed local→cloud mappings outside undo; copied cloud images upload
+new destination assets. Signed URLs stay in memory, refresh and clear on auth
+changes. Completed assets are retained for saved boards, offline recovery drafts
+and undo; cleanup targets unfinished uploads only. Signing limit is 1,500/hour
+per user with the existing global monthly byte budget. No existing data/images
+were deleted. Guide: `docs/cloud-images.md`.
+
+Real-time collaboration is implemented: atomic object CAS operations, durable
+retry receipts (migration 7), authorized SSE revision hints and presence, client
+merging and selective undo. All 12 real browser/API/DB image and collaboration
+scenarios pass, including two browsers, reconnect, conflicts, lost responses and
+access changes. Migration 7 is applied to normal Docker PostgreSQL on 5434;
+fingerprints confirmed nine existing tables and six rows unchanged. The API
+container passed 36 persistence checks across actual API/database restarts and
+container recreation in a disposable stack; normal volumes and 5433 were untouched.
+
+Scope change (2026-10-05): the user cancelled PWA installation/offline app loading
+and Postman tooling/collection maintenance. PWA additions and local Postman
+directories are removed; do not recreate them or update the cloud collection.
+Historical collection results below are prior verification only. A consolidated
+API list can wait until project completion. Cross-tab local save protection is
+implemented and passes three real two-tab browser/API/DB scenarios, atomic lease
+tests and a board/image-preserving IndexedDB upgrade. Production preparation is written:
+Worker proxy/HTTPS Compose, CI and systemd templates, production auth/TLS/origin
+guards, durable rate budgets and readiness/privacy-safe logs. Migration 8 is
+applied to Docker 5434 with ten prior tables/six rows unchanged; Prisma has no
+drift. Encrypted backup restore passed 15 checks across all 12 populated tables;
+Caddy error-log privacy passed six real checks. Nothing is deployed; Neon, origin
+host and the existing external Worker integration still need configuration.
+Final local checks: 579 fast tests, 95 real PostgreSQL checks, 41 standard browser
+cases and 16 actual browser/API/DB cases verified; both builds, deployment/fixture
+typechecks, CI YAML/pinned-action checks and diff validation pass. Focused reruns
+repaired old async-switch/favicon/ledger assertions and one new sharing selector.
+Zero fixture schemas or disposable resources remain. No existing image or board
+data was deleted. Guides: `docs/local-reliability.md`, `docs/collaboration.md`,
+`docs/production.md`, `docs/backups.md`.
+Next: choose the API hosting provider/HTTPS hostname, fill ignored `.env.production`
+locally using `production.env.example` (Neon pooled/direct URLs, Google OAuth and
+ImageKit settings, shared Worker/backend proxy secret), and provide the existing
+external Worker source location for review. Configure offsite encrypted backup
+storage/notifications and keep the key separate. Do not ask for secrets in chat.
+Deployment and hosted checks require separate approval after configuration review.
+User authorized these
+task-related commands/edits/installs/local Docker/disposable assets and focused
+subagents in the pasted request. The user explicitly authorized committing and
+pushing this completed change set on 2026-10-05. Future commits/pushes need fresh
+authorization; publishing/deployment remains pending separate approval.
+
+## Prior completed backend/sharing handoff
+
 Prisma is committed as `c092b74`. Sharing/roles and the backend cloud-image
 milestone are implemented and included in the combined commit authorized on
 2026-10-05; check `git log` for its revision. Future commits need fresh approval;

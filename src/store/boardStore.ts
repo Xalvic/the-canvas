@@ -16,6 +16,9 @@ type BoardState = Omit<BoardMetadata, "account"> & {
   account: AccountBoardLink | null;
   accessRole: BoardRole | "none" | null;
   readOnly: boolean;
+  tabReadOnly: boolean;
+  tabRecoveryId: string | null;
+  setTabReadOnly: (value: boolean) => void;
   setAccessRole: (role: BoardRole | "none" | null) => void;
   isHydrated: boolean;
   sessionVersion: number;
@@ -42,7 +45,10 @@ export const useBoardStore = create<BoardState>((set) => ({
   account: null,
   accessRole: null,
   readOnly: false,
-  setAccessRole: (role) => set({ accessRole: role, readOnly: role === "viewer" || role === "none" }),
+  tabReadOnly: false,
+  tabRecoveryId: null,
+  setTabReadOnly: (value) => set((state) => ({ tabReadOnly: value, readOnly: value || state.accessRole === "viewer" || state.accessRole === "none" })),
+  setAccessRole: (role) => set((state) => ({ accessRole: role, readOnly: state.tabReadOnly || role === "viewer" || role === "none" })),
   isHydrated: false,
   sessionVersion: 0,
   hasSavedViewport: false,
@@ -52,8 +58,9 @@ export const useBoardStore = create<BoardState>((set) => ({
   hydrate: (metadata, hasSavedViewport) => set((state) => ({
     ...metadata,
     account: metadata.account ?? null,
+    tabRecoveryId: null,
     accessRole: metadata.account ? "none" : null,
-    readOnly: !!metadata.account,
+    readOnly: state.tabReadOnly || !!metadata.account,
     isHydrated: true,
     sessionVersion: state.sessionVersion + 1,
     hasSavedViewport,

@@ -29,9 +29,14 @@ permissions. Choose Share beside an owned board, copy the invitation link, and
 have the recipient sign in with the invited Google email and explicitly accept.
 Scribble does not send email. See [sharing and roles](docs/sharing.md).
 
-Cloud-image backend APIs use ImageKit private files and short-lived signed URLs,
-with PostgreSQL metadata and revision-safe board references. Frontend image
-integration is pending. See [backend cloud images](docs/cloud-images.md) for
+Account boards support collaborative edits, cursors, presence and recoverable
+conflicts. See [collaboration](docs/collaboration.md) and
+[production preparation](docs/production.md). The API remains local; hosting
+configuration is prepared for review and has not been deployed.
+
+Cloud images use explicit uploads, ImageKit private files and short-lived signed
+URLs, with PostgreSQL metadata, draft recovery and revision-safe board references.
+See [cloud images](docs/cloud-images.md) for
 configuration, API contracts, limits and cleanup.
 
 See [the HTTP walkthrough](docs/backend.md) for browser requests and error cases,
@@ -42,10 +47,6 @@ Run `npm run test:server` and `npm run typecheck:server` for targeted API checks
 `npm run build:server` then `npm run start:server` runs the compiled API.
 `npm run build` continues to build the frontend. The Vite proxy is development-only;
 deployment of the API has not been configured.
-
-The [Postman collection](https://go.postman.co/collection/11763565-ed048b36-680c-47f7-934f-e7cb6f4dee53) includes all current endpoints,
-validation examples, and a configurable local base URL. It is maintained
-in Postman alongside future API changes. Local Postman files are ignored by Git.
 
 ## Interaction model
 

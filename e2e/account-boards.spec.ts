@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { CanvasObject, CardCanvasObject } from "../src/canvas/objects/types";
 import type { BoardDocument } from "../server/documents";
+import { isDeepStrictEqual } from "node:util";
 
 const user = { id: "11111111-1111-4111-8111-111111111111", email: "owner@example.com", displayName: "Owner" };
 const guest = { error: { code: "UNAUTHENTICATED", message: "Sign in to use account boards", details: { googleSignInEnabled: true } } };
@@ -20,6 +21,10 @@ function savedBoard(id: string, title: string, objects: CanvasObject[] = [note(`
 }
 
 async function mockAccount(page: Page, initial: SavedBoard[] = []) {
+  // This suite isolates finite HTTP/draft behavior; the integration suite
+  // exercises actual authorized SSE streams with two browser contexts.
+  await page.addInitScript(() => { Object.defineProperty(window, "EventSource", { value: undefined }); });
+  const receipts = new Map<string, string>();
   const cloud = {
     signedIn: true,
     failSaves: false,
@@ -41,11 +46,12 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     cloud.signedIn = false;
     return route.fulfill({ status: 204 });
   });
-  await page.route(/\/api\/boards(?:\/[^/?]+(?:\/document)?)?(?:\?.*)?$/, async (route) => {
+  await page.route(/\/api\/boards(?:\/[^/?]+(?:\/(?:document|operations|presence))?)?(?:\?.*)?$/, async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const method = request.method();
     const body = ["POST", "PATCH", "PUT"].includes(method) ? request.postDataJSON() : null;
+    if (path.endsWith("/presence")) { await route.fulfill({ status: 204 }); return; }
     if (method !== "GET") {
       expect(request.headers()["x-scribble-request"]).toBe("1");
       cloud.mutations.push({ method, path, body });
@@ -71,7 +77,7 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     const [, , , id, documentPath] = path.split("/");
     const board = cloud.boards.get(id);
     if (!board) { await route.fulfill({ status: 404, json: { error: { code: "BOARD_NOT_FOUND", message: "Board not found" } } }); return; }
-    if (documentPath === "document") {
+    if (documentPath === "document" || documentPath === "operations") {
       if (method === "GET") {
         cloud.documentStarted?.();
         if (cloud.documentGate) await cloud.documentGate;
@@ -84,6 +90,22 @@ async function mockAccount(page: Page, initial: SavedBoard[] = []) {
         board.document = { boardId: id, schemaVersion: 1, revision: (board.document?.revision ?? 0) + 1, updatedAt: 2, content: { objects: [note("remote-change", "Changed on another device")] } };
       }
       const revision = board.document?.revision ?? 0;
+      if (documentPath === "operations") {
+        const receipt = receipts.get(`${id}:${body.operationId}`);
+        if (receipt) {
+          expect(receipt).toBe(JSON.stringify(body));
+          await route.fulfill({ json: { document: board.document, replayed: true } }); return;
+        }
+        const objects = new Map(board.document!.content.objects.map((object) => [object.id, object]));
+        if (body.baseRevision > revision || body.changes.some((change: any) => !isDeepStrictEqual(objects.get(change.id) ?? null, change.before))) {
+          await route.fulfill({ status: 409, json: { error: { code: "COLLABORATION_CONFLICT", message: "This board changed elsewhere.", details: { currentRevision: revision } } } }); return;
+        }
+        for (const change of body.changes) { if (change.after === null) objects.delete(change.id); else objects.set(change.id, change.after); }
+        board.document = { ...board.document!, revision: revision + 1, updatedAt: Date.now(), content: { objects: [...objects.values()] } };
+        receipts.set(`${id}:${body.operationId}`, JSON.stringify(body));
+        if (cloud.loseNextSaveResponse) { cloud.loseNextSaveResponse = false; await route.abort("failed"); return; }
+        await route.fulfill({ json: { document: board.document, replayed: false } }); return;
+      }
       if (body.expectedRevision !== revision) {
         await route.fulfill({ status: 409, json: { error: { code: "REVISION_CONFLICT", message: "Document revision does not match", details: { currentRevision: revision } } } });
         return;
@@ -143,7 +165,7 @@ async function openBoard(page: Page, title: string) {
 }
 
 function documentWrites(cloud: Awaited<ReturnType<typeof mockAccount>>) {
-  return cloud.mutations.filter((mutation) => mutation.method === "PUT");
+  return cloud.mutations.filter((mutation) => mutation.method === "PUT" || mutation.path.endsWith("/operations"));
 }
 
 test("viewers can navigate and copy but cannot change the canvas, title or history", async ({ page }) => {
@@ -273,7 +295,7 @@ test("explicit upload creates a copy, then saves committed edits with increasing
   const localObjects = (await canvasState(page)).objects;
   await page.getByRole("button", { name: "Upload local board", exact: true }).click();
   await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
-  expect(cloud.mutations.filter((mutation) => mutation.method === "POST")).toHaveLength(1);
+  expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)[0].body).toMatchObject({ expectedRevision: 0, schemaVersion: 1, content: { objects: Object.values(localObjects) } });
   const guestBoard = await localBoard(page);
   await page.getByText("Local idea", { exact: true }).dblclick();
@@ -283,9 +305,10 @@ test("explicit upload creates a copy, then saves committed edits with increasing
   await page.keyboard.press("Escape");
   await expect.poll(() => documentWrites(cloud).length).toBe(2);
   await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
-  expect(documentWrites(cloud)[1].body).toMatchObject({ expectedRevision: 1, content: { objects: [expect.objectContaining({ title: "Uncommitted note edit" })] } });
+  expect(documentWrites(cloud)[1].body).toMatchObject({ baseRevision: 1, changes: [{ after: expect.objectContaining({ title: "Uncommitted note edit" }) }] });
   expect(await localBoard(page)).toEqual(guestBoard);
   await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Back to local board", exact: true })).toBeHidden();
   expect((await canvasState(page)).objects).toEqual(localObjects);
   await page.reload();
   await expect(page.getByLabel("Board title")).toHaveValue("My local board");
@@ -330,7 +353,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
   await expect(page.getByText("This board changed elsewhere. Your edits are saved on this device.", { exact: true })).toBeVisible();
   const draftObjects = (await canvasState(page)).objects;
   expect(documentWrites(cloud)).toHaveLength(1);
-  expect(documentWrites(cloud)[0].body.expectedRevision).toBe(1);
+  expect(documentWrites(cloud)[0].body.baseRevision).toBe(1);
   await page.reload();
   await expect(page.getByLabel("Board title")).toHaveValue("Untouched guest");
   await openBoard(page, "Shared between my devices");
@@ -345,7 +368,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
   await page.setViewportSize({ width: 1360, height: 900 });
   await page.getByRole("button", { name: "Save as new account board", exact: true }).click();
   await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
-  expect(cloud.mutations.filter((mutation) => mutation.method === "POST")).toHaveLength(1);
+  expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(documentWrites(cloud)[1]).toMatchObject({ body: { expectedRevision: 0, content: { objects: Object.values(draftObjects) } } });
   expect(documentWrites(cloud)[1].path).not.toBe(`/api/boards/${firstId}/document`);
@@ -429,7 +452,8 @@ test("an account save failure retains edits and retries the same expected revisi
   await page.getByRole("button", { name: "Retry account save", exact: true }).click();
   await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
   expect(documentWrites(cloud)).toHaveLength(2);
-  expect(documentWrites(cloud).map((mutation) => mutation.body.expectedRevision)).toEqual([1, 1]);
+  expect(documentWrites(cloud).map((mutation) => mutation.body.baseRevision)).toEqual([1, 1]);
+  expect(documentWrites(cloud)[0].body.operationId).toBe(documentWrites(cloud)[1].body.operationId);
   expect(cloud.boards.get(firstId)?.document?.content.objects).toEqual(Object.values(draftObjects));
 });
 
@@ -625,6 +649,8 @@ test("a lost save acknowledgement reconciles a fresh revision without duplicatin
   expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);
   await page.getByRole("button", { name: "Retry account save", exact: true }).click();
   await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
-  expect(documentWrites(cloud)).toHaveLength(1);
+  expect(documentWrites(cloud)).toHaveLength(2);
+  expect(new Set(documentWrites(cloud).map((mutation) => mutation.body.operationId)).size).toBe(1);
+  expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);
   await expect(page.getByText("Accepted before response loss", { exact: true })).toBeVisible();
 });

@@ -13,7 +13,8 @@ export function waitForLocalBoardSave(signal: AbortSignal): Promise<void> {
     function abort() { finish(new Error("Sign-in cancelled")); }
     function check() {
       const board = useBoardStore.getState();
-      if (board.saveStatus === "error") finish(new Error("Could not save your canvas"));
+      if (board.tabReadOnly) finish();
+      else if (board.saveStatus === "error") finish(new Error("Could not save your canvas"));
       else if (board.isHydrated && board.saveStatus === "saved") finish();
     }
     if (signal.aborted) { reject(new Error("Sign-in cancelled")); return; }

@@ -4,6 +4,7 @@ import {
   listServerBoards, renameServerBoard, saveServerBoardDocument, type ServerBoard,
 } from "./boards";
 import type { CanvasDocument } from "../persistence/canvasDocument";
+import { applyBoardOperation, type CollaborationOperationInput } from "./collaboration";
 
 export const accountBoardKeys = {
   all: ["account-boards"] as const,
@@ -101,6 +102,16 @@ export class AccountBoardQueries {
 
   save(ownerId: string, boardId: string, document: CanvasDocument, revision: number, signal: AbortSignal) {
     return this.mutate(ownerId, "save", signal, () => saveServerBoardDocument(boardId, document, revision, signal), async (saved) => {
+      const queryKey = accountBoardKeys.document(ownerId, boardId);
+      await this.client.cancelQueries({ queryKey, exact: true });
+      if (signal.aborted) return;
+      this.client.setQueryData(queryKey, saved);
+      await this.updateList(ownerId, signal, (boards) => boards.map((item) => item.id === boardId ? { ...item, updatedAt: saved.updatedAt } : item));
+    });
+  }
+
+  operation(ownerId: string, boardId: string, input: CollaborationOperationInput, signal: AbortSignal) {
+    return this.mutate(ownerId, "operation", signal, () => applyBoardOperation(boardId, input, signal), async (saved) => {
       const queryKey = accountBoardKeys.document(ownerId, boardId);
       await this.client.cancelQueries({ queryKey, exact: true });
       if (signal.aborted) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError, type ZodIssue } from "zod";
 import type { CanvasObject, StrokeCanvasObject } from "../canvas/objects/types";
 import { createImageObject } from "../canvas/objects/objectFactories";
 import { useDocumentStore, type DocumentSnapshot } from "../store/documentStore";
@@ -38,6 +38,13 @@ const connector = {
 // A connector may precede its nodes; order deliberately differs from zIndex.
 const objects: CanvasObject[] = [connector, frame, card, stroke, text];
 const snapshot: DocumentSnapshot = Object.fromEntries(objects.map((object) => [object.id, object]));
+const cloudAssetId = "11111111-1111-4111-8111-111111111111";
+const otherCloudAssetId = "22222222-2222-4222-8222-222222222222";
+const image = createImageObject({
+  assetId: "device-local-asset", center: { x: 0, y: 0 }, width: 320, height: 180,
+  originalWidth: 1920, originalHeight: 1080, zIndex: 8,
+});
+const cloudImage = { ...image, assetId: cloudAssetId, mimeType: "image/png" as const, name: "Sketch.png" };
 
 function documentWith(items: unknown[] = objects) {
   return { schemaVersion: 1, content: { objects: items } };
@@ -47,7 +54,17 @@ function expectInvalid(value: unknown, path?: (string | number)[]) {
   const result = canvasDocumentSchema.safeParse(value);
   expect(result.success).toBe(false);
   if (result.success) throw new Error("Expected an invalid document");
-  if (path) expect(result.error.issues).toContainEqual(expect.objectContaining({ path }));
+  // The shared cloud union wraps malformed object errors; include nested paths
+  // when checking that validation still points at the original field.
+  function issuePaths(issues: ZodIssue[], prefix: PropertyKey[] = []): PropertyKey[][] {
+    return issues.flatMap((issue) => {
+      const issuePath = [...prefix, ...issue.path];
+      return issue.code === "invalid_union"
+        ? [issuePath, ...issue.errors.flatMap((branch) => issuePaths(branch, issuePath))]
+        : [issuePath];
+    });
+  }
+  if (path) expect(issuePaths(result.error.issues)).toContainEqual(path);
   expect(() => deserializeCanvasDocument(value)).toThrow(ZodError);
 }
 
@@ -207,22 +224,78 @@ describe("canvas document v1", () => {
     expectInvalid(documentWith([{ ...connector, to: { ...connector.to, objectId: card.id } }, card, text]));
   });
 
-  it("explicitly rejects a mixed image document while the guest format still accepts it", () => {
-    const image = createImageObject({
-      assetId: "device-local-asset", center: { x: 0, y: 0 }, width: 320, height: 180,
-      originalWidth: 1920, originalHeight: 1080, zIndex: 8,
-    });
+  it("rejects unuploaded local images while the guest format still accepts them", () => {
     const mixedSnapshot = { ...snapshot, [image.id]: image };
     const before = JSON.stringify(mixedSnapshot);
-    expect(() => serializeDocumentSnapshot(mixedSnapshot)).toThrow("Image-containing documents are unsupported");
-    expect(() => deserializeCanvasDocument(documentWith([...objects, image]))).toThrow("durable asset storage");
-    expect(() => deserializeCanvasDocument(documentWith([{ type: "image" }]))).toThrow("durable asset storage");
+    expect(() => serializeDocumentSnapshot(mixedSnapshot)).toThrow("must be uploaded before saving");
+    expect(() => serializeDocumentSnapshot(mixedSnapshot, { boardId: "board-1" })).toThrow("must be uploaded before saving");
+    expectInvalid(documentWith([...objects, image]));
+    expectInvalid(documentWith([{ type: "image" }]));
     expect(JSON.stringify(mixedSnapshot)).toBe(before);
     const guestBoard = {
       schemaVersion: 1, id: CURRENT_BOARD_ID, title: "Guest", objects: mixedSnapshot,
       viewport: { x: 10, y: 20, zoom: 2 }, createdAt: 10, updatedAt: 20,
     };
     expect(parseLocalBoard(guestBoard)).toBe(guestBoard);
+  });
+
+  it("maps a local blob ID to a cloud UUID without mutating the editor or storing provenance", () => {
+    const mixedSnapshot = { ...snapshot, [image.id]: image };
+    const before = JSON.stringify(mixedSnapshot);
+    const document = serializeDocumentSnapshot(mixedSnapshot, {
+      boardId: "board-1", imageAssets: { [image.assetId]: cloudAssetId },
+    });
+    expect(document.content.objects.at(-1)).toEqual({ ...image, assetId: cloudAssetId });
+    expect(JSON.stringify(mixedSnapshot)).toBe(before);
+    const restored = deserializeCanvasDocument(document, "board-1");
+    expect(restored[image.id]).toEqual({
+      ...image, assetId: cloudAssetId, cloudAsset: { boardId: "board-1", assetId: cloudAssetId },
+    });
+    expect(serializeDocumentSnapshot(restored, { boardId: "board-1" })).toEqual(document);
+    expect(deserializeCanvasDocument(document)[image.id]).toEqual({ ...image, assetId: cloudAssetId });
+    expect(document.content.objects.at(-1)).not.toHaveProperty("cloudAsset");
+  });
+
+  it("requires explicit destination upload mapping for an image from another board", () => {
+    const remoteImage = { ...cloudImage, cloudAsset: { boardId: "board-1", assetId: cloudAssetId } };
+    const imageSnapshot = { [remoteImage.id]: remoteImage };
+    expect(() => serializeDocumentSnapshot(imageSnapshot, { boardId: "board-2" })).toThrow("belongs to another board");
+    expect(serializeDocumentSnapshot(imageSnapshot, {
+      boardId: "board-2", imageAssets: { [remoteImage.assetId]: otherCloudAssetId },
+    }).content.objects).toEqual([{ ...cloudImage, assetId: otherCloudAssetId }]);
+    expect(remoteImage.cloudAsset.boardId).toBe("board-1");
+  });
+
+  it("does not accept UUID-looking local IDs or inherited mappings as upload proof", () => {
+    const imageSnapshot = { [cloudImage.id]: cloudImage };
+    expect(() => serializeDocumentSnapshot(imageSnapshot, { boardId: "board-1" })).toThrow("must be uploaded");
+    expect(() => serializeDocumentSnapshot(imageSnapshot, {
+      boardId: "board-1", imageAssets: Object.create({ [cloudAssetId]: otherCloudAssetId }),
+    })).toThrow("must be uploaded");
+    expect(() => serializeDocumentSnapshot(imageSnapshot, {
+      boardId: "board-1", imageAssets: { [cloudAssetId]: "local-id" },
+    })).toThrow(ZodError);
+  });
+
+  it.each([
+    ["assetId", "local-id"], ["assetId", "https://example.com/image.png"],
+    ["assetId", "blob:local-image"], ["assetId", undefined],
+    ["originalWidth", 0], ["originalWidth", 4097], ["originalWidth", 1.5],
+    ["originalHeight", -1], ["originalHeight", 4097], ["originalHeight", Infinity],
+    ["mimeType", "image/svg+xml"], ["mimeType", "image/gif"], ["name", "bad\0name"],
+    ["name", "a".repeat(257)], ["width", 0], ["height", NaN],
+    ["url", "https://example.com/signed.png"], ["cloudAsset", { boardId: "board-1", assetId: cloudAssetId }],
+  ])("strictly rejects malformed cloud image field %s=%s", (field, value) => {
+    expectInvalid(documentWith([{ ...cloudImage, [field]: value }]));
+  });
+
+  it("retains duplicate, order, connector and unknown-field validation in image documents", () => {
+    expectInvalid(documentWith([cloudImage, { ...card, id: cloudImage.id }]));
+    expectInvalid(documentWith([{ ...cloudImage, id: "2" }, { ...card, id: "1" }]));
+    expectInvalid(documentWith([cloudImage, card, { ...connector, to: { objectId: cloudImage.id, anchor: "left" } }]));
+    expect(() => serializeDocumentSnapshot({ [image.id]: { ...image, url: "blob:private" } } as unknown as DocumentSnapshot, {
+      boardId: "board-1", imageAssets: { [image.assetId]: cloudAssetId },
+    })).toThrow(ZodError);
   });
 
   it("requires snapshot keys to match IDs and rejects non-map input", () => {

@@ -7,6 +7,7 @@ import {
 } from "./auth.js";
 import { HttpError } from "./errors.js";
 import { verifyMutationOrigin } from "./boardAccess.js";
+import { enforceUserBudget, type ProductionDependencies } from "./production.js";
 
 export type AuthDependencies = {
   store: AuthStore;
@@ -20,7 +21,7 @@ const callbackSchema = z.object({
   error: z.string().min(1).max(256).optional(),
 }).refine((value) => Boolean(value.code) !== Boolean(value.error));
 
-export function createAuthRouter(auth?: AuthDependencies) {
+export function createAuthRouter(auth?: AuthDependencies, production?: ProductionDependencies) {
   const router = Router();
   const sessionCookie: CookieOptions = { httpOnly: true, sameSite: "lax", secure: auth?.secureCookies ?? false, path: "/api" };
   const flowCookie: CookieOptions = { ...sessionCookie, path: "/api/auth/google" };
@@ -30,7 +31,7 @@ export function createAuthRouter(auth?: AuthDependencies) {
     if (!auth?.provider) throw new HttpError(503, "GOOGLE_AUTH_NOT_CONFIGURED", "Google sign-in is not configured yet");
     const now = Date.now();
     for (const [key, value] of starts) if (value.until <= now) starts.delete(key);
-    const ip = req.ip ?? "unknown";
+    const ip = (res.locals.productionClientIp as string | undefined) ?? req.ip ?? "unknown";
     const attempts = starts.get(ip) ?? { count: 0, until: now + FLOW_MAX_AGE };
     if (attempts.count >= 20 || starts.size >= 1000 && !starts.has(ip)) {
       res.set("Retry-After", String(Math.max(1, Math.ceil((attempts.until - now) / 1000))));
@@ -81,6 +82,7 @@ export function createAuthRouter(auth?: AuthDependencies) {
       res.clearCookie(SESSION_COOKIE, sessionCookie);
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue", { googleSignInEnabled: Boolean(auth?.provider) });
     }
+    if (production) await enforceUserBudget(production, res, session.user.id, true);
     res.json({ user: session.user });
   });
 
@@ -88,7 +90,13 @@ export function createAuthRouter(auth?: AuthDependencies) {
     // A required non-simple header + no CORS allowance prevents forged form logout.
     verifyMutationOrigin(req, auth);
     const token = readTokenCookie(req.headers.cookie, SESSION_COOKIE);
-    if (token && auth) await auth.store.revokeSession(hashToken(token));
+    if (token && auth) {
+      if (production) {
+        const session = await auth.store.getSession(hashToken(token));
+        if (session && session.expiresAt > Date.now()) await enforceUserBudget(production, res, session.user.id, false);
+      }
+      await auth.store.revokeSession(hashToken(token));
+    }
     res.clearCookie(SESSION_COOKIE, sessionCookie);
     res.clearCookie(FLOW_COOKIE, flowCookie);
     res.status(204).end();

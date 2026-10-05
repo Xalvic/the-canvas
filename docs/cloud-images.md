@@ -1,7 +1,7 @@
-# Cloud image assets: backend milestone
+# Cloud image assets
 
-Updated: 2026-10-05. Backend integration is implemented. Frontend image
-upload/loading and backend/database deployment remain pending.
+Updated: 2026-10-05. Backend integration and frontend upload/rendering are
+implemented and tested locally. Deployment remains pending.
 
 ## How the pieces connect
 
@@ -106,7 +106,7 @@ unsupported dimensions are rejected.
 | Durable uploads | Ten reservations per uploader in a rolling hour; 50 MiB per rolling day |
 | Board storage | 100 active assets and 100 MiB |
 | Global managed storage | 2,000,000,000 bytes reserved in PostgreSQL |
-| Signed URL issuance | 120 per user per UTC hour |
+| Signed URL issuance | 1,500 per user per UTC hour (supports refreshing a full 100-image board) |
 | Global monthly issuance budget | 10,000,000,000 bytes, charging the asset's size per issued URL |
 
 Reservations count against storage while pending or awaiting deletion.
@@ -166,10 +166,33 @@ save with `422 INVALID_ASSET_REFERENCE`. Stale saves retain the existing
 `409 REVISION_CONFLICT` behavior. A failed save neither changes the document
 or revision nor marks a newly uploaded asset as saved.
 
-This cloud document validator is backend-only. The current frontend adapters
-continue rejecting image-containing cloud saves until the next milestone
-adds explicit upload and signed-image rendering. Local guest images remain
-in IndexedDB and keep their existing behavior.
+The frontend uses the same strict cloud document validator. Editor images keep
+their existing device-local IDs, with completed upload mappings stored in the
+account draft outside undo history. Remote images carry board provenance only
+in the editor/draft; transport documents contain only the destination asset UUID.
+Local guest images remain in IndexedDB with their existing behavior.
+
+## Frontend upload and recovery
+
+Signing in transfers nothing. **Upload local board**, **Save as new account
+board**, and **Upload pending images** are explicit upload actions. Images
+inserted into an account board remain local until that action; ordinary autosave
+reports that upload is needed. Uploads run serially with progress; each completed
+asset mapping is persisted before continuing, so retry/reload skips completed
+uploads. An uncertain failed upload can leave an extra retained asset, but never
+overwrites the draft or existing board. Original local blobs and canvas history
+remain unchanged.
+
+Opening a remote board attaches its asset provenance; signed URLs are fetched
+with current authorization, deduplicated per account/board/asset, held only in
+memory and refreshed before expiry or on focus. Hidden tabs pause proactive
+refresh. Account changes clear signatures and abort stale reads. Revocation
+hides images and prevents new signed reads; already issued provider URLs can
+remain usable until their five-minute expiry. Failed reads provide **Retry image**.
+Copying a cloud image to another account board downloads its authorized source
+bytes transiently and uploads a distinct destination asset; it never reuses a
+cross-board reference or persists downloaded remote bytes in guest IndexedDB.
+Completed destination mappings also render against the destination board.
 
 ## Failures, retention and cleanup
 
@@ -180,18 +203,20 @@ exist even when its HTTP response was lost. The exact provider path lets
 cleanup reconcile that reservation later. Upload failure never changes the
 board document or immediately frees potentially occupied storage.
 
-Every asset successfully referenced by a committed document is retained for
-this milestone, including after later image removal or board deletion.
-This preserves recovery possibilities and avoids immediate deletion during
-undo or save failure. A future retention policy for formerly saved assets is
-separate work; retained files continue to consume the storage allowance.
+Every completed (`ready`) upload is retained, including before its first
+successful document save, after image removal and after board deletion. Local
+drafts can outlive a 24-hour window or remain offline; the server cannot safely
+infer whether an uploaded image is still needed by a recovery draft or undo.
+Retained files continue to consume the existing storage allowance.
 
-Only never-saved pending/ready assets older than 24 hours are cleanup
+Only unfinished pending uploads older than 24 hours are cleanup
 candidates. Cleanup takes the parent-board lock and rechecks whether a save
 protected each candidate. It marks candidates `deleting`, then looks up the
 exact reserved provider path or deletes the recorded file ID. Confirmed
 provider deletion/absence changes the row to `failed`, releasing storage.
-Failures retain the reservation and retry after a 15-minute lease. ImageKit
+Failures retain the reservation and retry after a 15-minute lease. Completed
+uploads are excluded even if they have never been referenced in a saved board.
+ImageKit
 listing is eventually consistent; the 24-hour grace also avoids immediate
 absence decisions after upload.
 
@@ -205,6 +230,12 @@ There is no automatic cleanup schedule yet. The command prints only safe
 counts (`claimed`, `deleted`, `deferred`) and returns failure when operations
 remain deferred. It uses only application asset rows, preserving the existing
 manually uploaded image.
+
+Proposed policy for later review: add explicit per-asset recovery/history leases
+and a user-visible discard flow before reclaiming completed assets. A retention
+window alone is insufficient for offline drafts; any automatic expiration must
+be clearly shown to the user and preserve/export recovery bytes first. Until
+that design is implemented, completed assets are never automatically reclaimed.
 
 | HTTP status | Relevant error codes |
 | --- | --- |
@@ -223,6 +254,15 @@ manually uploaded image.
 
 ## Verification and remaining work
 
+Frontend milestone: six automated browser → actual Express API → Prisma →
+Docker PostgreSQL scenarios pass in isolated schemas, with a controlled provider
+for repeatable binary uploads/signed delivery. They cover guest/login isolation,
+explicit upload and fresh-device open, failed upload/reload/retry, cross-board
+copy, save-as-new, editor/viewer/revocation, signing failure/retry and expiry
+refresh. Fixture teardown left zero test schemas. API/cache/adapter/local-draft
+tests and frontend/server builds also pass. These fixtures do not claim a live
+Google login, live ImageKit browser check or deployed verification.
+
 The actual restricted ImageKit key was verified with five tiny disposable
 files under `scribble/dev`: private upload, exact-path listing, signed image
 read, unsigned rejection, genuine expired-URL rejection and deletion all
@@ -232,7 +272,7 @@ viewer-signed URL, rejected its unsigned equivalent, saved/read revision 1
 and blocked fresh URL issuance after revocation. All seven test files were
 deleted; the pre-existing image was preserved. No subscription change was made.
 
-Focused backend tests and the maintained Postman collection cover current
+Focused backend tests and the historical Postman verification cover
 roles, invalid uploads, board-scoped references, revision/save failures,
 retention and quotas. Database fixtures use isolated random PostgreSQL
 schemas. Postman uses fake provider storage with the real Express, Prisma and
@@ -245,9 +285,10 @@ payloads were preserved. The collection adds 37 image workflow requests and
 60 saved examples. Other final test counts are recorded in
 `docs/implementation-status.md`.
 
-Next: explicitly upload frontend image blobs, translate their local IDs into
-board-scoped asset UUIDs, load/refresh signed URLs, and preserve draft,
-permission and uncertain-save recovery. Then deploy Express and PostgreSQL
-(Neon remains planned), configure the backend secrets and frontend API URL,
-and arrange cleanup/usage monitoring. PWA offline loading and real-time
-collaboration remain separate pending features.
+Frontend upload/rendering/recovery and collaboration are now implemented.
+Explicit image batches have a ten-minute total deadline and each upload is
+bounded at 90 seconds; completed mappings persist after each upload for retry.
+Next: configure the chosen API host, Neon and existing Worker integration, then
+review deployment separately. Cleanup/monitoring/backup templates are prepared.
+PWA and ongoing Postman maintenance were cancelled by the user. Local fixtures
+do not verify deployed Google OAuth, ImageKit delivery or scheduled jobs.

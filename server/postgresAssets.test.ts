@@ -69,7 +69,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL cloud image assets", () => {
     await pool.query("DROP TABLE board_assets, asset_request_budgets; DELETE FROM schema_migrations WHERE version=6; CREATE TABLE asset_request_budgets(marker text)");
     await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });
     expect((await pool.query("SELECT to_regclass('board_assets') AS assets")).rows[0].assets).toBeNull();
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 7, 8]);
     await pool.query("DROP TABLE asset_request_budgets"); await migrateDatabase(pool); await migrateDatabase(pool);
     expect(await state()).toEqual(before);
   });
@@ -172,18 +172,18 @@ describe.skipIf(!databaseUrl)("real PostgreSQL cloud image assets", () => {
     expect(await state()).toEqual(before);
   });
 
-  it("claims only abandoned never-saved assets and preserves reservations until confirmed deletion", async () => {
+  it("cleans unfinished uploads while retaining ready draft/undo assets, including deleted boards", async () => {
     const { owner, assets, boards, board, other, ready } = await setup();
     const uploaded = await ready(), pending = await assets.reserve(other.id, owner, input()), fresh = await ready();
     await pool.query("UPDATE board_assets SET created_at=clock_timestamp()-interval '2 days' WHERE id=ANY($1::uuid[])", [[uploaded.id, pending.id]]);
     await boards.delete(other.id, owner);
     const claimed = await assets.claimAbandoned(20);
-    expect(claimed.map(({ id }) => id).sort()).toEqual([uploaded.id, pending.id].sort());
+    expect(claimed.map(({ id }) => id)).toEqual([pending.id]);
     expect(claimed.find(({ id }) => id === pending.id)).toMatchObject({ boardId: null, scopeBoardId: other.id, filePath: pending.filePath, status: "deleting" });
     expect(await assets.claimAbandoned(20)).toEqual([]);
     expect((await prisma.boardAsset.findUniqueOrThrow({ where: { id: fresh.id } })).status).toBe("ready");
     await assets.finishDelete(uploaded.id);
-    expect((await prisma.boardAsset.findUniqueOrThrow({ where: { id: uploaded.id } })).status).toBe("failed");
+    expect((await prisma.boardAsset.findUniqueOrThrow({ where: { id: uploaded.id } })).status).toBe("ready");
     await pool.query("UPDATE board_assets SET updated_at=clock_timestamp()-interval '16 minutes' WHERE id=$1", [pending.id]);
     expect((await assets.claimAbandoned(20)).map(({ id }) => id)).toEqual([pending.id]);
     await assets.finishDelete(fresh.id);
@@ -224,7 +224,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL cloud image assets", () => {
 
   it("serializes signing budgets and rolls every counter back when the monthly budget refuses a URL", async () => {
     const { owner, viewer, assets, board, ready } = await setup(); const asset = await ready();
-    await budget("read", owner, 119, 119 * 20);
+    await budget("read", owner, 1499, 1499 * 20);
     const results = await Promise.allSettled([assets.getForRead(board.id, asset.id, owner), assets.getForRead(board.id, asset.id, owner)]);
     expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
     expect(results.find(({ status }) => status === "rejected")).toMatchObject({ reason: { status: 429, code: "ASSET_SIGN_RATE_LIMIT" } });
@@ -234,13 +234,13 @@ describe.skipIf(!databaseUrl)("real PostgreSQL cloud image assets", () => {
     expect(await prisma.assetRequestBudget.findMany({ orderBy: { bucket: "asc" } })).toEqual(before);
   });
 
-  it("lets a save protect a candidate before cleanup acquires the shared parent lock", async () => {
-    const { owner, assets, documents, board, ready } = await setup(); const asset = await ready();
+  it("rechecks a pending candidate after concurrent finalization acquires the shared parent lock", async () => {
+    const { owner, assets, documents, board } = await setup(); const asset = await assets.reserve(board.id, owner, input());
     await pool.query("UPDATE board_assets SET created_at=clock_timestamp()-interval '2 days'");
     const lock = await pool.connect();
     try {
       await lock.query("BEGIN"); await lock.query("SELECT id FROM boards WHERE id=$1 FOR UPDATE", [board.id]);
-      await lock.query("UPDATE board_assets SET last_referenced_at=clock_timestamp() WHERE id=$1", [asset.id]);
+      await lock.query("UPDATE board_assets SET status='ready', provider_file_id=$2 WHERE id=$1", [asset.id, `provider-${asset.id}`]);
       const cleanup = assets.claimAbandoned(20);
       let waiting = false;
       for (let attempt = 0; attempt < 100 && !waiting; attempt++) {

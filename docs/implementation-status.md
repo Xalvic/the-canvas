@@ -2,7 +2,44 @@
 
 Updated: 2026-10-05. Implementation only; lesson topics are excluded.
 
+Scope update: PWA installation/offline app loading and Postman collection
+maintenance were cancelled by the user. Their project tooling is removed.
+Cross-tab persistence protection remains in scope. Prior collection results below
+are historical; no further collection updates are required.
+
 ## Completed milestones
+
+- Collaboration: authorized SSE/presence/world-space cursors, atomic object
+  changes, durable receipts, reconnect/merge/recovery and selective local undo.
+  Twelve real image/collaboration browser/API/DB scenarios pass. SQL migration 7
+  preserves existing Docker data. Guide: [collaboration.md](collaboration.md).
+- Cross-tab reliability: one writer per local board, atomic IndexedDB leases,
+  role-composed read-only state, fresh takeover and separate recovery after lease
+  loss. Version-2→3 preserves board/image data. Three actual two-tab cases and
+  seven lease/upgrade checks pass. Guide: [local-reliability.md](local-reliability.md).
+- Docker API: nonroot container, explicit migrations and retained-volume setup.
+  The updated schema-8 image passes 36 actual restart/recreation persistence
+  checks against a disposable stack. Normal volume/5433 remain untouched.
+- Production preparation: same-origin Worker proxy, HTTPS host template, verified
+  database TLS/Google configuration guards, durable admission budgets, bounded
+  readiness, sanitized logging, CI and scheduler templates. Migration 8 is applied
+  to Docker 5434; ten prior tables/six rows fingerprint unchanged; Prisma has no
+  drift. Five real DB budget tests and 23 new production unit/HTTP checks pass.
+  Encrypted restore passes 15 checks across 12 populated tables; actual Caddy
+  proxy-error logging passes six privacy checks. Configuration/timers/CI are
+  prepared for review, not remotely executed. Guides: [production.md](production.md),
+  [backups.md](backups.md).
+
+- Frontend cloud images (2026-10-05): explicit guest/account upload, persisted
+  completed-asset mappings, same-board adapters, signed rendering/expiry refresh,
+  progress/failure/retry, reload/recovery and destination uploads for copies.
+  Local blobs/history are preserved; signing in transfers nothing. Six real
+  browser/API/Prisma/PostgreSQL scenarios pass with controlled provider fixtures;
+  teardown left no test schemas. Completed uploads are retained even before
+  their first save, protecting offline drafts/undo. Cleanup now targets unfinished
+  uploads only. Signing allows 1,500 reads per user/hour while retaining the
+  global monthly byte budget. Saved-asset reclamation remains a proposed policy.
+  Local verification does not imply deployment. Guide: [cloud-images.md](cloud-images.md).
 
 - Backend cloud-image assets: ImageKit private immutable uploads, validated static
   JPEG/PNG/WebP, board-scoped access and five-minute signed reads; SQL migration 6
@@ -128,28 +165,35 @@ were user-verified; an automated real browser/API/DB fixture remains pending. Se
 
 ## Pending implementation queue
 
-1. **Frontend cloud image assets:** explicit upload from guest/account drafts,
-   cloud-reference adapters, pending/failure/retry UI, expiring signed-image
-   refresh and meaningful browser verification. Backend support is implemented.
-   Saved-asset reclamation and a scheduled deployment cleanup job remain pending;
-   saved assets currently retain storage even after board deletion.
-2. **Real-time collaboration:** authorized connections, presence/cursors,
-   synchronized edits, reconnect handling and tested concurrent-edit behavior.
-3. **PWA and local reliability:** installation/offline loading and cross-tab
-   coordination for local saves; preserve stored guest data compatibility.
-4. **Repeatable Docker setup:** containerize the API alongside PostgreSQL,
-   document fresh setup, and verify an actual Docker database-process restart.
-5. **Production delivery:** frontend already runs through a Cloudflare Worker
+1. **Saved-asset reclamation:** completed files remain retained for drafts/undo,
+   including after board deletion. A lease/discard policy is proposed; automatic
+   deletion is not implemented. Scheduled unfinished-upload cleanup awaits deployment.
+2. **Production delivery:** frontend already runs through a Cloudflare Worker
    at `https://milanputhukkudy.com/scribble/`; deploy the local Express API and
-   PostgreSQL (Neon planned), connect the frontend, and add CI checks,
-   HTTPS/configuration, logs/error monitoring, deployment
-    rate limiting, backups, restore verification and operational runbooks.
-6. **End-to-end cloud validation:** automate a real browser/API/DB fixture beyond
-   the completed user live-Google account save/open verification, then repeat on
-   deployment. Sharing/assets/collaboration paths follow as those features
-   become available.
+   PostgreSQL (Neon planned), connect the frontend and enable the prepared CI,
+   schedules, offsite backup storage and notifications after separate approval.
+3. **Deployed validation:** real Google OAuth, hosting/Neon TLS, Worker routing,
+   signed CDN delivery, timers/notifications, offsite backups and recovery drills
+   wait for actual approved deployment.
 
-Next session: frontend cloud-image integration. The backend is local and ready;
+Final local verification (2026-10-05): 579 fast tests, 95 real PostgreSQL checks,
+41 standard browser cases and 16 actual browser/API/DB cases are verified. Full
+browser runs found two old assertions (favicon path and asynchronous switching)
+and one new sharing selector; focused reruns pass after repair. The database
+batch's two old ledger assertions were updated for migration 8; all 33 affected
+asset/collaboration checks then passed. Both builds, deployment/fixture typechecks,
+Prisma equality, CI YAML/pinned-action checks and diff whitespace validation pass.
+Sixteen real cases include images, collaboration, roles/invitations, cross-tab
+ownership and recovery; teardown left zero fixture schemas/resources. Docker
+persistence passed 36 checks, encrypted restore 15, and actual Caddy error-log
+privacy six. No new live Google/ImageKit or deployed verification is claimed.
+
+Local implementation and production preparation are complete within the revised
+scope. Completed-asset reclamation remains deliberately proposed to preserve
+drafts/undo. SQL migrations 1–8 are applied to Docker 5434 with existing data
+unchanged; portable 5433 is untouched. Next: choose/configure the origin host and
+Neon, review the external existing Worker integration and deployment separately.
+The backend remains local;
 API/Neon deployment, scheduled cleanup and actual CDN usage monitoring remain
 pending. ImageKit budgets limit application storage and URL issuance; reused
 signed URLs can consume additional bandwidth during their five-minute validity.

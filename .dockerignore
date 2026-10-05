@@ -1,0 +1,26 @@
+# Only backend inputs enter the build context; local secrets/data stay on host.
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!prisma.config.ts
+!prisma/
+!prisma/schema.prisma
+!server/
+!server/**
+server/generated/
+server/**/*.test.ts
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+!db/
+!db/*.sql
+!docker/
+!docker/container-entrypoint.mjs
+!docker/backups/
+!docker/backups/Dockerfile
+!scripts/
+!scripts/backup-tools.mjs
+!scripts/backup.mjs
+!scripts/restore.mjs

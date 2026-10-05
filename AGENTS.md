@@ -50,7 +50,7 @@ Start task
 
 ## Architecture and Interaction Rules
 
-- Preserve free guest use without login and the existing IndexedDB persistence. Login will enable optional cloud saves and cross-device access; keep local editing available. PWA installation/offline loading are a separate pending feature. Do not automatically upload guest boards on login without an explicit user-facing flow.
+- Preserve free guest use without login and the existing IndexedDB persistence. Login enables optional cloud saves and cross-device access; keep local editing available. PWA installation/offline app loading are out of scope by user request. Do not automatically upload guest boards on login without an explicit user-facing flow.
 - This is a React + TypeScript + Vite application. Keep components, hooks, state, and types aligned with the existing local patterns.
 - Treat the infinite canvas as a coordinate-system-sensitive feature. Keep world coordinates distinct from screen/viewport coordinates; make conversions explicit and account for pan and zoom.
 - Preserve the intended ownership and semantics of selection state. Avoid duplicating selection state across components or introducing competing sources of truth.
@@ -75,8 +75,6 @@ git log --oneline -10
 - Run the narrowest useful checks first: targeted tests, type checking for affected code, or the relevant build/lint command. Expand validation only when risk or failures justify it.
 - Do not discard, overwrite, or rewrite unrelated user changes. Do not create commits unless explicitly requested.
 
-## Postman Collection Maintenance
+## API Documentation Scope
 
-- When adding or changing API endpoints, update the cloud **Scribble API** collection through the Postman plugin, including method, URL, body, examples, and relevant assertions. The user has requested ongoing maintenance. Keep `baseUrl` configurable; change its value when an actual deployment URL exists.
-- Collection UID: `11763565-ed048b36-680c-47f7-934f-e7cb6f4dee53`; workspace ID: `5b963add-9b03-46eb-815b-13627cec506a`. Fetch the cloud collection before modifying it to retain manual edits, and preserve existing IDs.
-- Local `postman/` and `.postman/` artifacts are ignored by Git at the user's request. Use the installed Postman API Engineering skill for collection work and the schema guidance for any local collection edits. Validate affected requests against the local server; lint any local mirror before syncing. Do not list planned endpoints as working requests until they are implemented.
+- Postman tooling and collection maintenance are discontinued by user request. Do not recreate local Postman artifacts or update the cloud collection. Prepare a consolidated API list after project implementation, when requested.

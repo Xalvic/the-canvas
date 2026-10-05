@@ -113,6 +113,58 @@ describe("local board format", () => {
     expect(parseLocalBoard(board)).toBe(board);
   });
 
+  it("persists cloud image provenance and rejects malformed provenance", () => {
+    const board = validBoard();
+    const image = createImageObject({
+      assetId: "11111111-1111-4111-8111-111111111111",
+      center: { x: 0, y: 0 }, width: 320, height: 180,
+      originalWidth: 1920, originalHeight: 1080, zIndex: 2,
+    });
+    image.cloudAsset = { boardId: "board-1", assetId: image.assetId };
+    board.objects[image.id] = image;
+    expect(parseLocalBoard(JSON.parse(JSON.stringify(board)))).toEqual(board);
+    for (const cloudAsset of [
+      null, {}, { boardId: "", assetId: image.assetId },
+      { boardId: "board-1", assetId: "local-id" },
+      { ...image.cloudAsset, url: "https://example.com/signed" },
+    ]) {
+      expect(parseLocalBoard({ ...board, objects: { [image.id]: { ...image, cloudAsset } } })).toBeNull();
+    }
+  });
+
+  it("preserves account save baselines with strict cloud image references", () => {
+    const board = accountBoard();
+    const image = createImageObject({
+      assetId: "local-image", center: { x: 0, y: 0 }, width: 320, height: 180,
+      originalWidth: 1920, originalHeight: 1080, zIndex: 2,
+    });
+    board.objects[image.id] = image;
+    board.account.imageAssets = { [image.assetId]: "11111111-1111-4111-8111-111111111111" };
+    board.account.savedDocument = serializeDocumentSnapshot(board.objects, {
+      boardId: board.account.boardId,
+      imageAssets: board.account.imageAssets,
+    });
+    board.account.pendingSave = { document: board.account.savedDocument, expectedRevision: 2 };
+    expect(parseLocalBoard(JSON.parse(JSON.stringify(board)))).toEqual(board);
+  });
+
+  it("validates upload mappings and preserves special local asset keys", () => {
+    const board = accountBoard();
+    board.account.imageAssets = Object.fromEntries([
+      ["__proto__", "11111111-1111-4111-8111-111111111111"],
+      ["asset-1", "22222222-2222-4222-8222-222222222222"],
+    ]);
+    const restored = parseLocalBoard(JSON.parse(JSON.stringify(board)));
+    expect(restored).toEqual(board);
+    expect(Object.hasOwn(restored!.account!.imageAssets!, "__proto__")).toBe(true);
+    for (const imageAssets of [
+      null, [], { "asset-1": "local-id" }, { "asset-1": 42 },
+      Object.fromEntries([["__proto__", "local-id"]]),
+    ]) {
+      expect(parseLocalBoard({ ...board, account: { ...board.account, imageAssets } })).toBeNull();
+    }
+  });
+
   it("keeps guest records free of account metadata", () => {
     const board = validBoard();
     const restored = parseLocalBoard(JSON.parse(JSON.stringify(board)));

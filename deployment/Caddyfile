@@ -1,0 +1,28 @@
+{
+  # Apply to default/core HTTP error logs as well as optional access loggers.
+  # Request objects include custom origin secrets and OAuth query parameters.
+  log default {
+    format filter {
+      wrap json
+      fields {
+        request delete
+        headers delete
+      }
+    }
+  }
+}
+
+{$API_ORIGIN_HOST} {
+  # Caddy obtains/renews HTTPS certificates. Do not enable raw request logging:
+  # OAuth query parameters and cookies must not enter origin access logs.
+  request_body {
+    max_size 6MB
+  }
+  reverse_proxy api:3001 {
+    flush_interval -1
+    transport http {
+      dial_timeout 5s
+      response_header_timeout 95s
+    }
+  }
+}

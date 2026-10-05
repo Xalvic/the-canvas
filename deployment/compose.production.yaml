@@ -1,0 +1,44 @@
+name: scribble-production
+services:
+  api:
+    image: ${SCRIBBLE_API_IMAGE:?Set a reviewed immutable API image tag or digest}
+    env_file: ${SCRIBBLE_RUNTIME_ENV_FILE:-../.env.production}
+    environment:
+      DEPLOYMENT_ENV: production
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: "3001"
+    expose: ["3001"]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+  https:
+    image: caddy:2.10.2-alpine
+    environment:
+      API_ORIGIN_HOST: ${API_ORIGIN_HOST:?Set the HTTPS API origin DNS hostname}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [api]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+volumes:
+  caddy-data:
+  caddy-config:

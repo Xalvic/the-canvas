@@ -1,4 +1,11 @@
-# PostgreSQL-only Docker setup
+# Local PostgreSQL and Express Docker setup
+
+Current status (2026-10-05): the API container and SQL migrations 1–8 are
+implemented. Thirty-six actual disposable restart/recreation checks pass;
+normal data and volumes and portable PostgreSQL on 5433 are preserved. See
+[Express container](#express-container-2026-10-05) for current commands and
+[production preparation](production.md) for the separate pending hosting setup.
+The dated setup slices below record earlier learning stages.
 
 Status (2026-10-02): image downloaded and PostgreSQL started with approval.
 The container is healthy; an authenticated Windows connection to port 5434
@@ -175,3 +182,102 @@ References: [official PostgreSQL image](https://hub.docker.com/_/postgres),
 [Docker volumes](https://docs.docker.com/engine/storage/volumes/),
 [Compose networking](https://docs.docker.com/compose/how-tos/networking/),
 [psql variables](https://www.postgresql.org/docs/18/app-psql.html).
+
+## Express container (2026-10-05)
+
+The optional Compose `api` profile packages Express, Prisma's generated client,
+the image decoder and the SQL migration runner. PostgreSQL's existing service,
+loopback port 5434, initialization credentials and `postgres-data` volume remain
+the same. Without `--profile api` (or explicitly targeting `api`), Compose still
+runs the existing PostgreSQL-only setup. React continues to run through Vite or
+the existing Cloudflare deployment.
+
+The Dockerfile builds on the pinned official Node 24.21.0 Bookworm slim image,
+generates Prisma from the checked-in mapping, compiles the server and removes
+development dependencies. The final container runs as the `node` user, with a
+read-only filesystem and a small temporary filesystem. The build allowlist in
+`.dockerignore` excludes `.env` files, local databases, IndexedDB/browser test
+artifacts, frontend files and host-generated Prisma code. Backend secrets are
+provided at runtime by `.env.docker`; they never enter an image layer.
+
+Inside Compose, `API_HOST=0.0.0.0` binds the container network interface while
+`127.0.0.1:3001:3001` exposes the API only on this computer. Host npm commands
+still bind to `127.0.0.1` by default. The container entrypoint rewrites only the
+host/port of the existing `DATABASE_URL` to `postgres:5432`, retaining its
+username, URL-encoded password, database and query options. It does not rewrite
+`.env.docker` or the portable `.env`; Windows npm commands continue to connect
+to port 5434. Google and ImageKit variables are backend-only runtime settings.
+Their existing callback/frontend URLs can remain unchanged for this local
+loopback deployment.
+
+Build and migrate explicitly before starting the API:
+
+```powershell
+docker compose --env-file .env.docker --profile api config --quiet
+docker compose --env-file .env.docker --profile api build api
+docker compose --env-file .env.docker up -d --wait postgres
+docker compose --env-file .env.docker --profile api run --rm api migrate
+docker compose --env-file .env.docker --profile api up -d --wait api
+docker compose --env-file .env.docker --profile api ps
+```
+
+Ensure only one API process owns port 3001: the npm API and the container API use
+the same browser/Vite proxy address. SQL remains the migration authority; the
+container never runs Prisma migrations or resets the database on startup.
+One-off `migrate` commands are transactional and retain all existing data.
+The API healthcheck reads `/health`; authenticated board/document checks verify
+the actual database-backed application path separately.
+
+The explicit abandoned-asset cleanup command is available in the same image:
+
+```powershell
+docker compose --env-file .env.docker --profile api run --rm api cleanup
+```
+
+Its policy only deletes confirmed abandoned unfinished uploads.
+All completed assets, including those used by drafts/recovery/undo, remain
+retained. This command has no automatic schedule in the local Compose setup.
+
+For persistence verification, prefer a disposable Compose project with a unique
+project name, separate port overrides and its own newly created volume. Record
+a board/document and database migration ledger through that project's API;
+restart its database container, wait for database health, then restart its API
+and verify the same board/document/revision and ledger through actual requests.
+Replacing the API container also leaves PostgreSQL data intact. Retain proof
+results and delete only the disposable project's named resources afterward.
+Do not use `down -v` against `scribble-local`: that deletes the user's existing
+database volume. Portable PostgreSQL on port 5433 stays outside this workflow.
+
+For the existing project, an explicitly authorized sequential restart uses:
+
+```powershell
+docker compose --env-file .env.docker restart postgres
+docker compose --env-file .env.docker up -d --wait postgres
+docker compose --env-file .env.docker --profile api restart api
+docker compose --env-file .env.docker --profile api up -d --wait api
+```
+
+Verification (2026-10-05): the image built successfully with Prisma generation
+and the server build. A runtime smoke check ran as UID 1000, loaded the generated
+client, encoded a PNG through Sharp and confirmed no `.env.docker` in the image.
+The reusable proof below passed 36 checks against a new isolated Compose project:
+authenticated API reads, preserved row/revision/JSON/ledger fingerprints after
+an API restart, an actual PostgreSQL container restart, and `down`/`up` container
+recreation while retaining that project's volume. Unauthenticated reads stayed
+blocked throughout. The proof verified the normal app role, used no ImageKit
+settings and removed only the exact disposable project's resources after
+checking its volume labels. The existing project/volume and portable database
+were not restarted or modified.
+
+```powershell
+node scripts/docker-persistence-proof.mjs
+```
+
+Build `scribble-api:local` before running the proof. The script allocates random
+loopback ports, an ignored temporary credential file and a new project/volume;
+it never reads existing credentials into its test stack or prints passwords or
+connection URLs. Its cleanup preserves every other Docker project. A local
+container proof does not verify production deployment or Google OAuth redirects
+from a deployed API.
+Image guidance: [official Node images](https://github.com/nodejs/docker-node),
+[Node container practices](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md).

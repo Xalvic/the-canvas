@@ -1,9 +1,11 @@
+import { boardTabCoordinator } from "./boardTabCoordinator";
 import type { CanvasObject } from "../canvas/objects/types";
 import type { Viewport } from "../canvas/viewport/viewportMath";
 import type { DocumentSnapshot } from "../store/documentStore";
 import { isOpacity } from "../tools/toolSettings";
 import { z } from "zod";
 import { canvasDocumentSchema, type CanvasDocument } from "./canvasDocument";
+import { collaborationOperationSchema, type CollaborationOperationInput } from "../../server/contracts/collaboration";
 import {
   BOARD_STORE_NAME,
   openCanvasDatabase,
@@ -21,6 +23,8 @@ export type AccountBoardLink = {
   revision: number;
   savedDocument: CanvasDocument;
   savedTitle: string;
+  imageAssets?: Record<string, string>;
+  pendingOperation?: { input: CollaborationOperationInput; document: CanvasDocument; conflicted?: boolean };
   pendingSave?: { document: CanvasDocument; expectedRevision: number };
 };
 
@@ -28,16 +32,32 @@ export function accountBoardStorageId(ownerId: string, boardId: string): string 
   return `account-board:${encodeURIComponent(ownerId)}:${encodeURIComponent(boardId)}`;
 }
 
+// z.record skips '__proto__' entries. Validate each own value and clone via
+// fromEntries so every local asset ID is validated and survives reload.
+const cloudAssetIdSchema = z.uuid();
+const imageAssetsSchema = z.custom<Record<string, string>>((value) =>
+  typeof value === "object" && value !== null &&
+  (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) &&
+  Object.values(value).every((assetId) => cloudAssetIdSchema.safeParse(assetId).success),
+).transform((value) => Object.fromEntries(Object.entries(value)));
+
 const accountBoardLinkSchema = z.strictObject({
   ownerId: z.string().min(1).refine((value) => value.trim().length > 0),
   boardId: z.string().min(1).refine((value) => value.trim().length > 0),
   revision: z.number().int().nonnegative(),
   savedDocument: canvasDocumentSchema,
   savedTitle: z.string(),
+  imageAssets: imageAssetsSchema.optional(),
+  pendingOperation: z.strictObject({ input: collaborationOperationSchema, document: canvasDocumentSchema, conflicted: z.boolean().optional() }).optional(),
   pendingSave: z.strictObject({
     document: canvasDocumentSchema,
     expectedRevision: z.number().int().nonnegative(),
   }).optional(),
+});
+
+const cloudAssetSchema = z.strictObject({
+  boardId: z.string().min(1).refine((value) => value.trim().length > 0),
+  assetId: z.uuid(),
 });
 
 export type LocalBoardRecord = {
@@ -119,7 +139,8 @@ function isCanvasObjectRecord(value: unknown): value is CanvasObject {
       isFiniteNumber(value.originalHeight) &&
       value.originalHeight > 0 &&
       (value.name === undefined || typeof value.name === "string") &&
-      (value.mimeType === undefined || typeof value.mimeType === "string")
+      (value.mimeType === undefined || typeof value.mimeType === "string") &&
+      (value.cloudAsset === undefined || cloudAssetSchema.safeParse(value.cloudAsset).success)
     );
   }
   if (value.type !== "stroke") return false;
@@ -178,7 +199,8 @@ export function parseLocalBoard(value: unknown): LocalBoardRecord | null {
     } catch {
       return null;
     }
-    if (value.id !== storageId && value.id !== `${storageId}:recovery`) return null;
+    if (value.id !== storageId && value.id !== `${storageId}:recovery` &&
+        !(value.id.startsWith(`${storageId}:recovery:`) && z.uuid().safeParse(value.id.slice(`${storageId}:recovery:`.length)).success)) return null;
     return { ...value, account: account.data } as LocalBoardRecord;
   }
 
@@ -199,6 +221,10 @@ export async function loadLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardR
 }
 
 export async function saveLocalBoard(board: LocalBoardRecord): Promise<void> {
+  if (boardTabCoordinator.enabled) {
+    const leaseId = board.id.endsWith(":recovery") ? board.id.slice(0, -":recovery".length) : board.id;
+    return boardTabCoordinator.write(leaseId, [board]);
+  }
   const database = await openCanvasDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(BOARD_STORE_NAME, "readwrite");
@@ -210,5 +236,34 @@ export async function saveLocalBoard(board: LocalBoardRecord): Promise<void> {
     transaction.onabort = () => reject(
       transaction.error ?? new Error("Saving the board was interrupted"),
     );
+  });
+}
+
+/** A lost writer never overwrites the new writer's canonical/recovery record. */
+export async function saveDetachedRecovery(board: LocalBoardRecord): Promise<string> {
+  const id = `${board.id}:recovery:${crypto.randomUUID()}`;
+  if (!boardTabCoordinator.enabled) { await saveLocalBoard({ ...board, id }); return id; }
+  if (!await boardTabCoordinator.acquire(id)) throw new Error("Could not preserve the interrupted draft");
+  try { await boardTabCoordinator.write(id, [{ ...board, id }]); }
+  finally { await boardTabCoordinator.release(id); }
+  return id;
+}
+
+export async function latestDetachedRecovery(id: string): Promise<LocalBoardRecord | null> {
+  const database = await openCanvasDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(BOARD_STORE_NAME, "readonly");
+    const prefix = `${id}:recovery:`;
+    const request = transaction.objectStore(BOARD_STORE_NAME).openCursor(IDBKeyRange.bound(prefix, `${prefix}\uffff`));
+    let latest: LocalBoardRecord | null = null;
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const record = parseLocalBoard(cursor.value);
+      if (record && (!latest || record.updatedAt > latest.updatedAt)) latest = record;
+      cursor.continue();
+    };
+    transaction.oncomplete = () => resolve(latest);
+    transaction.onerror = transaction.onabort = () => reject(transaction.error ?? new Error("Could not read the interrupted draft"));
   });
 }

@@ -10,7 +10,9 @@ const DAILY_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MONTHLY_ISSUED_BYTES = 10_000_000_000;
 const MAX_BOARD_ASSETS = 100;
 const MAX_HOURLY_UPLOADS = 10;
-const MAX_HOURLY_SIGNED_READS = 120;
+// A 100-image board renews at most ~1,400 signatures per visible hour.
+// The independent monthly byte budget still bounds managed provider usage.
+const MAX_HOURLY_SIGNED_READS = 1_500;
 
 function metadata(row: BoardAsset): AssetMetadata {
   return {
@@ -146,7 +148,7 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
         await storageLock(tx);
         const candidates = await tx.$queryRaw<{ id: string; board_id: string | null }[]>`
           SELECT id, board_id FROM board_assets WHERE last_referenced_at IS NULL
-            AND ((status IN ('pending', 'ready') AND created_at < clock_timestamp() - interval '24 hours')
+            AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours')
               OR (status = 'deleting' AND updated_at < clock_timestamp() - interval '15 minutes'))
           ORDER BY created_at, id LIMIT ${Math.max(1, Math.min(100, limit))}
         `;
@@ -158,7 +160,7 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
           const rows = await tx.$queryRaw<BoardAsset[]>`
             UPDATE board_assets SET status = 'deleting', updated_at = clock_timestamp()
             WHERE id = ${candidate.id}::uuid AND last_referenced_at IS NULL
-              AND ((status IN ('pending', 'ready') AND created_at < clock_timestamp() - interval '24 hours')
+              AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours')
                 OR (status = 'deleting' AND updated_at < clock_timestamp() - interval '15 minutes'))
             RETURNING id, board_id AS "boardId", scope_board_id AS "scopeBoardId", uploader_id AS "uploaderId", status,
               byte_size AS "byteSize", mime_type AS "mimeType", width, height, provider_file_id AS "providerFileId",

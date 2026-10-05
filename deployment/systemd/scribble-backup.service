@@ -1,0 +1,13 @@
+[Unit]
+Description=Scribble encrypted database backup
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=scribble
+WorkingDirectory=/opt/scribble
+EnvironmentFile=/opt/scribble/.env.backup
+ExecStart=/usr/bin/node /opt/scribble/scripts/scheduled-backup.mjs
+TimeoutStartSec=900
+UMask=0077

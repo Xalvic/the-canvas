@@ -51,7 +51,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
   }
 
   async function expectVersions() {
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }]);
   }
 
   it("installs all versions on a fresh schema even with concurrent runners", async () => {

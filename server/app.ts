@@ -8,8 +8,11 @@ import { requireBoardSession } from "./boardAccess.js";
 import { inviteSchema, memberUpdateSchema, type SharingStore } from "./sharing.js";
 import { createUploadGate, type ImageAssetService } from "./imageAssets.js";
 import { MAX_IMAGE_BYTES } from "./imageValidation.js";
+import type { CollaborationStore } from "./collaboration.js";
+import { createCollaborationRouter } from "./collaborationRoutes.js";
+import { checkReady, productionRequestGuard, productionUserBudget, verifyProductionOrigin, type ProductionDependencies } from "./production.js";
 
-export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService) {
+export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService, collaboration?: CollaborationStore, production?: ProductionDependencies) {
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -20,9 +23,21 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
-  app.use("/api/auth", createAuthRouter(auth));
+  if (production) {
+    app.get("/ready", async (req, res) => {
+      verifyProductionOrigin(req, res, production.proxySecret);
+      try { await checkReady(production.ready); res.json({ status: "ready" }); }
+      catch { res.status(503).json({ status: "unavailable" }); }
+    });
+    app.use("/api", productionRequestGuard(production));
+  }
+  app.use("/api/auth", createAuthRouter(auth, production));
   app.use("/api/boards", requireBoardSession(auth));
   if (sharing) app.use("/api/invitations", requireBoardSession(auth));
+  if (production) {
+    app.use("/api/boards", productionUserBudget(production));
+    if (sharing) app.use("/api/invitations", productionUserBudget(production));
+  }
 
   if (assets) {
     const acquire = createUploadGate();
@@ -78,6 +93,7 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
     });
   }
 
+  if (collaboration) app.use("/api/boards/:id", createCollaborationRouter(collaboration, auth));
   app.use(express.json({ limit: "16kb" }));
 
   if (sharing) {

@@ -8,6 +8,8 @@ const migrations = [
   { version: 4, file: "004_add_board_ownership.sql" },
   { version: 5, file: "005_create_board_sharing.sql" },
   { version: 6, file: "006_create_board_assets.sql" },
+  { version: 7, file: "007_create_board_operation_receipts.sql" },
+  { version: 8, file: "008_create_api_request_budgets.sql" },
 ] as const;
 
 export async function migrateDatabase(pool: Pool) {

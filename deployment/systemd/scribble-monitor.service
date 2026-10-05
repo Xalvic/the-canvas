@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Scribble production readiness and backup freshness
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=scribble
+WorkingDirectory=/opt/scribble
+EnvironmentFile=/opt/scribble/.env.monitor
+ExecStart=/usr/bin/node /opt/scribble/scripts/production-monitor.mjs
+TimeoutStartSec=30

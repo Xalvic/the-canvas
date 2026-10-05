@@ -11,4 +11,10 @@ describe("server configuration", () => {
     "rejects invalid API_PORT %j before listening",
     (API_PORT) => expect(() => loadServerConfig({ API_PORT })).toThrow(),
   );
+  it("allows the explicit container network bind while preserving host defaults", () => {
+    expect(loadServerConfig({ API_HOST: "0.0.0.0" })).toEqual({ host: "0.0.0.0", port: 3001 });
+  });
+  it.each(["", "localhost", "192.168.1.1", "http://0.0.0.0", "::"])("rejects unsupported API_HOST %j", (API_HOST) => {
+    expect(() => loadServerConfig({ API_HOST })).toThrow();
+  });
 });

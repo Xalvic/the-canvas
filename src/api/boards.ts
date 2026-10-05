@@ -67,7 +67,7 @@ export async function boardRequest(url: string, init: RequestInit, failureMessag
     const payload: unknown = await response.json().catch(() => null);
     const parsed = errorResponseSchema.safeParse(payload);
     const error = parsed.success ? parsed.data.error : undefined;
-    const conflict = error?.code === "REVISION_CONFLICT"
+    const conflict = error && ["REVISION_CONFLICT", "COLLABORATION_CONFLICT"].includes(error.code)
       ? conflictDetailsSchema.safeParse(error.details) : undefined;
     throw new BoardApiError(
       response.status,

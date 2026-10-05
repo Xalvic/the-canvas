@@ -38,6 +38,8 @@ export type FrameCanvasObject = BaseSpatialObject & {
 export type ImageCanvasObject = BaseSpatialObject & {
   type: "image";
   assetId: string;
+  // Only remote images need provenance; local assets keep their IndexedDB ID.
+  cloudAsset?: { boardId: string; assetId: string };
   originalWidth: number;
   originalHeight: number;
   name?: string;

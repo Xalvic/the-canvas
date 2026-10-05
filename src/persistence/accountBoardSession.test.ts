@@ -4,7 +4,9 @@ import {
   createServerBoard, getServerBoard, getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
   type ServerBoardDocument,
 } from "../api/boards";
-import { createCardObject } from "../canvas/objects/objectFactories";
+import { createCardObject, createImageObject } from "../canvas/objects/objectFactories";
+import { getAsset } from "../assets/assetStore";
+import { uploadBoardAsset, downloadBoardAsset } from "../api/assets";
 import { useBoardStore } from "../store/boardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -35,6 +37,8 @@ vi.mock("./localBoardStorage", async (importOriginal) => ({
   saveLocalBoard: vi.fn(),
 }));
 vi.mock("./waitForLocalBoardSave", () => ({ waitForLocalBoardSave: vi.fn() }));
+vi.mock("../assets/assetStore", () => ({ getAsset: vi.fn() }));
+vi.mock("../api/assets", () => ({ uploadBoardAsset: vi.fn(), downloadBoardAsset: vi.fn() }));
 
 const ownerId = "owner-1";
 const metadata = { id: "board-1", title: "Account board", createdAt: 10, updatedAt: 20 };
@@ -116,6 +120,12 @@ beforeEach(() => {
   vi.mocked(saveServerBoardDocument).mockImplementation(async (_id, content, expected) => remote(content, expected + 1));
   vi.mocked(createServerBoard).mockResolvedValue(metadata);
   vi.mocked(renameServerBoard).mockImplementation(async (id, title) => ({ ...metadata, id, title }));
+  vi.mocked(getAsset).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+  vi.mocked(downloadBoardAsset).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+  vi.mocked(uploadBoardAsset).mockImplementation(async (boardId) => ({
+    id: "550e8400-e29b-41d4-a716-446655440010", boardId, mimeType: "image/png",
+    byteSize: 3, width: 20, height: 10, createdAt: 10,
+  }));
   queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
   session = new AccountBoardSession(queryClient);
   session.setUser(ownerId);
@@ -129,6 +139,73 @@ afterEach(() => {
   useBoardStore.setState(initialBoard);
   useDocumentStore.getState().loadDocument({});
   useSelectionStore.getState().clearSelection();
+});
+
+function localImage(assetId = "local-image") {
+  return { ...createImageObject({ assetId, center: { x: 30, y: 30 }, width: 20, height: 10,
+    originalWidth: 20, originalHeight: 10, mimeType: "image/png", name: "Draft image", zIndex: 2 }), id: assetId };
+}
+
+describe("explicit account image uploads", () => {
+  it("keeps local images out of autosave until explicit upload, without changing undo history", async () => {
+    startAccount(accountRecord(document("Saved")));
+    const image = localImage();
+    useDocumentStore.getState().addObject(image);
+    const history = useDocumentStore.getState().past;
+    await session.save();
+    expect(uploadBoardAsset).not.toHaveBeenCalled();
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    await session.uploadImages();
+    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(useDocumentStore.getState().past).toBe(history);
+    expect(useDocumentStore.getState().objects[image.id]).toEqual(image);
+    expect(useBoardStore.getState().account?.imageAssets).toEqual({ "local-image": "550e8400-e29b-41d4-a716-446655440010" });
+    expect(saveServerBoardDocument).toHaveBeenCalledWith(metadata.id,
+      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 2, expect.any(AbortSignal));
+    useDocumentStore.getState().undo();
+    await session.save();
+    useDocumentStore.getState().redo();
+    await session.save();
+    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("persists each completed upload and retries only missing images after a failure", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObjects([localImage("first"), localImage("second")]);
+    vi.mocked(uploadBoardAsset).mockResolvedValueOnce({ id: "550e8400-e29b-41d4-a716-446655440010", boardId: metadata.id,
+      mimeType: "image/png", width: 20, height: 10, byteSize: 3, createdAt: 10 }).mockRejectedValueOnce(new Error("Provider offline"));
+    await session.uploadImages();
+    expect(session.getState()).toMatchObject({ status: "error", error: "Provider offline" });
+    expect(useBoardStore.getState().account?.imageAssets).toHaveProperty("first");
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    const record = captureLocalBoard();
+    startAccount(structuredClone(record));
+    await session.uploadImages();
+    expect(uploadBoardAsset).toHaveBeenCalledTimes(3);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("uploads source-board bytes into a new board instead of reusing its asset reference", async () => {
+    const image = { ...localImage("550e8400-e29b-41d4-a716-446655440020"),
+      cloudAsset: { boardId: "source-board", assetId: "550e8400-e29b-41d4-a716-446655440020" } };
+    const record = accountRecord(document("Saved")); record.objects[image.id] = image;
+    startAccount(record);
+    await session.saveCopy();
+    expect(downloadBoardAsset).toHaveBeenCalledExactlyOnceWith("source-board", image.assetId, expect.any(AbortSignal));
+    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(saveServerBoardDocument).toHaveBeenCalledWith(metadata.id,
+      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 0, expect.any(AbortSignal));
+  });
+
+  it("does not upload while signed out or with viewer access", async () => {
+    startAccount(accountRecord());
+    useDocumentStore.getState().addObject(localImage());
+    useBoardStore.getState().setAccessRole("viewer");
+    await session.uploadImages();
+    expect(uploadBoardAsset).not.toHaveBeenCalled();
+    expect(session.getState().error).toMatch(/Editing access/);
+  });
 });
 
 describe("account draft save queue", () => {
@@ -213,6 +290,23 @@ describe("account draft save queue", () => {
     expect(useBoardStore.getState().account?.pendingSave).toEqual(record.account!.pendingSave);
     expect(useDocumentStore.getState().objects).toEqual(record.objects);
     expect(session.getState().status).toBe("conflict");
+  });
+
+  it("keeps the exact pending draft when a response arrives after local tab ownership is lost", async () => {
+    const submitted = document("Before ownership loss");
+    startAccount(accountRecord(submitted));
+    const response = deferred<ServerBoardDocument>();
+    vi.mocked(saveServerBoardDocument).mockImplementationOnce(() => response.promise);
+    const saving = session.save();
+    await drain();
+    expect(saveServerBoardDocument).toHaveBeenCalledTimes(1);
+    const pending = useBoardStore.getState().account;
+    useBoardStore.getState().setTabReadOnly(true);
+    response.resolve(remote(document("Late remote result"), 3));
+    await saving;
+    expect(useBoardStore.getState().account).toBe(pending);
+    expect(serializeDocumentSnapshot(useDocumentStore.getState().objects)).toEqual(submitted);
+    expect(vi.mocked(saveServerBoardDocument).mock.calls[0][3]?.aborted).toBe(true);
   });
 
   it("serializes edits made during a request into the next save with the accepted revision", async () => {
@@ -405,14 +499,14 @@ describe("account board transitions", () => {
     else session.expire();
     await drain();
 
-    expect(loadLocalBoard).toHaveBeenCalledExactlyOnceWith(CURRENT_BOARD_ID);
+    expect(loadLocalBoard).not.toHaveBeenCalled();
     expect(waitForLocalBoardSave).toHaveBeenCalledTimes(1);
     expect(session.getState()).toMatchObject({ userId: null, busy: false, status: "error", error: "Could not save your canvas" });
     expect(useBoardStore.getState().id).toBe(draft.id);
     expect(useDocumentStore.getState().objects).toEqual(draft.objects);
     await vi.advanceTimersByTimeAsync(1000);
     await drain();
-    expect(loadLocalBoard).toHaveBeenCalledTimes(1);
+    expect(loadLocalBoard).not.toHaveBeenCalled();
     expect(saveServerBoardDocument).not.toHaveBeenCalled();
   });
 });

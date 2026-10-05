@@ -677,11 +677,34 @@ button {
 
 .image-object-placeholder {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
+  place-content: center;
+  gap: 2px;
   color: #898a84;
   background: rgb(247 247 244 / 0.92);
   font-size: 11px;
   font-weight: 560;
+}
+
+.image-object-message {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 12px;
+}
+
+.image-object-retry {
+  pointer-events: auto;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 10px;
+  line-height: 12px;
+  cursor: pointer;
 }
 
 .image-object-placeholder[data-image-error="true"] {

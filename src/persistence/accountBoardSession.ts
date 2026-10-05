@@ -1,3 +1,4 @@
+import { boardTabCoordinator, BOARD_TAB_READ_ONLY_MESSAGE } from "./boardTabCoordinator";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
@@ -17,10 +18,17 @@ import { deserializeCanvasDocument, serializeDocumentSnapshot } from "./canvasDo
 import type { CanvasDocument } from "./canvasDocument";
 import {
   accountBoardStorageId, CURRENT_BOARD_ID, LOCAL_BOARD_SCHEMA_VERSION,
-  loadLocalBoard, saveLocalBoard, type AccountBoardLink, type LocalBoardRecord,
+  loadLocalBoard, saveLocalBoard, latestDetachedRecovery, type AccountBoardLink, type LocalBoardRecord,
 } from "./localBoardStorage";
 import { captureLocalBoard } from "./useLocalBoardPersistence";
 import { waitForLocalBoardSave } from "./waitForLocalBoardSave";
+import { getAsset } from "../assets/assetStore";
+import { uploadBoardAsset, downloadBoardAsset, MAX_CLOUD_IMAGE_BYTES } from "../api/assets";
+import { clearCloudImageAccess } from "../assets/cloudImageAccess";
+import { sendBoardPresence } from "../api/collaboration";
+import { z } from "zod";
+import { documentChanges, mergeCollaborativeDocuments, sameObject } from "./collaborationMerge";
+import { useCollaborationStore } from "../store/collaborationStore";
 
 type CloudStatus = "local" | "saved" | "unsaved" | "saving" | "conflict" | "error" | "signed-out" | "read-only";
 type SessionState = {
@@ -30,16 +38,26 @@ type SessionState = {
   error: string | null;
   hasRecovery: boolean;
   accountVersion: number;
+  imageUpload: { completed: number; total: number } | null;
 };
 
 const blankDocument = (): CanvasDocument => serializeDocumentSnapshot({});
 const sameDocument = (a: CanvasDocument, b: CanvasDocument) => JSON.stringify(a) === JSON.stringify(b);
 const titleNow = () => useBoardStore.getState().title.trim() || DEFAULT_BOARD_TITLE;
-const message = (error: unknown) => error instanceof Error ? error.message : "Couldn’t save your account board.";
+const message = (error: unknown) => error instanceof z.ZodError ? error.issues[0]?.message ?? "The draft contains an unsupported value."
+  : error instanceof Error ? error.message : "Couldn’t save your account board.";
+const accountDocument = (objects: Parameters<typeof serializeDocumentSnapshot>[0], account: AccountBoardLink) =>
+  serializeDocumentSnapshot(objects, { boardId: account.boardId, imageAssets: account.imageAssets });
+const liveRevisionSchema = z.object({ revision: z.number().int().nonnegative(), role: z.enum(["owner", "editor", "viewer"]) });
+const livePresenceSchema = z.object({ participants: z.array(z.object({
+  clientId: z.uuid(), userId: z.uuid(), displayName: z.string().max(320).nullable(),
+  cursor: z.object({ x: z.number().finite().min(-1e9).max(1e9), y: z.number().finite().min(-1e9).max(1e9) }).nullable(),
+  selectedIds: z.array(z.string().min(1).max(256)).max(100),
+})).max(32) });
 
 /** Only committed store changes enter this queue. Pointer previews stay in the editor. */
 export class AccountBoardSession {
-  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, accountVersion: 0 };
+  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, accountVersion: 0, imageUpload: null };
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private request: AbortController | null = null;
@@ -47,8 +65,16 @@ export class AccountBoardSession {
   private operationSession = 0;
   private returnToGuest = false;
   private queries: AccountBoardQueries;
+  private liveStream: EventSource | null = null;
+  private liveKey = "";
+  private liveRetry: ReturnType<typeof setTimeout> | null = null;
+  private liveAttempts = 0;
+  private liveRefreshPending = false;
+  private liveReading = false;
+  private applyingRemote = false;
+  private readonly clientId = crypto.randomUUID();
 
-  constructor(queryClient: QueryClient) {
+  constructor(queryClient: QueryClient, private live = false) {
     this.queries = new AccountBoardQueries(queryClient);
   }
 
@@ -60,9 +86,124 @@ export class AccountBoardSession {
   }
   private clearTimer() { if (this.timer !== null) clearTimeout(this.timer); this.timer = null; }
 
+  private closeLive() {
+    this.liveStream?.close(); this.liveStream = null;
+    if (this.liveRetry) clearTimeout(this.liveRetry);
+    this.liveRetry = null;
+    if (this.live) useCollaborationStore.getState().clear();
+  }
+
+  private connectLive() {
+    if (!this.live || typeof EventSource === "undefined") return;
+    const board = useBoardStore.getState();
+    const account = board.account;
+    const key = account && board.isHydrated && this.state.userId === account.ownerId
+      ? `${account.ownerId}:${account.boardId}:${board.sessionVersion}` : "";
+    if (key === this.liveKey) return;
+    this.closeLive(); this.liveKey = key; this.liveAttempts = 0;
+    if (!key || !account) return;
+    const connect = () => {
+      if (this.liveKey !== key) return;
+      useCollaborationStore.getState().setSession({ clientId: this.clientId, status: this.liveAttempts ? "reconnecting" : "connecting" });
+      const stream = new EventSource(`/api/boards/${encodeURIComponent(account.boardId)}/events?clientId=${this.clientId}`);
+      this.liveStream = stream;
+      stream.onopen = () => {
+        if (this.liveKey !== key) return;
+        this.liveAttempts = 0;
+        useCollaborationStore.getState().setSession({ clientId: this.clientId, status: "connected" });
+        this.liveRefreshPending = true; void this.refreshLive();
+      };
+      stream.addEventListener("revision", (event) => {
+        if (this.liveKey !== key) return;
+        try {
+          const data = liveRevisionSchema.parse(JSON.parse((event as MessageEvent).data));
+          this.access(data.role);
+          if (data.revision > (useBoardStore.getState().account?.revision ?? 0)) {
+            this.liveRefreshPending = true; void this.refreshLive();
+          }
+        } catch { /* Malformed hints never change durable content. */ }
+      });
+      stream.addEventListener("presence", (event) => {
+        if (this.liveKey !== key) return;
+        try {
+          const data = livePresenceSchema.parse(JSON.parse((event as MessageEvent).data));
+          useCollaborationStore.getState().setParticipants(data.participants);
+        } catch { /* A malformed presence frame is transient. */ }
+      });
+      stream.addEventListener("access", (event) => {
+        if (this.liveKey !== key) return;
+        stream.close(); this.liveStream = null;
+        useCollaborationStore.getState().clear();
+        try {
+          if (JSON.parse((event as MessageEvent).data).code === "UNAUTHENTICATED") this.expire();
+          else this.access("none");
+        } catch { this.access("none"); }
+      });
+      stream.onerror = () => {
+        stream.close(); if (this.liveKey !== key) return;
+        this.liveStream = null;
+        this.liveAttempts += 1;
+        useCollaborationStore.getState().setSession({ clientId: this.clientId, status: this.liveAttempts > 8 ? "error" : "reconnecting" });
+        if (this.liveAttempts <= 8) this.liveRetry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** (this.liveAttempts - 1)));
+      };
+    };
+    connect();
+  }
+
+  publishPresence = (cursor: { x: number; y: number } | null, selectedIds: string[]) => {
+    const board = useBoardStore.getState();
+    if (!this.live || !board.account || this.state.userId !== board.account.ownerId || board.accessRole === "none") return;
+    void sendBoardPresence(board.account.boardId, this.clientId, cursor, selectedIds).catch(() => undefined);
+  };
+
+  private applyLiveDocument(document: CanvasDocument, local: CanvasDocument, link: AccountBoardLink) {
+    const existing = useDocumentStore.getState().objects;
+    const normalized = new Map(local.content.objects.map((object) => [object.id, object]));
+    const incoming = deserializeCanvasDocument(document, link.boardId);
+    for (const object of document.content.objects) {
+      if (Object.hasOwn(existing, object.id) && sameObject(normalized.get(object.id), object)) incoming[object.id] = existing[object.id];
+    }
+    this.applyingRemote = true;
+    try { useDocumentStore.getState().applyRemoteDocument(incoming); }
+    finally { this.applyingRemote = false; }
+  }
+
+  private async refreshLive() {
+    if (!this.liveRefreshPending || this.liveReading) return;
+    if (this.state.busy || this.saving || useInteractionStore.getState().mode !== "idle") return;
+    const board = useBoardStore.getState(), link = board.account;
+    if (!link || link.ownerId !== this.state.userId || link.pendingSave || link.pendingOperation || ["conflict", "error"].includes(this.state.status)) return;
+    this.liveReading = true; this.liveRefreshPending = false;
+    const session = board.sessionVersion, controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const remote = await this.readDocument(link.boardId, controller.signal);
+      if (this.state.userId !== link.ownerId || useBoardStore.getState().sessionVersion !== session) return;
+      if (this.saving || this.state.busy || useInteractionStore.getState().mode !== "idle") { this.liveRefreshPending = true; return; }
+      this.access(remote.role ?? "owner");
+      if (remote.revision <= link.revision) return;
+      const latest = useBoardStore.getState().account!;
+      if (remote.revision <= latest.revision) return;
+      const local = accountDocument(useDocumentStore.getState().objects, latest);
+      const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
+      const merged = mergeCollaborativeDocuments(latest.savedDocument, local, document);
+      if (merged.conflicts.length) throw new BoardApiError(409, "COLLABORATION_CONFLICT", "Someone changed the same objects. Your draft stays on this device.", remote.revision);
+      this.applyLiveDocument(merged.document, local, latest);
+      useBoardStore.getState().setAccount({ ...latest, revision: remote.revision, savedDocument: document });
+      if (!useBoardStore.getState().readOnly) this.update({ status: sameDocument(merged.document, document) ? "saved" : "unsaved" });
+    } catch (error) {
+      if (this.state.userId === link.ownerId && useBoardStore.getState().sessionVersion === session) {
+        if (error instanceof BoardApiError && error.code === "BOARD_NOT_FOUND") this.access("none");
+        else this.fail(error);
+      }
+    } finally { clearTimeout(timeout); this.liveReading = false;
+      if (this.liveRefreshPending) void this.refreshLive(); }
+  }
+
   start() {
     const changed = () => {
       const board = useBoardStore.getState();
+      if (this.applyingRemote) return;
       if (!board.isHydrated || !board.account || board.readOnly) return;
       if (this.state.userId !== board.account.ownerId) { this.update({ status: "signed-out" }); return; }
       if (["conflict", "error"].includes(this.state.status)) return;
@@ -77,17 +218,30 @@ export class AccountBoardSession {
       if (state.objects !== previous.objects) changed();
     });
     const boardUnsubscribe = useBoardStore.subscribe((state, previous) => {
+      if (state.tabReadOnly && !previous.tabReadOnly) { this.clearTimer(); this.request?.abort(); }
+      if (state.sessionVersion !== previous.sessionVersion || state.isHydrated !== previous.isHydrated) this.connectLive();
       if (state.isHydrated && previous.isHydrated && state.sessionVersion === previous.sessionVersion &&
           state.title !== previous.title) changed();
     });
-    return () => { documentUnsubscribe(); boardUnsubscribe(); this.clearTimer(); this.request?.abort(); };
+    const interactionUnsubscribe = useInteractionStore.subscribe((state) => {
+      if (state.mode === "idle" && this.liveRefreshPending) void this.refreshLive();
+    });
+    const online = () => { this.closeLive(); this.liveKey = ""; this.liveAttempts = 0; this.connectLive(); };
+    if (this.live && typeof window !== "undefined") window.addEventListener("online", online);
+    this.connectLive();
+    return () => { documentUnsubscribe(); boardUnsubscribe(); interactionUnsubscribe(); this.clearTimer(); this.request?.abort(); this.closeLive();
+      if (typeof window !== "undefined") window.removeEventListener("online", online); };
   }
 
   setUser = (userId: string | null) => {
     if (userId === this.state.userId) return;
     this.clearTimer(); this.request?.abort();
     this.queries.clear();
+    clearCloudImageAccess(userId);
     this.update({ userId, error: null });
+    this.closeLive();
+    this.liveKey = "";
+    this.connectLive();
     const account = useBoardStore.getState().account;
     if (account && account.ownerId !== userId) {
       this.update({ status: "signed-out" });
@@ -107,7 +261,7 @@ export class AccountBoardSession {
 
   private access(role: BoardRole | "none") {
     const board = useBoardStore.getState();
-    const wasReadOnly = board.readOnly;
+    const wasReadOnly = board.accessRole === "viewer" || board.accessRole === "none";
     board.setAccessRole(role);
     if (role === "viewer" || role === "none") {
       this.clearTimer();
@@ -141,7 +295,10 @@ export class AccountBoardSession {
 
   private fail(error: unknown) {
     if (error instanceof BoardSignInRequired) { this.expire(); return; }
-    const conflict = error instanceof BoardApiError && error.code === "REVISION_CONFLICT";
+    const conflict = error instanceof BoardApiError && ["REVISION_CONFLICT", "COLLABORATION_CONFLICT"].includes(error.code);
+    const account = useBoardStore.getState().account;
+    if (conflict && account?.pendingOperation) useBoardStore.getState().setAccount({ ...account,
+      pendingOperation: { ...account.pendingOperation, conflicted: true } });
     this.update({ status: useBoardStore.getState().account ? (conflict ? "conflict" : "error") : "local", error: message(error) });
   }
 
@@ -162,6 +319,7 @@ export class AccountBoardSession {
       id: record.id, title: record.title, createdAt: record.createdAt,
       updatedAt: record.updatedAt, account: record.account,
     }, true);
+    useBoardStore.getState().setTabReadOnly(boardTabCoordinator.enabled && !boardTabCoordinator.owns(record.id));
     useBoardStore.getState().setAccessRole(record.account ? role : null);
     if (record.account && (role === "viewer" || role === "none")) this.access(role);
     this.operationSession = useBoardStore.getState().sessionVersion;
@@ -172,6 +330,7 @@ export class AccountBoardSession {
   private async replace(record: LocalBoardRecord, signal: AbortSignal, persist = false, role: BoardRole | "none" = "owner") {
     await waitForLocalBoardSave(signal);
     this.applyRecord(record, signal, persist, role);
+    if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(record.id);
   }
 
   private async preserveAndReplace(record: LocalBoardRecord, signal: AbortSignal, role: BoardRole | "none" = "owner") {
@@ -187,11 +346,12 @@ export class AccountBoardSession {
       if (useDocumentStore.getState().objects !== recovery.objects ||
           titleNow() !== recovery.title || useViewportStore.getState().viewport !== recovery.viewport) continue;
       this.applyRecord({ ...record, viewport: recovery.viewport }, signal, true, role);
+      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(record.id);
       return;
     }
   }
 
-  private async operation(work: (signal: AbortSignal) => Promise<void>) {
+  private async operation(work: (signal: AbortSignal) => Promise<void>, timeoutMs = 20_000) {
     if (this.state.busy) return;
     this.clearTimer();
     this.update({ busy: true, error: null });
@@ -200,7 +360,7 @@ export class AccountBoardSession {
     const controller = new AbortController();
     this.request = controller;
     this.operationSession = useBoardStore.getState().sessionVersion;
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try { await work(controller.signal); }
     catch (error) {
       if (!controller.signal.aborted) this.fail(error);
@@ -214,6 +374,8 @@ export class AccountBoardSession {
         void this.back();
       }
       else if (this.state.status === "unsaved" && !this.state.busy) void this.save();
+      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(useBoardStore.getState().id);
+      if (this.liveRefreshPending) void this.refreshLive();
     }
   }
 
@@ -236,6 +398,8 @@ export class AccountBoardSession {
     if (useBoardStore.getState().account?.boardId === board.id && useBoardStore.getState().account?.ownerId === ownerId && !useBoardStore.getState().readOnly) return;
     this.assertIdle();
     const id = accountBoardStorageId(ownerId, board.id);
+    await waitForLocalBoardSave(signal);
+    const writable = !boardTabCoordinator.enabled || !!await boardTabCoordinator.acquire(id);
     const draft = await loadLocalBoard(id);
     const remote = await this.readDocument(board.id, signal);
     if (signal.aborted || this.state.userId !== ownerId) return;
@@ -243,16 +407,16 @@ export class AccountBoardSession {
     let unsupportedDraft = false;
     let draftDocument: CanvasDocument | null = null;
     if (draft) {
-      try { draftDocument = serializeDocumentSnapshot(draft.objects); }
+      try { draftDocument = draft.account ? accountDocument(draft.objects, draft.account) : serializeDocumentSnapshot(draft.objects); }
       catch { unsupportedDraft = true; }
     }
     const dirty = draft?.account && (
-      draft.account.pendingSave || draft.title !== draft.account.savedTitle ||
+      draft.account.pendingSave || draft.account.pendingOperation || draft.title !== draft.account.savedTitle ||
       unsupportedDraft || (draftDocument !== null && !sameDocument(draftDocument, draft.account.savedDocument))
     );
     let record: LocalBoardRecord;
     let status: CloudStatus = "saved";
-    if (remote.role === "viewer" && dirty && draft) await saveLocalBoard({ ...draft, id: `${id}:recovery` });
+    if (writable && remote.role === "viewer" && dirty && draft) await saveLocalBoard({ ...draft, id: `${id}:recovery` });
     if (dirty && draft?.account && remote.role !== "viewer") {
       record = draft;
       const pending = draft.account.pendingSave;
@@ -260,24 +424,29 @@ export class AccountBoardSession {
       if (pending && remote.revision === pending.expectedRevision + 1 && sameDocument(document, pending.document)) {
         record = { ...draft, account: { ...draft.account, revision: remote.revision, savedDocument: document, pendingSave: undefined } };
         status = "unsaved";
-      } else if (remote.revision !== draft.account.revision) status = "conflict";
+      } else if (draft.account.pendingOperation) status = draft.account.pendingOperation.conflicted ? "conflict" : "error";
+      else if (remote.revision !== draft.account.revision) status = "conflict";
       else status = pending || unsupportedDraft ? "error" : "unsaved";
     } else {
       record = {
         schemaVersion: LOCAL_BOARD_SCHEMA_VERSION, id, title: board.title,
-        objects: deserializeCanvasDocument(document), viewport: draft?.viewport ?? initialViewport,
+        objects: deserializeCanvasDocument(document, board.id), viewport: draft?.viewport ?? initialViewport,
         createdAt: board.createdAt ?? Date.now(), updatedAt: Date.now(),
         account: { ownerId, boardId: board.id, revision: remote.revision, savedDocument: document, savedTitle: board.title },
       };
     }
-    await saveLocalBoard(record);
+    if (writable) await saveLocalBoard(record);
     const recovery = await loadLocalBoard(`${id}:recovery`);
+    const interrupted = boardTabCoordinator.enabled ? await latestDetachedRecovery(id) : null;
     await this.replace(record, signal, false, remote.role ?? "owner");
+    if (!signal.aborted) useBoardStore.setState({ tabRecoveryId: interrupted?.id ?? null });
     if (!signal.aborted) this.update({ status: remote.role === "viewer" ? "read-only" : remote.revision === 0 && status === "saved" ? "unsaved" : status, hasRecovery: recovery !== null,
-      error: unsupportedDraft ? "Image-containing documents are unsupported for account saves until durable asset storage is available. Your draft is kept on this device." : null });
+      error: !writable ? BOARD_TAB_READ_ONLY_MESSAGE : unsupportedDraft ? "Choose Upload pending images to save this draft’s images to your account. Your draft stays on this device." : null });
   });
 
   back = () => this.operation(async (signal) => {
+    await waitForLocalBoardSave(signal);
+    if (boardTabCoordinator.enabled) await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
     const guest = await loadLocalBoard(CURRENT_BOARD_ID);
     if (!guest) throw new Error("The local board could not be opened. Your current draft is still available.");
     await this.replace(guest, signal);
@@ -289,29 +458,94 @@ export class AccountBoardSession {
     if (!ownerId) throw new BoardSignInRequired();
     this.assertIdle();
     await waitForLocalBoardSave(signal);
-    // Validate before POST: images are kept local until durable assets exist.
-    const document = copy ? serializeDocumentSnapshot(useDocumentStore.getState().objects) : blankDocument();
+    const objects = copy ? structuredClone(useDocumentStore.getState().objects) : {};
+    // Validate the wire shape before creating a board, with temporary identities
+    // for images that this explicit action will upload to the new board.
+    const temporaryAssets = Object.fromEntries(Object.values(objects).flatMap((object) =>
+      object.type === "image" ? [[object.assetId, crypto.randomUUID()]] : []));
+    serializeDocumentSnapshot(objects, { boardId: crypto.randomUUID(), imageAssets: temporaryAssets });
+    // Missing/unsupported local files fail before creating account metadata.
+    for (const image of Object.values(objects)) {
+      if (image.type !== "image" || image.cloudAsset) continue;
+      const blob = await getAsset(image.assetId);
+      if (!blob) throw new Error(`“${image.name || "Image"}” is missing on this device. Restore its file before uploading.`);
+      if (!["image/jpeg", "image/png", "image/webp"].includes(blob.type) || blob.size < 1 || blob.size > MAX_CLOUD_IMAGE_BYTES) {
+        throw new Error("Cloud images must be JPEG, PNG or WebP and at most 5 MiB. Your local image stays on this device.");
+      }
+    }
     const title = copy ? titleNow() : DEFAULT_BOARD_TITLE;
     const remote = await this.queries.create(ownerId, title, signal);
     if (signal.aborted || this.state.userId !== ownerId) return;
     const record: LocalBoardRecord = {
       schemaVersion: LOCAL_BOARD_SCHEMA_VERSION, id: accountBoardStorageId(ownerId, remote.id),
-      title, objects: deserializeCanvasDocument(document),
+      title, objects,
       viewport: copy ? useViewportStore.getState().viewport : initialViewport,
       createdAt: remote.createdAt ?? Date.now(), updatedAt: Date.now(),
       account: { ownerId, boardId: remote.id, revision: 0, savedDocument: blankDocument(), savedTitle: title },
     };
+    if (boardTabCoordinator.enabled && !await boardTabCoordinator.acquire(record.id)) throw new Error(BOARD_TAB_READ_ONLY_MESSAGE);
     await saveLocalBoard(record);
     await this.replace(record, signal);
     if (!signal.aborted) {
       this.update({ status: "unsaved", hasRecovery: false });
+      await this.uploadImagesForActiveBoard(signal);
       // A blank new board needs an explicit first document write too.
       await this.save(true, signal);
     }
-  });
+  }, copy ? 10 * 60_000 : 20_000);
   upload = () => this.create(true);
   createBlank = () => this.create(false);
   saveCopy = () => this.create(true);
+
+  private waitForIdle(signal: AbortSignal): Promise<void> {
+    if (useInteractionStore.getState().mode === "idle") return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const finish = () => { unsubscribe(); signal.removeEventListener("abort", abort); resolve(); };
+      const abort = () => { unsubscribe(); signal.removeEventListener("abort", abort); reject(new Error("The save was interrupted. Your draft stays on this device.")); };
+      const unsubscribe = useInteractionStore.subscribe((state) => { if (state.mode === "idle") finish(); });
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+    });
+  }
+
+  /** Upload is a user action. Autosave never transfers an unuploaded image. */
+  uploadImages = () => this.operation(async (signal) => {
+    await this.uploadImagesForActiveBoard(signal);
+    await this.save(true, signal);
+  }, 10 * 60_000);
+
+  private async uploadImagesForActiveBoard(signal: AbortSignal) {
+    const board = useBoardStore.getState();
+    if (!board.account || board.account.ownerId !== this.state.userId) throw new BoardSignInRequired();
+    if (board.readOnly) throw new Error("Editing access is required to upload images.");
+    const { boardId, ownerId } = board.account;
+    const session = board.sessionVersion;
+    const current = () => !signal.aborted && this.state.userId === ownerId &&
+      useBoardStore.getState().sessionVersion === session && !useBoardStore.getState().readOnly;
+    const images = Object.values(useDocumentStore.getState().objects).filter((object) => object.type === "image");
+    const missing = [...new Map(images.filter((image) =>
+      !Object.hasOwn(board.account!.imageAssets ?? {}, image.assetId) && image.cloudAsset?.boardId !== boardId)
+      .map((image) => [image.assetId, image])).values()];
+    this.update({ imageUpload: { completed: 0, total: missing.length } });
+    try {
+      for (const [index, image] of missing.entries()) {
+        if (!current()) throw new Error("Image upload interrupted. Your draft stays on this device.");
+        const blob = image.cloudAsset
+          ? await downloadBoardAsset(image.cloudAsset.boardId, image.cloudAsset.assetId, signal)
+          : await getAsset(image.assetId);
+        if (!blob) throw new Error(`“${image.name || "Image"}” is missing on this device. Restore its file before uploading.`);
+        if (!current()) throw new Error("Image upload interrupted. Your draft stays on this device.");
+        const asset = await uploadBoardAsset(boardId, blob, signal);
+        if (!current()) throw new Error("Image upload interrupted. Your draft stays on this device.");
+        // Metadata lives outside editor history, so undo/redo keeps local blobs
+        // and retry reuses every completed upload, even after a page reload.
+        const link = useBoardStore.getState().account!;
+        useBoardStore.getState().setAccount({ ...link, imageAssets: { ...link.imageAssets, [image.assetId]: asset.id } });
+        await waitForLocalBoardSave(signal);
+        this.update({ imageUpload: { completed: index + 1, total: missing.length } });
+      }
+    } finally { this.update({ imageUpload: null }); }
+  }
 
   save = async (force = false, operationSignal?: AbortSignal): Promise<void> => {
     if (this.saving) return this.saving;
@@ -322,12 +556,25 @@ export class AccountBoardSession {
     if (controller) this.request = controller;
     const id = useBoardStore.getState().id;
     const session = useBoardStore.getState().sessionVersion;
-    const current = () => !signal.aborted && useBoardStore.getState().id === id && useBoardStore.getState().sessionVersion === session && this.state.userId === account.ownerId;
+    const current = () => !signal.aborted && !useBoardStore.getState().tabReadOnly && useBoardStore.getState().id === id && useBoardStore.getState().sessionVersion === session && this.state.userId === account.ownerId;
     const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
     this.update({ status: "saving", error: null });
     this.saving = (async () => {
       try {
         let link: AccountBoardLink = account;
+        if (link.pendingOperation) {
+          const pending = link.pendingOperation;
+          const remote = await this.queries.operation(account.ownerId, link.boardId, pending.input, signal);
+          await this.waitForIdle(signal);
+          if (!current()) return;
+          const local = accountDocument(useDocumentStore.getState().objects, link);
+          const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
+          const merged = mergeCollaborativeDocuments(pending.document, local, document);
+          link = { ...link, revision: remote.revision, savedDocument: document, pendingOperation: undefined };
+          useBoardStore.getState().setAccount(link);
+          if (merged.conflicts.length) throw new BoardApiError(409, "COLLABORATION_CONFLICT", "Someone changed the same objects. Your draft stays on this device.", remote.revision);
+          this.applyLiveDocument(merged.document, local, link);
+        }
         if (link.pendingSave) {
           const remote = await this.readDocument(link.boardId, signal);
           if (!current()) return;
@@ -339,19 +586,40 @@ export class AccountBoardSession {
           else throw new BoardApiError(409, "REVISION_CONFLICT", "This board changed elsewhere.", remote.revision);
           useBoardStore.getState().setAccount(link);
         }
-        const document = serializeDocumentSnapshot(useDocumentStore.getState().objects);
+        const document = accountDocument(useDocumentStore.getState().objects, link);
         const title = titleNow();
         if (force || link.revision === 0 || !sameDocument(document, link.savedDocument)) {
-          link = { ...link, pendingSave: { document, expectedRevision: link.revision } };
-          useBoardStore.getState().setAccount(link);
-          // Persist the submission marker before sending a write with an uncertain outcome.
-          await waitForLocalBoardSave(signal);
-          if (!current()) return;
-          if (useBoardStore.getState().readOnly) return;
-          const remote = await this.queries.save(account.ownerId, link.boardId, document, link.revision, signal);
-          if (!current()) return;
-          link = { ...link, revision: remote.revision, savedDocument: { schemaVersion: remote.schemaVersion, content: remote.content }, pendingSave: undefined };
-          useBoardStore.getState().setAccount(link);
+          if (this.live && link.revision > 0) {
+            const changes = documentChanges(link.savedDocument, document);
+            if (changes.length) {
+              const input = { operationId: crypto.randomUUID(), baseRevision: link.revision, changes };
+              link = { ...link, pendingOperation: { input, document } };
+              useBoardStore.getState().setAccount(link);
+              // Exact operation IDs survive reloads and uncertain responses.
+              await waitForLocalBoardSave(signal);
+              if (!current() || useBoardStore.getState().readOnly) return;
+              const remote = await this.queries.operation(account.ownerId, link.boardId, input, signal);
+              await this.waitForIdle(signal);
+              if (!current()) return;
+              const newest = accountDocument(useDocumentStore.getState().objects, link);
+              const accepted: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
+              const merged = mergeCollaborativeDocuments(document, newest, accepted);
+              link = { ...link, revision: remote.revision, savedDocument: accepted, pendingOperation: undefined };
+              useBoardStore.getState().setAccount(link);
+              if (merged.conflicts.length) throw new BoardApiError(409, "COLLABORATION_CONFLICT", "Someone changed the same objects. Your draft stays on this device.", remote.revision);
+              this.applyLiveDocument(merged.document, newest, link);
+            }
+          } else {
+            link = { ...link, pendingSave: { document, expectedRevision: link.revision } };
+            useBoardStore.getState().setAccount(link);
+            // Persist the submission marker before sending a write with an uncertain outcome.
+            await waitForLocalBoardSave(signal);
+            if (!current() || useBoardStore.getState().readOnly) return;
+            const remote = await this.queries.save(account.ownerId, link.boardId, document, link.revision, signal);
+            if (!current()) return;
+            link = { ...link, revision: remote.revision, savedDocument: { schemaVersion: remote.schemaVersion, content: remote.content }, pendingSave: undefined };
+            useBoardStore.getState().setAccount(link);
+          }
         }
         if (title !== link.savedTitle) {
           if (useBoardStore.getState().readOnly) return;
@@ -361,31 +629,35 @@ export class AccountBoardSession {
           useBoardStore.getState().setAccount(link);
         }
         if (!current()) return;
-        const dirty = titleNow() !== link.savedTitle || !sameDocument(serializeDocumentSnapshot(useDocumentStore.getState().objects), link.savedDocument);
+        let dirty = titleNow() !== link.savedTitle;
+        try { dirty ||= !sameDocument(accountDocument(useDocumentStore.getState().objects, link), link.savedDocument); }
+        catch { dirty = true; }
         if (!useBoardStore.getState().readOnly) this.update({ status: dirty ? "unsaved" : "saved" });
       } catch (error) {
         if (current() && error instanceof BoardApiError && ["BOARD_FORBIDDEN", "BOARD_NOT_FOUND"].includes(error.code)) this.access(error.code === "BOARD_FORBIDDEN" ? "viewer" : "none");
         else if (current()) this.fail(error);
-        else if (signal.aborted && useBoardStore.getState().id === id && this.state.userId === account.ownerId) this.update({ status: "error", error: "The save was interrupted. Retry to check whether it reached your account." });
+        else if (signal.aborted && !useBoardStore.getState().tabReadOnly && useBoardStore.getState().id === id && this.state.userId === account.ownerId) this.update({ status: "error", error: "The save was interrupted. Retry to check whether it reached your account." });
       }
     })();
     await this.saving;
     this.saving = null;
     if (timeout) clearTimeout(timeout);
     if (controller && this.request === controller) this.request = null;
+    if (this.liveRefreshPending) void this.refreshLive();
     if (current() && this.state.status === "unsaved" && !this.state.busy) void this.save();
   };
 
   reload = () => this.operation(async (signal) => {
     const board = useBoardStore.getState();
     if (!board.account || board.account.ownerId !== this.state.userId) throw new BoardSignInRequired();
+    if (board.tabReadOnly) throw new Error(BOARD_TAB_READ_ONLY_MESSAGE);
     const remote = await this.readDocument(board.account.boardId, signal);
     const metadata = (await this.queries.list(board.account.ownerId, signal)).find((item) => item.id === board.account!.boardId);
     if (!metadata) throw new Error("This account board no longer exists.");
     const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
     const record: LocalBoardRecord = {
-      ...captureLocalBoard(), title: metadata.title, objects: deserializeCanvasDocument(document),
-      account: { ...board.account, revision: remote.revision, savedDocument: document, savedTitle: metadata.title, pendingSave: undefined },
+      ...captureLocalBoard(), title: metadata.title, objects: deserializeCanvasDocument(document, board.account.boardId),
+      account: { ...board.account, revision: remote.revision, savedDocument: document, savedTitle: metadata.title, pendingSave: undefined, pendingOperation: undefined },
     };
     // Keep the current draft intact until its backup and remote read succeed.
     await this.preserveAndReplace(record, signal, remote.role ?? "owner");
@@ -397,11 +669,24 @@ export class AccountBoardSession {
   restore = () => this.operation(async (signal) => {
     const board = useBoardStore.getState();
     if (!board.account || board.account.ownerId !== this.state.userId) throw new BoardSignInRequired();
+    if (board.tabReadOnly) throw new Error(BOARD_TAB_READ_ONLY_MESSAGE);
     const recovery = await loadLocalBoard(`${board.id}:recovery`);
     if (!recovery) throw new Error("No previous draft is available on this device.");
     const record = { ...recovery, id: board.id };
     await this.preserveAndReplace(record, signal, board.accessRole ?? "none");
     if (!signal.aborted) this.update({ status: board.readOnly ? "read-only" : "conflict", hasRecovery: true });
+  });
+
+  restoreInterrupted = () => this.operation(async (signal) => {
+    const board = useBoardStore.getState();
+    if (!board.account || board.account.ownerId !== this.state.userId) throw new BoardSignInRequired();
+    if (board.tabReadOnly || !board.tabRecoveryId) throw new Error(BOARD_TAB_READ_ONLY_MESSAGE);
+    const remote = await this.readDocument(board.account.boardId, signal);
+    if (remote.role === "viewer") { this.access("viewer"); return; }
+    const recovery = await loadLocalBoard(board.tabRecoveryId);
+    if (!recovery) throw new Error("The interrupted draft is unavailable");
+    await this.preserveAndReplace({ ...recovery, id: board.id }, signal, remote.role ?? "owner");
+    this.update({ status: "conflict", hasRecovery: true });
   });
 
   rename = (board: ServerBoard, title: string) => this.operation(async (signal) => {
@@ -422,6 +707,7 @@ export class AccountBoardSession {
     await this.queries.remove(ownerId, board.id, signal);
     if (signal.aborted) return;
     if (useBoardStore.getState().account?.boardId === board.id) {
+      if (boardTabCoordinator.enabled) await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
       const guest = await loadLocalBoard();
       if (!guest) throw new Error("Deleted from your account. Your draft stays on this device.");
       await this.replace(guest, signal);
@@ -432,7 +718,7 @@ export class AccountBoardSession {
 
 export function useAccountBoardSession() {
   const queryClient = useQueryClient();
-  const [session] = useState(() => new AccountBoardSession(queryClient));
+  const [session] = useState(() => new AccountBoardSession(queryClient, true));
   const state = useSyncExternalStore(session.subscribe, session.getState);
   useEffect(() => session.start(), [session]);
   return { session, state };

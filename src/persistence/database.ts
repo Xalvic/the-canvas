@@ -1,8 +1,9 @@
 export const BOARD_STORE_NAME = "boards";
 export const ASSET_STORE_NAME = "assets";
+export const BOARD_LEASE_STORE_NAME = "board-leases";
 
 const DATABASE_NAME = "the-canvas";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -29,6 +30,9 @@ export function openCanvasDatabase(): Promise<IDBDatabase> {
       }
       if (!request.result.objectStoreNames.contains(ASSET_STORE_NAME)) {
         request.result.createObjectStore(ASSET_STORE_NAME, { keyPath: "id" });
+      }
+      if (!request.result.objectStoreNames.contains(BOARD_LEASE_STORE_NAME)) {
+        request.result.createObjectStore(BOARD_LEASE_STORE_NAME, { keyPath: "id" });
       }
     };
     request.onsuccess = () => {
