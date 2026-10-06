@@ -17,6 +17,20 @@ const boardSchema = z.object({
 });
 const boardListSchema = z.object({ boards: z.array(boardSchema) });
 const boardResponseSchema = z.object({ board: boardSchema });
+const pageRequestSchema = z.strictObject({
+  title: titleSchema,
+  requestId: z.uuid().transform((value) => value.toLowerCase()),
+  initializeDocument: z.literal(true),
+});
+const pageCreationSchema = z.object({
+  board: boardSchema.extend({ id: z.uuid() }),
+  creation: z.object({
+    requestId: z.uuid(),
+    documentRevision: z.literal(1),
+    replayed: z.boolean(),
+    expiresAt: timestamp,
+  }),
+});
 const boardDocumentSchema = canvasDocumentSchema.safeExtend({
   boardId: identifier,
   revision: z.number().int().min(1).max(MAX_DOCUMENT_REVISION),
@@ -40,6 +54,8 @@ const conflictDetailsSchema = z.object({
 
 export type ServerBoard = z.output<typeof boardSchema>;
 export type ServerBoardDocument = z.output<typeof boardDocumentSchema>;
+export type CreateServerPageInput = z.input<typeof pageRequestSchema>;
+export type ServerPageCreation = z.output<typeof pageCreationSchema>;
 
 export class BoardApiError extends Error {
   constructor(
@@ -126,6 +142,21 @@ export async function createServerBoard(title: string, signal?: AbortSignal): Pr
   const body = { title: titleSchema.parse(title) };
   const response = await boardRequest("/api/boards", mutation("POST", signal, body), "Could not create server board");
   return (await parseResponse(response, boardResponseSchema)).board;
+}
+
+// Callers persist this intent before dispatch and keep its requestId on retry.
+// Orchestration is added in M6/M7; the legacy UI still uses createServerBoard.
+export async function createServerPage(input: CreateServerPageInput, signal?: AbortSignal): Promise<ServerPageCreation> {
+  const body = pageRequestSchema.parse(input);
+  const response = await boardRequest("/api/boards", mutation("POST", signal, body), "Could not create workspace page");
+  const result = await parseResponse(response, pageCreationSchema);
+  if (result.creation.requestId !== body.requestId) {
+    throw new BoardApiError(response.status, "INVALID_RESPONSE", "The server returned a different creation request");
+  }
+  if (response.status !== (result.creation.replayed ? 200 : 201)) {
+    throw new BoardApiError(response.status, "INVALID_RESPONSE", "The server returned an unexpected creation acknowledgement");
+  }
+  return result;
 }
 
 export async function renameServerBoard(id: string, title: string, signal?: AbortSignal): Promise<ServerBoard> {

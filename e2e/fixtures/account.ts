@@ -1,6 +1,6 @@
 import { browse, closeDialogs } from "./ui";
 import { expect, type Page } from "@playwright/test";
-import type { CanvasObject, CardCanvasObject } from "../../src/canvas/objects/types";
+import type { CardCanvasObject } from "../../src/canvas/objects/types";
 import type { BoardDocument } from "../../server/documents";
 import { isDeepStrictEqual } from "node:util";
 
@@ -17,7 +17,7 @@ export function note(id: string, title: string): CardCanvasObject {
   return { id, type: "card", title, body: "", x: 300, y: 450, width: 260, height: 150, zIndex: 1, createdAt: 1, updatedAt: 1 };
 }
 
-export function savedBoard(id: string, title: string, objects: CanvasObject[] = [note(`note-${id}`, title)]): SavedBoard {
+export function savedBoard(id: string, title: string, objects: BoardDocument["content"]["objects"] = [note(`note-${id}`, title)]): SavedBoard {
   return { id, title, createdAt: 1, updatedAt: 1, document: { boardId: id, schemaVersion: 1, revision: 1, updatedAt: 1, content: { objects } } };
 }
 

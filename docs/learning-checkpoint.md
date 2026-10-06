@@ -4,6 +4,30 @@ Updated: 2026-10-06. Read once per new project session.
 
 ## Current handoff
 
+Workspace UX **M0-M3 are verified locally** on 2026-10-06. Status authority and next
+session instructions: `WORKSPACE_UX_IMPLEMENTATION_PLAN.md`, sections 6 and 9.
+Next: **M4 only**, workspace state/initialization APIs. M3 contracts and commands:
+`docs/workspace-ux-m3.md`. POST /api/boards adds actor/request receipts and an atomic
+blank document at revision 1; legacy {title} creation remains unchanged. Replay
+confirms original creation without resetting current title/content. Fresh document
+reads precede recovered editing; 90-day expiry/deletion return terminal 410 and
+retained identities prevent recreation. Typed createServerPage leaves stable intent
+persistence to M6/M7. Current UI still uses the legacy path.
+Migration 9 was applied only to disposable schemas; next unused number is 10.
+Verified 120 focused HTTP/client cases, 83 real PostgreSQL checks including actual
+API process restarts, SQL/Prisma no-drift, both builds and targeted typechecks.
+All 12 normal public tables/14 rows have unchanged fingerprints; zero disposable
+schemas remain. Docker 5434 is left running. M0-M3 changes are included in the
+user-authorized local commit; M2's IndexedDB v4 journals/guest handoff contract is in
+`docs/workspace-ux-m2.md`. Retain its v4-capable opener on rollback; physical
+sleep/native IME remain M11. M4 initialization must reuse the actor-row lock in one
+transaction. User authorized committing all current updates on 2026-10-06;
+future commits need fresh approval. No normal/production migration, push,
+provider change or deployment. Stop after the selected milestone and save its
+handoff.
+
+## Previous pen handoff
+
 Pen drawing update is implemented locally on 2026-10-06. Guide and validation:
 `docs/pen-drawing-validation.md`. The root `PEN_DRAWING_UPDATE_PLAN.md` is still
 ignored/untracked and records progress. Single pointer ownership, provisional

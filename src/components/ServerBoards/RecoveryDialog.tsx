@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AccountBoardSession } from "../../persistence/accountBoardSession";
 import { getServerBoard } from "../../api/boards";
 import { useBoardStore } from "../../store/boardStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { useCollaborationStore } from "../../store/collaborationStore";
 import { BOARD_TAB_READ_ONLY_MESSAGE } from "../../persistence/boardTabCoordinator";
-import { reopenLocalBoard, restoreInterruptedLocalBoard, retryLocalBoardSave } from "../../persistence/useLocalBoardPersistence";
+import { continueGuestEditing, reopenLocalBoard, restoreInterruptedLocalBoard, retryLocalBoardSave } from "../../persistence/useLocalBoardPersistence";
 import { Dialog } from "../Dialog";
 import type { SaveFlowKind } from "./SaveFlow";
 
@@ -17,6 +17,7 @@ export function RecoveryDialog({ open, close, session, save, pendingImages }: { 
   const [confirmReload, setConfirmReload] = useState(false);
   const [reopening, setReopening] = useState(false);
   const account = board.account;
+  useEffect(() => { if (open) void session.refreshEditorDrafts(); }, [open, session, board.id]);
   const deviceFailed = board.saveStatus === "error" && board.saveError !== BOARD_TAB_READ_ONLY_MESSAGE;
   const localAction = (action: () => Promise<void>) => { void action().catch((error: unknown) => useBoardStore.getState().markSaveError(error instanceof Error ? error.message : "Could not restore the device draft")); };
   const reopen = async () => {
@@ -39,8 +40,9 @@ export function RecoveryDialog({ open, close, session, save, pendingImages }: { 
     {board.saveError && <p role="alert">{board.saveError}</p>}
     {state.error && state.error !== board.saveError && <p role="alert">{state.error}</p>}
     {historyError && <p role="alert">{historyError}</p>}
-    {board.tabReadOnly && <section><h3>Editing in another tab</h3><p>{BOARD_TAB_READ_ONLY_MESSAGE} Reopening reads the latest draft and permissions. Close the other writer first.</p><button type="button" disabled={state.busy || reopening || (!!account && !state.userId)} onClick={() => void reopen()}>{reopening ? "Reopening…" : "Reopen here"}</button></section>}
-    {board.saveStatus === "error" && !board.tabReadOnly && <button type="button" onClick={retryLocalBoardSave}>Retry device save</button>}
+    {!account && board.tabReadOnly && ["passive", "contended", "unverified"].includes(board.tabOwnership) && <section><h3>Shared device drawing</h3><p>This view follows the saved drawing. Continue here after the other tab finishes its current edit.</p><button type="button" onClick={() => void continueGuestEditing()}>Continue editing here</button></section>}
+    {account && board.tabReadOnly && (board.tabOwnership === "contended" || board.tabOwnership === "unverified") && <section><h3>Editing access needs checking</h3><p>Reopening checks your editor draft and current permissions.</p><button type="button" disabled={state.busy || reopening || !state.userId} onClick={() => void reopen()}>{reopening ? "Reopening…" : "Reopen here"}</button></section>}
+    {board.saveStatus === "error" && (!board.tabReadOnly || board.tabOwnership === "unavailable") && <button type="button" onClick={retryLocalBoardSave}>Retry device save</button>}
     {account && state.userId && !board.readOnly && state.status === "error" && <button className="primary-action" type="button" disabled={state.busy} onClick={() => void session.save()}>Retry account save</button>}
     {account && pendingImages > 0 && <p>{pendingImages} {pendingImages === 1 ? "image is" : "images are"} still waiting to upload; the account document does not contain these files yet.</p>}
     {account && state.userId && !board.readOnly && pendingImages > 0 && <button type="button" disabled={state.busy} onClick={() => save("images")}>Upload and save</button>}
@@ -51,6 +53,7 @@ export function RecoveryDialog({ open, close, session, save, pendingImages }: { 
     </section>}
     {state.userId && account && state.hasRecovery && <section><h3>Previous draft</h3><p>Restore the previous backup made before using the account version. Your current content is backed up before replacement; this does not overwrite the account version.</p><button type="button" disabled={state.busy || board.tabReadOnly} onClick={() => void session.restore()}>Restore previous draft</button></section>}
     {board.tabRecoveryId && !board.readOnly && <section><h3>Interrupted draft</h3><p>Restore the draft captured when this tab lost its editing lease. Current content is backed up before replacement.</p><button type="button" disabled={state.busy} onClick={() => { if (account) void session.restoreInterrupted(); else localAction(restoreInterruptedLocalBoard); }}>Restore interrupted draft</button></section>}
+    {account && state.editorDrafts.length > 0 && <section><h3>Other editor drafts</h3><p>Pending work from other editors on this device is kept separately. A draft can be recovered after its editor releases it.</p>{state.editorDrafts.map((draft, index) => <button key={draft.id} type="button" disabled={state.busy || board.readOnly} onClick={() => void session.restoreEditorDraft(draft.id)}>Recover draft {index + 1}: {draft.title}</button>)}</section>}
     {state.busy && <p role="status">Updating board…</p>}
     {state.imageUpload && <p role="status">Uploading images… {state.imageUpload.completed}/{state.imageUpload.total}</p>}
     <Dialog open={confirmReload} title="Use account version" close={() => setConfirmReload(false)}>

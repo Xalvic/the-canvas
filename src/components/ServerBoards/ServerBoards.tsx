@@ -25,6 +25,7 @@ export function ServerBoards() {
   const accessRole = useBoardStore((board) => board.accessRole);
   const tabRecoveryId = useBoardStore((board) => board.tabRecoveryId);
   const tabReadOnly = useBoardStore((board) => board.tabReadOnly);
+  const tabOwnership = useBoardStore((board) => board.tabOwnership);
   const readOnly = useBoardStore((board) => board.readOnly);
   const boardTitle = useBoardStore((board) => board.title);
   const objects = useDocumentStore((document) => document.objects);
@@ -41,7 +42,7 @@ export function ServerBoards() {
   const [saveFlow, setSaveFlow] = useState<SaveFlowKind | null>(null);
   const [accountOpenRequest, setAccountOpenRequest] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const status = savePresentation({ local: localSaveStatus, localError: localSaveError, cloud: accountBoards.status, account: !!activeAccount, role: accessRole, tabReadOnly, pendingImages, recovery: !!tabRecoveryId || accountBoards.hasRecovery });
+  const status = savePresentation({ local: localSaveStatus, localError: localSaveError, cloud: accountBoards.status, account: !!activeAccount, role: accessRole, tabReadOnly, tabOwnership, pendingImages, recovery: !!tabRecoveryId || accountBoards.hasRecovery });
 
   useEffect(() => useUiStore.subscribe((next, previous) => {
     if (next.activeTool !== previous.activeTool && window.matchMedia("(max-width: 767px)").matches) {

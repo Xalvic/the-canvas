@@ -48,7 +48,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL sharing and roles", () => {
   it("rolls a failed sharing migration back and safely retries with existing content intact", async () => {
     const { board, owner, documents } = await setup();
     const before = await documents.get(board.id, owner.id);
-    await pool.query("DROP TABLE api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members; DELETE FROM schema_migrations WHERE version >= 5; CREATE TABLE board_invitations (sentinel text)");
+    await pool.query("DROP TABLE board_creation_receipts, api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members; DELETE FROM schema_migrations WHERE version >= 5; CREATE TABLE board_invitations (sentinel text)");
     await expect(migrateDatabase(pool)).rejects.toThrow();
     expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map((row) => row.version)).toEqual([1, 2, 3, 4]);
     expect((await pool.query("SELECT to_regclass('board_members') AS members")).rows[0].members).toBeNull();

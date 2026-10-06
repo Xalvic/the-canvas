@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { BoardTabCoordinator, BoardTabReadOnlyError, BOARD_LEASE_DURATION_MS } from "./boardTabCoordinator";
-import { BOARD_STORE_NAME, BOARD_LEASE_STORE_NAME, ASSET_STORE_NAME, openCanvasDatabase } from "./database";
+import { BOARD_STORE_NAME, BOARD_LEASE_STORE_NAME, ASSET_STORE_NAME, EDITOR_JOURNAL_STORE_NAME, openCanvasDatabase } from "./database";
 
 let database: IDBDatabase;
 let now = 1000;
@@ -30,7 +30,7 @@ function read(id: string) {
   });
 }
 describe("atomic cross-tab board leases", () => {
-  it("adds only the lease store when upgrading existing guest boards and image blobs", async () => {
+  it("adds lease and editor-journal stores without rewriting existing guest boards and image blobs", async () => {
     const factory = new IDBFactory();
     const original = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = factory.open("the-canvas", 2);
@@ -53,8 +53,8 @@ describe("atomic cross-tab board leases", () => {
     vi.stubGlobal("indexedDB", factory);
     const upgraded = await openCanvasDatabase();
     try {
-      expect(upgraded.version).toBe(3);
-      expect([...upgraded.objectStoreNames].sort()).toEqual([ASSET_STORE_NAME, BOARD_LEASE_STORE_NAME, BOARD_STORE_NAME].sort());
+      expect(upgraded.version).toBe(4);
+      expect([...upgraded.objectStoreNames].sort()).toEqual([ASSET_STORE_NAME, BOARD_LEASE_STORE_NAME, BOARD_STORE_NAME, EDITOR_JOURNAL_STORE_NAME].sort());
       const transaction = upgraded.transaction([BOARD_STORE_NAME, ASSET_STORE_NAME]);
       const board = transaction.objectStore(BOARD_STORE_NAME).get("current-board");
       const asset = transaction.objectStore(ASSET_STORE_NAME).get("existing-image");
@@ -89,12 +89,92 @@ describe("atomic cross-tab board leases", () => {
     await second.write("guest", [{ id: "guest", value: "new writer" }]);
     expect(await read("guest")).toEqual({ id: "guest", value: "new writer" });
   });
-  it("cannot silently renew an expired lease before loading the current board again", async () => {
+  it("renews a sole expired writer with its unchanged token and no ownership loss", async () => {
+    const changes = vi.fn(); first.subscribe(changes);
+    const lease = await first.acquire("guest");
+    changes.mockClear();
+    now += BOARD_LEASE_DURATION_MS + 1;
+    expect(await first.renew("guest")).toBe(true);
+    expect(first.owns("guest")).toBe(true);
+    expect((await first.acquire("guest"))?.token).toBe(lease?.token);
+    expect(changes).not.toHaveBeenCalled();
+    expect(await second.acquire("guest")).toBeNull();
+  });
+  it("atomically extends an unchanged expired token while writing, before a fallback contender claims", async () => {
     await first.acquire("guest");
     now += BOARD_LEASE_DURATION_MS + 1;
+    const [written, claimed] = await Promise.all([
+      first.write("guest", [{ id: "guest", value: "resumed sole writer" }]), second.acquire("guest"),
+    ]);
+    expect(written).toBeUndefined();
+    expect(claimed).toBeNull();
+    expect(await read("guest")).toEqual({ id: "guest", value: "resumed sole writer" });
+  });
+  it("rejects renewal after an intervening writer, even after that writer's lease expires", async () => {
+    await first.acquire("guest");
+    now += BOARD_LEASE_DURATION_MS + 1;
+    await second.acquire("guest");
+    await second.write("guest", [{ id: "guest", value: "new owner" }]);
+    now += BOARD_LEASE_DURATION_MS + 1;
     expect(await first.renew("guest")).toBe(false);
+    expect(first.status("guest")).toBe("unverified");
+    await expect(first.write("guest", [{ id: "guest", value: "stale" }])).rejects.toBeInstanceOf(BoardTabReadOnlyError);
+    expect(await read("guest")).toEqual({ id: "guest", value: "new owner" });
+  });
+  it("distinguishes a missing lease from proof of another writer", async () => {
+    await first.acquire("guest");
+    await new Promise<void>((resolve) => {
+      const transaction = database.transaction(BOARD_LEASE_STORE_NAME, "readwrite");
+      transaction.objectStore(BOARD_LEASE_STORE_NAME).delete("guest");
+      transaction.oncomplete = () => resolve();
+    });
+    expect(await first.renew("guest")).toBe(false);
+    expect(first.status("guest")).toBe("unverified");
     expect(first.owns("guest")).toBe(false);
-    expect(await second.acquire("guest")).not.toBeNull();
+  });
+  it("keeps its token through failed storage reads and writes and resumes without a lost event", async () => {
+    let unavailable = false;
+    first = new BoardTabCoordinator(async () => {
+      if (unavailable) throw new Error("Device storage unavailable");
+      return database;
+    }, () => now, "first", null);
+    const changes = vi.fn(); first.subscribe(changes);
+    const lease = await first.acquire("guest");
+    unavailable = true;
+    expect(await first.renew("guest")).toBe(false);
+    expect(first.status("guest")).toBe("unavailable");
+    expect(first.owns("guest")).toBe(false);
+    await expect(first.write("guest", [{ id: "guest", value: "pending" }])).rejects.toThrow("Device storage unavailable");
+    expect(changes.mock.calls.every(([event]) => !event.lost)).toBe(true);
+    unavailable = false;
+    now += BOARD_LEASE_DURATION_MS + 1;
+    expect(await first.renew("guest")).toBe(true);
+    expect((await first.acquire("guest"))?.token).toBe(lease?.token);
+    await first.write("guest", [{ id: "guest", value: "recovered" }]);
+    expect(await read("guest")).toEqual({ id: "guest", value: "recovered" });
+  });
+  it("reports initial storage failure as unavailable without proving contention", async () => {
+    first = new BoardTabCoordinator(async () => { throw new Error("Cannot open storage"); }, () => now, "first", null);
+    await expect(first.acquire("guest")).rejects.toThrow("Cannot open storage");
+    expect(first.status("guest")).toBe("unavailable");
+  });
+  it("does not steal a still-held Web Lock when its durable heartbeat is old", async () => {
+    const names = new Set<string>();
+    const locks = { request: async (name: string, _options: LockOptions, callback: (lock: Lock | null) => Promise<void>) => {
+      if (names.has(name)) return callback(null);
+      names.add(name);
+      try { await callback({ name, mode: "exclusive" } as Lock); }
+      finally { names.delete(name); }
+    } } as unknown as LockManager;
+    first = new BoardTabCoordinator(async () => database, () => now, "first", locks);
+    second = new BoardTabCoordinator(async () => database, () => now, "second", locks);
+    await first.acquire("guest");
+    now += BOARD_LEASE_DURATION_MS + 1;
+    expect(await second.acquire("guest")).toBeNull();
+    expect(second.status("guest")).toBe("contended");
+    expect(await first.renew("guest")).toBe(true);
+    await first.write("guest", [{ id: "guest", value: "original owner" }]);
+    expect(await read("guest")).toEqual({ id: "guest", value: "original owner" });
   });
   it("guards the canonical recovery record with its base lease and disallows unrelated writes", async () => {
     await first.acquire("account");

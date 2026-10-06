@@ -1,11 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-export const createBoardSchema = z.strictObject({
+export const renameBoardSchema = z.strictObject({
   title: z.string().trim().min(1).max(120),
 });
 
-export const renameBoardSchema = createBoardSchema;
+export const createPageSchema = renameBoardSchema.safeExtend({
+  requestId: z.uuid().transform((value) => value.toLowerCase()),
+  initializeDocument: z.literal(true),
+});
+// The old metadata-only request remains valid. Creation-only fields must be
+// supplied together and never become accepted rename fields.
+export const createBoardSchema = z.union([renameBoardSchema, createPageSchema]);
+export type CreatePageInput = z.output<typeof createPageSchema>;
 
 export const boardIdSchema = z.uuid();
 
@@ -18,11 +25,25 @@ export type BoardMetadata = {
   role?: BoardRole;
 };
 
+export type BoardCreationResult = {
+  board: BoardMetadata;
+  creation: {
+    requestId: string;
+    // This is the original blank document's revision, not its current revision.
+    documentRevision: 1;
+    replayed: boolean;
+    expiresAt: number;
+  };
+};
+
 // HTTP handlers await either the test fixture or the PostgreSQL implementation.
 export interface BoardStore {
   list(ownerId: string): BoardMetadata[] | Promise<BoardMetadata[]>;
   get(id: string, ownerId: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
   create(title: string, ownerId: string): BoardMetadata | Promise<BoardMetadata>;
+  // Legacy in-memory fixtures implement metadata only; the durable store owns
+  // the transaction spanning metadata, the blank document, and the receipt.
+  createPage?(input: CreatePageInput, ownerId: string): Promise<BoardCreationResult>;
   rename(id: string, title: string, ownerId: string): BoardMetadata | undefined | Promise<BoardMetadata | undefined>;
   delete(id: string, ownerId: string): boolean | Promise<boolean>;
 }

@@ -1,7 +1,7 @@
-import { browse, closeDialogs, details, newAccountBoard } from "../e2e/fixtures/ui";
+import { newAccountBoard } from "../e2e/fixtures/ui";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
-import { BASE_URL, canvasState, createNote, editNote, flushLocalDraft, mutationHeaders, openBoard, signIn, state } from "./fixture";
+import { BASE_URL, canvasState, createNote, flushLocalDraft, mutationHeaders, openBoard, signIn, state } from "./fixture";
 
 async function tabState(page: Page) {
   return page.evaluate(async () => {
@@ -17,7 +17,7 @@ async function localRecord(page: Page, id?: string) {
   }, id);
 }
 
-test("same-device guest tabs have one writer and explicit takeover reloads the latest IndexedDB objects and viewport", async ({ page, context }) => {
+test("same-device guest tabs synchronize and automatically hand off the latest IndexedDB objects and viewport", async ({ page, context }) => {
   await page.goto("/scribble/");
   await createNote(page, "Latest guest note", 450, 560);
   await page.evaluate(async () => {
@@ -28,39 +28,32 @@ test("same-device guest tabs have one writer and explicit takeover reloads the l
   const before = await localRecord(page);
   const other = await context.newPage();
   await other.goto("/scribble/");
-  await details(other);
-  await expect(other.getByRole("button", { name: "Reopen here", exact: true })).toBeVisible();
-  await closeDialogs(other);
-  await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
-  await other.evaluate(async () => {
+  await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
+  expect((await canvasState(other)).objects).toEqual(Object.values(before!.objects));
+  expect((await tabState(page)).readOnly).toBe(true);
+  await page.evaluate(async () => {
     const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
     const { useBoardStore } = await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts");
     useDocumentStore.getState().deleteObjects(Object.keys(useDocumentStore.getState().objects));
     useBoardStore.getState().setTitle("Stale tab overwrite");
   });
   expect(await localRecord(other)).toEqual(before);
-  await details(other);
-  await other.getByRole("button", { name: "Reopen here", exact: true }).click();
-  await closeDialogs(other);
-  expect((await tabState(other)).readOnly).toBe(true);
-  await page.close();
-  await details(other);
-  await other.getByRole("button", { name: "Reopen here", exact: true }).click();
-  await closeDialogs(other);
-  await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
-  expect((await canvasState(other)).objects).toEqual(Object.values(before!.objects));
   const viewport = await other.evaluate(async () => {
     const { useViewportStore } = await import(/* @vite-ignore */ "/scribble/src/store/viewportStore.ts");
     return useViewportStore.getState().viewport;
   });
   expect(viewport).toEqual(before!.viewport);
   await other.getByRole("button", { name: "Reset viewport", exact: true }).click();
-  await createNote(other, "After takeover", 790, 550);
+  await createNote(other, "After handoff", 790, 550);
   await flushLocalDraft(other);
-  expect(Object.values((await localRecord(other))!.objects)).toHaveLength(2);
+  await expect.poll(async () => (await canvasState(page)).objects).toEqual((await canvasState(other)).objects);
+  await page.bringToFront();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
+  expect((await tabState(other)).readOnly).toBe(true);
 });
 
-test("same-account tabs protect the canonical draft; different boards can edit and reopening rechecks actual API permission", async ({ page, context }) => {
+test("same-account tabs edit simultaneously through operations and SSE while different pages keep isolated journals", async ({ page, context }) => {
   await signIn(context.request);
   const title = `Tab account-${randomUUID()}`;
   const response = await context.request.post(`${BASE_URL}/api/boards`, { headers: mutationHeaders, data: { title } });
@@ -68,44 +61,30 @@ test("same-account tabs protect the canonical draft; different boards can edit a
   expect((await context.request.put(`${BASE_URL}/api/boards/${boardId}/document`, {
     headers: mutationHeaders, data: { schemaVersion: 1, expectedRevision: 0, content: { objects: [] } },
   })).status()).toBe(201);
-  await page.goto("/scribble/");
-  await openBoard(page, title);
-  await createNote(page, "Owner tab note", 450, 560);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
-  await flushLocalDraft(page);
-  const id = (await tabState(page)).id;
-  const before = await localRecord(page, id);
-  const other = await context.newPage();
-  await other.goto("/scribble/");
-  await openBoard(other, title);
-  await details(other);
-  await expect(other.getByRole("button", { name: "Reopen here", exact: true })).toBeVisible();
-  await closeDialogs(other);
-  await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
-  expect(await localRecord(other, id)).toEqual(before);
-  await newAccountBoard(other);
-  await expect.poll(async () => (await canvasState(other)).account?.boardId).not.toBe(boardId);
+  await page.goto("/scribble/"); await openBoard(page, title);
+  const other = await context.newPage(); await other.goto("/scribble/"); await openBoard(other, title);
+  await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
   await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
-  await createNote(other, "Different board note", 790, 560);
+  const keys = await Promise.all([page, other].map((tab) => tab.evaluate(async () => {
+    const { useBoardStore } = await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts");
+    const { accountEditorJournals } = await import(/* @vite-ignore */ "/scribble/src/persistence/accountEditorJournals.ts");
+    return { key: accountEditorJournals.leaseId(useBoardStore.getState().id), editor: accountEditorJournals.editorId };
+  })));
+  expect(keys[0].key).not.toBe(keys[1].key); expect(keys[0].editor).not.toBe(keys[1].editor);
+  await Promise.all([createNote(page, "First editor note", 450, 560), createNote(other, "Second editor note", 790, 560)]);
+  const titles = (objects: any[]) => objects.filter((object) => object.type === "card").map((object) => object.title).sort();
+  await expect.poll(async () => titles((await state(context.request, boardId)).document!.content.objects), { timeout: 12000 }).toEqual(["First editor note", "Second editor note"]);
+  await expect.poll(async () => titles((await canvasState(page)).objects)).toEqual(["First editor note", "Second editor note"]);
+  await expect.poll(async () => titles((await canvasState(other)).objects)).toEqual(["First editor note", "Second editor note"]);
+  await page.getByRole("button", { name: /^Undo / }).click();
+  await page.getByRole("button", { name: /^Undo / }).click();
+  await expect.poll(async () => titles((await state(context.request, boardId)).document!.content.objects)).toEqual(["Second editor note"]);
+  await newAccountBoard(other); await createNote(other, "Different page", 790, 560);
   await expect(other.locator(".save-status")).toHaveText("Saved to account");
   expect((await tabState(page)).readOnly).toBe(false);
   await openBoard(other, title);
-  await details(other);
-  await expect(other.getByRole("button", { name: "Reopen here", exact: true })).toBeVisible();
-  await closeDialogs(other);
-  await editNote(page, "Owner tab note", "Fresh owner edit");
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
-  await flushLocalDraft(page);
-  await page.close();
-  let reads = 0;
-  other.on("request", (request) => { if (request.method() === "GET" && request.url().endsWith(`/api/boards/${boardId}/document`)) reads++; });
-  await details(other);
-  await other.getByRole("button", { name: "Reopen here", exact: true }).click();
-  await closeDialogs(other);
   await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
-  expect(reads).toBeGreaterThan(0);
-  expect((await canvasState(other)).objects.some((object) => object.type === "card" && object.title === "Fresh owner edit")).toBe(true);
-  expect((await state(context.request, boardId)).document!.content.objects).toEqual((await canvasState(other)).objects);
+  expect(titles((await canvasState(other)).objects)).toEqual(["Second editor note"]);
 });
 
 test("a stale writer loses mutations and history; its interrupted draft stays under a unique recovery key", async ({ page }) => {

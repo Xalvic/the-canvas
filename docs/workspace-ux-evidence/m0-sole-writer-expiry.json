@@ -1,0 +1,26 @@
+{
+  "activeCoordinators": 1,
+  "webLocks": false,
+  "clockAdvanceMs": 20001,
+  "ownedBefore": true,
+  "renewed": false,
+  "ownedAfter": false,
+  "ownershipEvents": [
+    {
+      "id": "current-board",
+      "owned": true,
+      "lost": false
+    },
+    {
+      "id": "current-board",
+      "owned": false,
+      "lost": true
+    }
+  ],
+  "presentation": {
+    "label": "Editing in another tab",
+    "attention": true
+  },
+  "canonicalRecordUnchanged": true,
+  "limitation": "Deterministic injected-clock reproduction; not a measurement of browser timer throttling."
+}

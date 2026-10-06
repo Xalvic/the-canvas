@@ -1,10 +1,24 @@
 # Scribble learning progress
 
-Updated: 2026-10-05. Record milestones and substantial implementation changes
+Updated: 2026-10-06. Record milestones and substantial implementation changes
 only. No individual questions, answers, or understanding assessments.
 
 Start with [the compact checkpoint](learning-checkpoint.md). Use relevant
 sections of [the learning plan](learning-plan.md) when needed.
+
+Workspace UX M0-M3 are implemented/verified locally. M3 adds retry-safe page
+creation with actor/request receipts, an atomic blank revision-one document,
+legacy compatibility and typed client support. Replay preserves later edits;
+expired/deleted requests are terminal and retain identity. Migration 9 was tested
+only in disposable schemas; normal data is unchanged. Verified 120 focused
+HTTP/client cases, 83 real PostgreSQL checks including actual API process restarts,
+SQL/Prisma no-drift, both builds and targeted typechecks. Contracts/commands:
+`workspace-ux-m3.md`. This records implementation, not a new assessment milestone.
+M2's guest handoff and independent IndexedDB v4 account journals remain preserved;
+their contracts/evidence are in `workspace-ux-m2.md`. Next: M4 workspace state and
+initialization; no M4 implementation yet. M0-M3 changes are included in the
+user-authorized local commit of all current updates (2026-10-06). No push/deployment;
+future commits require fresh approval.
 
 ## Covered
 

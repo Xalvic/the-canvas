@@ -1,4 +1,5 @@
 import { boardTabCoordinator } from "./boardTabCoordinator";
+import { accountEditorJournals } from "./accountEditorJournals";
 import type { CanvasObject } from "../canvas/objects/types";
 import type { Viewport } from "../canvas/viewport/viewportMath";
 import type { DocumentSnapshot } from "../store/documentStore";
@@ -212,7 +213,7 @@ export function parseLocalBoard(value: unknown): LocalBoardRecord | null {
   return value as LocalBoardRecord;
 }
 
-export async function loadLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardRecord | null> {
+export async function loadLegacyLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardRecord | null> {
   const database = await openCanvasDatabase();
   const transaction = database.transaction(BOARD_STORE_NAME, "readonly");
   const rawBoard = await requestResult(
@@ -225,8 +226,20 @@ export async function loadLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardR
   return board;
 }
 
+export async function loadLocalBoard(id = CURRENT_BOARD_ID): Promise<LocalBoardRecord | null> {
+  const base = id.endsWith(":recovery") ? id.slice(0, -9) : id;
+  if (boardTabCoordinator.enabled && accountEditorJournals.leaseId(base) !== base) {
+    if (id === base) return accountEditorJournals.read(base);
+    return await accountEditorJournals.recovery(base) ?? loadLegacyLocalBoard(id);
+  }
+  return loadLegacyLocalBoard(id);
+}
+
 export async function saveLocalBoard(board: LocalBoardRecord): Promise<void> {
   if (boardTabCoordinator.enabled) {
+    if (board.account && (board.id === accountBoardStorageId(board.account.ownerId, board.account.boardId) || board.id.endsWith(":recovery"))) {
+      return accountEditorJournals.save(board);
+    }
     const leaseId = board.id.endsWith(":recovery") ? board.id.slice(0, -":recovery".length) : board.id;
     return boardTabCoordinator.write(leaseId, [board]);
   }

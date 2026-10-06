@@ -1,9 +1,10 @@
 export const BOARD_STORE_NAME = "boards";
 export const ASSET_STORE_NAME = "assets";
 export const BOARD_LEASE_STORE_NAME = "board-leases";
+export const EDITOR_JOURNAL_STORE_NAME = "editor-journals";
 
 const DATABASE_NAME = "the-canvas";
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -22,7 +23,7 @@ export function openCanvasDatabase(): Promise<IDBDatabase> {
     return Promise.reject(new Error("IndexedDB is not available"));
   }
 
-  databasePromise = new Promise((resolve, reject) => {
+  databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(BOARD_STORE_NAME)) {
@@ -33,6 +34,9 @@ export function openCanvasDatabase(): Promise<IDBDatabase> {
       }
       if (!request.result.objectStoreNames.contains(BOARD_LEASE_STORE_NAME)) {
         request.result.createObjectStore(BOARD_LEASE_STORE_NAME, { keyPath: "id" });
+      }
+      if (!request.result.objectStoreNames.contains(EDITOR_JOURNAL_STORE_NAME)) {
+        request.result.createObjectStore(EDITOR_JOURNAL_STORE_NAME, { keyPath: "id" });
       }
     };
     request.onsuccess = () => {
@@ -50,6 +54,11 @@ export function openCanvasDatabase(): Promise<IDBDatabase> {
       databasePromise = null;
       reject(new Error("Local canvas storage is open in an older tab"));
     };
+  }).catch((error) => {
+    // open() can also throw synchronously (for example while storage is denied).
+    // Do not cache that rejection: an explicit retry must be able to open again.
+    databasePromise = null;
+    throw error;
   });
 
   return databasePromise;

@@ -82,7 +82,7 @@ import {
   type Point,
   type Viewport,
 } from "./viewportMath";
-import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "./pointerInteractionEvents";
+import { CANCEL_TOUCH_INTERACTIONS_EVENT, COMMIT_CANVAS_INTERACTIONS_EVENT, REQUEST_GUEST_EDIT_EVENT } from "./pointerInteractionEvents";
 
 type PanInteraction = {
   pointerId: number;
@@ -397,9 +397,11 @@ export function CanvasViewport() {
     };
     const visibility = () => { if (document.hidden) interrupt(); };
     window.addEventListener("blur", interrupt);
+    window.addEventListener(COMMIT_CANVAS_INTERACTIONS_EVENT, interrupt);
     document.addEventListener("visibilitychange", visibility);
     return () => {
       window.removeEventListener("blur", interrupt);
+      window.removeEventListener(COMMIT_CANVAS_INTERACTIONS_EVENT, interrupt);
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [settleStroke]);
@@ -1221,6 +1223,10 @@ export function CanvasViewport() {
   const handleViewportPointerDownCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const board = useBoardStore.getState();
+    if (!board.account && board.tabReadOnly && event.button === 0 && !isSpacePressed && selectedTool !== "hand") {
+      window.dispatchEvent(new Event(REQUEST_GUEST_EDIT_EVENT));
+    }
     // IDs may be reused after a real lift, including a rejected contact.
     ignoredContactsRef.current.delete(event.pointerId);
     const target = event.target;

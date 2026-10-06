@@ -51,7 +51,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
   }
 
   async function expectVersions() {
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }]);
   }
 
   it("installs all versions on a fresh schema even with concurrent runners", async () => {
@@ -119,6 +119,46 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
     await pool.query("DELETE FROM boards WHERE id = $1", [board.id]);
     expect((await pool.query("SELECT board_id FROM board_documents ORDER BY board_id")).rows).toEqual([{ board_id: other.id }]);
     expect((await pool.query("SELECT * FROM boards")).rows).toEqual([other]);
+  });
+
+  it("upgrades version 8 without changing any existing data and rolls back a failed creation-receipt migration", async () => {
+    await migrateDatabase(pool);
+    // In this disposable schema only, remove the unused additive table/ledger
+    // row to reproduce the actual version-eight upgrade boundary.
+    await pool.query("DROP TABLE board_creation_receipts; DELETE FROM schema_migrations WHERE version=9");
+    const owner = randomUUID(), member = randomUUID(), board = randomUUID(), asset = randomUUID();
+    await pool.query("INSERT INTO users(id,google_subject,email) VALUES($1,'migration-owner','owner@example.com'),($2,'migration-member','member@example.com')", [owner, member]);
+    await pool.query("INSERT INTO boards(id,title,owner_id) VALUES($1,'Existing owned board',$2)", [board, owner]);
+    await createBoard("Existing ownerless board");
+    await insertDocument(board, content, 1, 4);
+    await pool.query("INSERT INTO board_members(board_id,user_id,role) VALUES($1,$2,'editor')", [board, member]);
+    await pool.query("INSERT INTO board_invitations(id,board_id,email,role) VALUES($1,$2,'invitee@example.com','viewer')", [randomUUID(), board]);
+    await pool.query("INSERT INTO auth_sessions(token_hash,user_id) VALUES($1,$2)", ["a".repeat(64), owner]);
+    await pool.query("INSERT INTO google_auth_flows(state_hash,browser_hash,nonce,code_verifier) VALUES($1,$2,$3,$4)", ["b".repeat(64), "c".repeat(64), "d".repeat(43), "e".repeat(43)]);
+    await pool.query("INSERT INTO board_assets(id,board_id,scope_board_id,uploader_id,status,byte_size,mime_type,width,height,provider_file_id,provider_file_path,last_referenced_at) VALUES($1,$2,$2,$3,'ready',20,'image/png',2,2,'preserved-provider-id','/preserved-image.png',clock_timestamp())", [asset, board, owner]);
+    await pool.query("INSERT INTO board_operation_receipts(board_id,actor_id,operation_id,payload_hash,applied_revision) VALUES($1,$2,$3,$4,4)", [board, owner, randomUUID(), "f".repeat(64)]);
+    await pool.query("INSERT INTO asset_request_budgets(bucket,request_count,byte_count,expires_at) VALUES('preserved-budget',2,40,clock_timestamp()+interval '1 day')");
+    await pool.query("INSERT INTO api_request_budgets(bucket,request_count,expires_at) VALUES($1,2,clock_timestamp()+interval '1 day')", ["1".repeat(64)]);
+    const tables = ["users", "boards", "board_documents", "board_members", "board_invitations", "auth_sessions", "google_auth_flows", "board_assets", "board_operation_receipts", "asset_request_budgets", "api_request_budgets"];
+    async function snapshot() {
+      return Promise.all(tables.map(async (table) => (await pool.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows));
+    }
+    const before = await snapshot();
+    const ledger = (await pool.query("SELECT * FROM schema_migrations ORDER BY version")).rows;
+    await pool.query("CREATE TABLE board_creation_receipts(marker text); INSERT INTO board_creation_receipts VALUES('keep this conflict')");
+    await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });
+    expect(await snapshot()).toEqual(before);
+    expect((await pool.query("SELECT * FROM schema_migrations ORDER BY version")).rows).toEqual(ledger);
+    expect((await pool.query("SELECT * FROM board_creation_receipts")).rows).toEqual([{ marker: "keep this conflict" }]);
+    await pool.query("DROP TABLE board_creation_receipts");
+    await Promise.all([migrateDatabase(pool), migrateDatabase(pool)]);
+    await expectVersions();
+    expect(await snapshot()).toEqual(before);
+    expect((await pool.query("SELECT * FROM board_creation_receipts")).rows).toEqual([]);
+    const constraints = await pool.query("INSERT INTO board_creation_receipts(actor_id,request_id,payload_hash,board_id,document_revision) VALUES($1,$2,$3,$4,1) RETURNING *", [owner, randomUUID(), "2".repeat(64), board]);
+    expect(constraints.rows[0].expires_at.getTime() - constraints.rows[0].created_at.getTime()).toBeCloseTo(90 * 86_400_000, -1);
+    await expect(pool.query("INSERT INTO board_creation_receipts(actor_id,request_id,payload_hash,document_revision) VALUES($1,$2,$3,2)", [owner, randomUUID(), "2".repeat(64)])).rejects.toMatchObject({ code: "23514" });
+    await expect(pool.query("INSERT INTO board_creation_receipts(actor_id,request_id,payload_hash,document_revision) VALUES($1,$2,'bad',1)", [owner, randomUUID()])).rejects.toMatchObject({ code: "23514" });
   });
 
   it("requires explicit positive integer versions/revisions and non-null timestamps", async () => {

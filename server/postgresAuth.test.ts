@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import pg from "pg";
 import request from "supertest";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -39,12 +38,12 @@ describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
 
   it("upgrades version 2 with saved content intact and creates no users/sessions automatically", async () => {
     await pool.query("ALTER TABLE boards DROP COLUMN owner_id");
-    await pool.query("DROP TABLE api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members, google_auth_flows, auth_sessions, users");
+    await pool.query("DROP TABLE board_creation_receipts, api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members, google_auth_flows, auth_sessions, users");
     await pool.query("DELETE FROM schema_migrations WHERE version >= 3");
     const board = (await pool.query("INSERT INTO boards (id, title) VALUES ($1, 'Keep this board') RETURNING *", [randomUUID()])).rows[0];
     const saved = (await pool.query("INSERT INTO board_documents (board_id, schema_version, revision, content) VALUES ($1, 1, 1, $2::jsonb) RETURNING *", [board.id, JSON.stringify(documentInput().content)])).rows[0];
     await migrateDatabase(pool); await migrateDatabase(pool);
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }]);
     expect((await pool.query("SELECT * FROM board_documents WHERE board_id = $1", [board.id])).rows).toEqual([saved]);
     expect((await pool.query("SELECT * FROM boards WHERE id = $1", [board.id])).rows).toEqual([{ ...board, owner_id: null }]);
     expect((await pool.query("SELECT * FROM users")).rows).toEqual([]);
@@ -53,7 +52,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL Google authentication", () => {
 
   it("rolls migration 3 back when its last table conflicts, preserving earlier tables and ledger", async () => {
     await pool.query("ALTER TABLE boards DROP COLUMN owner_id");
-    await pool.query("DROP TABLE api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members, google_auth_flows, auth_sessions, users"); await pool.query("DELETE FROM schema_migrations WHERE version >= 3");
+    await pool.query("DROP TABLE board_creation_receipts, api_request_budgets, board_operation_receipts, board_assets, asset_request_budgets, board_invitations, board_members, google_auth_flows, auth_sessions, users"); await pool.query("DELETE FROM schema_migrations WHERE version >= 3");
     await pool.query("CREATE TABLE google_auth_flows (marker text)");
     const board = (await pool.query("INSERT INTO boards (id, title) VALUES ($1, 'Survivor') RETURNING *", [randomUUID()])).rows[0];
     await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });

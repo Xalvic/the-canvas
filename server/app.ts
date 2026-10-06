@@ -140,6 +140,12 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
       throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
     }
     const input = createBoardSchema.parse(req.body);
+    if ("requestId" in input) {
+      if (!boards.createPage) throw new HttpError(503, "PAGE_CREATION_UNAVAILABLE", "Retry-safe page creation is unavailable");
+      const result = await boards.createPage(input, res.locals.ownerId);
+      res.status(result.creation.replayed ? 200 : 201).location(`/api/boards/${result.board.id}`).json(result);
+      return;
+    }
     const board = await boards.create(input.title, res.locals.ownerId);
     res.status(201).location(`/api/boards/${board.id}`).json({ board });
   });

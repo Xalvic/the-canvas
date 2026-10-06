@@ -1,0 +1,161 @@
+{
+  "checkedAt": "2026-10-06T17:06:49.902Z",
+  "publicDataUnchanged": true,
+  "disposableSchemasBefore": 0,
+  "disposableSchemasAfter": 0,
+  "before": [
+    {
+      "table": "api_request_budgets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "asset_request_budgets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "auth_sessions",
+      "rows": 1,
+      "sha256": "2f148344ce0ce4d5f7192ba6f9df0ceffcc2d455933c096fe49d989b55e2e9a3"
+    },
+    {
+      "table": "board_assets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_documents",
+      "rows": 1,
+      "sha256": "62b997c7c93f71e3d5acc52e648d9c931af5860590430495fbd253abb03e8818"
+    },
+    {
+      "table": "board_invitations",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_members",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_operation_receipts",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "boards",
+      "rows": 2,
+      "sha256": "c2820d4becd552e72ec728d6dd9967b4787c2d64bd283c8d4e356247200b97dd"
+    },
+    {
+      "table": "google_auth_flows",
+      "rows": 1,
+      "sha256": "38a929d332f549e12012e9cbbe59b5f8c766eea7597a173b652dd46ce2a4d8ea"
+    },
+    {
+      "table": "schema_migrations",
+      "rows": 8,
+      "sha256": "cee5b9f24cd6a70480a00406925b69058cef6562c3f8361cfb8e4b890f66c159"
+    },
+    {
+      "table": "users",
+      "rows": 1,
+      "sha256": "7e1087501bb8444cd909750fd3d4f9d52d7a9923b1a02cfa0a0ebd33680be22e"
+    }
+  ],
+  "after": [
+    {
+      "table": "api_request_budgets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "asset_request_budgets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "auth_sessions",
+      "rows": 1,
+      "sha256": "2f148344ce0ce4d5f7192ba6f9df0ceffcc2d455933c096fe49d989b55e2e9a3"
+    },
+    {
+      "table": "board_assets",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_documents",
+      "rows": 1,
+      "sha256": "62b997c7c93f71e3d5acc52e648d9c931af5860590430495fbd253abb03e8818"
+    },
+    {
+      "table": "board_invitations",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_members",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "board_operation_receipts",
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "table": "boards",
+      "rows": 2,
+      "sha256": "c2820d4becd552e72ec728d6dd9967b4787c2d64bd283c8d4e356247200b97dd"
+    },
+    {
+      "table": "google_auth_flows",
+      "rows": 1,
+      "sha256": "38a929d332f549e12012e9cbbe59b5f8c766eea7597a173b652dd46ce2a4d8ea"
+    },
+    {
+      "table": "schema_migrations",
+      "rows": 8,
+      "sha256": "cee5b9f24cd6a70480a00406925b69058cef6562c3f8361cfb8e4b890f66c159"
+    },
+    {
+      "table": "users",
+      "rows": 1,
+      "sha256": "7e1087501bb8444cd909750fd3d4f9d52d7a9923b1a02cfa0a0ebd33680be22e"
+    }
+  ],
+  "initialRunExitCode": 1,
+  "correctedCreationRun": {
+    "file": "server/postgresPageCreation.test.ts",
+    "testsPassed": 11,
+    "exitCode": 0
+  },
+  "regressionRun": {
+    "files": [
+      "server/postgresAuth.test.ts",
+      "server/postgresAssets.test.ts"
+    ],
+    "exitCode": 1
+  },
+  "correctedAuthSharingRun": {
+    "exitCode": 0,
+    "testsPassed": 25
+  },
+  "collaborationRun": {
+    "exitCode": 0,
+    "testsPassed": 14
+  },
+  "finalPassedCases": {
+    "creation": 11,
+    "migrations": 8,
+    "boards": 6,
+    "auth": 9,
+    "assets": 19,
+    "sharing": 16,
+    "collaboration": 14
+  },
+  "finalStatus": "passed"
+}

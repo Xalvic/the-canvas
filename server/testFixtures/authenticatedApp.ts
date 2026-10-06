@@ -14,11 +14,11 @@ export async function seedTestOwner(pool: Pool) {
 
 // Existing contract tests use a valid session; dedicated access tests exercise
 // the real application without this request wrapper.
-export function createAuthenticatedApp(boards: BoardStore, documents?: BoardDocumentStore) {
+export function createAuthenticatedApp(boards: BoardStore, documents?: BoardDocumentStore, ownerId = TEST_OWNER_ID) {
   const store: AuthStore = {
     async getSession(value) {
       return value === hashToken(token) ? {
-        user: { id: TEST_OWNER_ID, email: "owner@example.com", displayName: null }, expiresAt: Date.now() + 60_000,
+        user: { id: ownerId, email: "owner@example.com", displayName: null }, expiresAt: Date.now() + 60_000,
       } : undefined;
     },
     async createFlow() { throw new Error("Unused test method"); },

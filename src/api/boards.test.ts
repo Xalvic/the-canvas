@@ -4,6 +4,7 @@ import {
   BoardApiError,
   BoardSignInRequired,
   createServerBoard,
+  createServerPage,
   deleteServerBoard,
   getServerBoardDocument,
   listServerBoards,
@@ -90,6 +91,53 @@ describe("board metadata API boundary", () => {
   });
 });
 
+describe("retry-safe page creation API boundary", () => {
+  const input = { title: "  My board  ", requestId: otherId, initializeDocument: true as const };
+  const creation = { requestId: otherId, documentRevision: 1, replayed: false, expiresAt: 1000 };
+
+  it.each([false, true])("sends the caller's stable request and validates first/replayed acknowledgement: %s", async (replayed) => {
+    const result = { board, creation: { ...creation, replayed } };
+    const fetch = respond(result, replayed ? 200 : 201);
+    const signal = new AbortController().signal;
+    expect(await createServerPage({ ...input, requestId: otherId.toUpperCase() }, signal)).toEqual(result);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/boards", {
+      credentials: "same-origin", method: "POST",
+      headers: { "X-Scribble-Request": "1", "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, title: "My board" }), signal,
+    });
+  });
+
+  it.each([
+    { board }, { board: { ...board, id: "invalid" }, creation },
+    { board, creation: { ...creation, requestId: id } },
+    { board, creation: { ...creation, documentRevision: 0 } },
+    { board, creation: { ...creation, documentRevision: 2 } },
+    { board, creation: { ...creation, expiresAt: -1 } },
+    { board, creation: { ...creation, replayed: true } },
+  ])("rejects missing, mismatched, or invalid creation acknowledgements: %j", async (body) => {
+    respond(body, 201);
+    await expect(createServerPage(input)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
+  it("rejects an invalid identity before dispatch and leaves network retry identity with the caller", async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError("Lost response"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ board, creation: { ...creation, replayed: true } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(createServerPage({ ...input, requestId: "bad" })).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(createServerPage(input)).rejects.toThrow("Lost response");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((await createServerPage(input)).board.id).toBe(id);
+    expect(fetch.mock.calls[0][1].body).toBe(fetch.mock.calls[1][1].body);
+  });
+
+  it.each([[409, "CREATION_REQUEST_CONFLICT"], [410, "CREATION_REQUEST_EXPIRED"], [410, "CREATION_DESTINATION_GONE"]])("exposes terminal %s %s without generating a new request", async (status, code) => {
+    const fetch = respond({ error: { code, message: "Cannot resume creation" } }, status as number);
+    await expect(createServerPage(input)).rejects.toMatchObject({ status, code });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("board document API boundary", () => {
   it("loads a validated document with its board identity and revision", async () => {
     const fetch = respond({ document: savedDocument });
@@ -170,6 +218,7 @@ describe("protected board request failures", () => {
   it.each([
     () => listServerBoards(),
     () => createServerBoard("Board"),
+    () => createServerPage({ title: "Board", requestId: otherId, initializeDocument: true }),
     () => renameServerBoard(id, "Board"),
     () => deleteServerBoard(id),
     () => getServerBoardDocument(id),

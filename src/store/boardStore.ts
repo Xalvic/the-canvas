@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { CURRENT_BOARD_ID, type AccountBoardLink } from "../persistence/localBoardStorage";
 import type { BoardRole } from "../api/boards";
+import type { BoardTabOwnership } from "../persistence/boardTabCoordinator";
 
 export type BoardSaveStatus = "loading" | "saving" | "saved" | "error";
 
@@ -17,8 +18,10 @@ type BoardState = Omit<BoardMetadata, "account"> & {
   accessRole: BoardRole | "none" | null;
   readOnly: boolean;
   tabReadOnly: boolean;
+  tabOwnership: BoardTabOwnership;
   tabRecoveryId: string | null;
   setTabReadOnly: (value: boolean) => void;
+  setTabOwnership: (value: BoardTabOwnership) => void;
   setAccessRole: (role: BoardRole | "none" | null) => void;
   isHydrated: boolean;
   sessionVersion: number;
@@ -46,8 +49,10 @@ export const useBoardStore = create<BoardState>((set) => ({
   accessRole: null,
   readOnly: false,
   tabReadOnly: false,
+  tabOwnership: "acquiring",
   tabRecoveryId: null,
-  setTabReadOnly: (value) => set((state) => ({ tabReadOnly: value, readOnly: value || state.accessRole === "viewer" || state.accessRole === "none" })),
+  setTabReadOnly: (value) => set((state) => ({ tabReadOnly: value, tabOwnership: value ? "contended" : "owned", readOnly: value || state.accessRole === "viewer" || state.accessRole === "none" })),
+  setTabOwnership: (value) => set((state) => ({ tabOwnership: value, tabReadOnly: value !== "owned", readOnly: value !== "owned" || state.accessRole === "viewer" || state.accessRole === "none" })),
   setAccessRole: (role) => set((state) => ({ accessRole: role, readOnly: state.tabReadOnly || role === "viewer" || role === "none" })),
   isHydrated: false,
   sessionVersion: 0,

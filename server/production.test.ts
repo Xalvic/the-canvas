@@ -53,7 +53,7 @@ describe("production origin and admission", () => {
     expect(production.budgets.consume).toHaveBeenCalledWith("api-ip", "203.0.113.10", 2400, 60);
     expect(production.budgets.consume).toHaveBeenCalledWith("user-read", user.id, 1200, 60);
     vi.mocked(production.budgets.consume).mockImplementation(async (scope) => ({ allowed: scope !== "user-write", retryAfter: 17 }));
-    expect((await proxy(request(app).post("/api/boards")).set("Cookie", `${SESSION_COOKIE}=${token}`).set("X-Scribble-Request", "1").send({ title: "Never written" }).expect(429).expect("Retry-After", "17")).body.error.code).toBe("REQUEST_RATE_LIMIT");
+    expect((await proxy(request(app).post("/api/boards")).set("Cookie", `${SESSION_COOKIE}=${token}`).set("X-Scribble-Request", "1").send({ title: "Never written", requestId: randomUUID(), initializeDocument: true }).expect(429).expect("Retry-After", "17")).body.error.code).toBe("REQUEST_RATE_LIMIT");
     expect((await proxy(request(app).get("/api/boards")).set("Cookie", `${SESSION_COOKIE}=${token}`).expect(200)).body.boards).toEqual([]);
   });
   it("limits OAuth starts/callbacks with matching route classes and fails closed if admission is unavailable", async () => {

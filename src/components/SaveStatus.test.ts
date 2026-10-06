@@ -21,4 +21,13 @@ describe("truthful save presentation", () => {
     expect(savePresentation({ ...base, cloud: "error" }).label).toContain("saved on this device");
     expect(savePresentation({ ...base, cloud: "error", local: "saving" }).label).not.toContain("saved on this device");
   });
+  it("never infers another writer from loading, unverified access or storage failure", () => {
+    expect(savePresentation({ ...base, tabReadOnly: true, local: "loading" })).toEqual({ label: "Opening device draft…", attention: false });
+    expect(savePresentation({ ...base, tabReadOnly: true, tabOwnership: "acquiring" })).toEqual({ label: "Opening device draft…", attention: false });
+    expect(savePresentation({ ...base, tabReadOnly: true, tabOwnership: "unverified" }).label).toBe("Editing access needs checking");
+    expect(savePresentation({ ...base, tabReadOnly: true, tabOwnership: "unavailable" }).label).toBe("Couldn’t save on this device");
+    expect(savePresentation({ ...base, tabReadOnly: true, tabOwnership: "contended" }).label).toBe("Editing in another tab");
+    expect(savePresentation({ ...base, account: false, tabReadOnly: true, tabOwnership: "passive" })).toEqual({ label: "Shared device drawing", attention: false });
+    expect(savePresentation({ ...base, account: false, tabReadOnly: true, tabOwnership: "contended" }).label).toBe("Waiting for the other tab to finish");
+  });
 });

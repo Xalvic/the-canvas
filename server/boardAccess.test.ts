@@ -97,4 +97,17 @@ describe("private board HTTP access", () => {
     await request(app).put(path).set("Cookie", cookie).set("X-Scribble-Request", "1").set("Origin", "http://127.0.0.1:5173").send(documentInput()).expect(404);
     expect(save).toHaveBeenCalledWith(id, documentInput(), owner.id);
   });
+
+  it("protects retry-safe creation with the same session and mutation checks before invoking storage", async () => {
+    const { app, boards, sessions } = setup();
+    const createPage = vi.fn();
+    Object.assign(boards, { createPage });
+    const body = { title: "Untitled", requestId: randomUUID(), initializeDocument: true };
+    await request(app).post("/api/boards").set("X-Scribble-Request", "1").send(body).expect(401);
+    await request(app).post("/api/boards").set("Cookie", cookie).send(body).expect(403);
+    await request(app).post("/api/boards").set("Cookie", cookie).set("X-Scribble-Request", "1").set("Origin", "https://evil.example").send(body).expect(403);
+    sessions.set(hashToken(token), { user: owner, expiresAt: Date.now() - 1 });
+    await request(app).post("/api/boards").set("Cookie", cookie).set("X-Scribble-Request", "1").send(body).expect(401);
+    expect(createPage).not.toHaveBeenCalled();
+  });
 });

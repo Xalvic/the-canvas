@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Board, PrismaClient } from "./generated/prisma/client.js";
 import type { BoardMetadata, BoardStore, BoardRole } from "./boards.js";
 import { boardRoleSql, lockBoardAccess } from "./boardPermissions.js";
+import { HttpError } from "./errors.js";
 
 type BoardRow = Pick<Board, "id" | "title" | "createdAt" | "updatedAt"> & { role?: BoardRole };
 const metadataSelect = { id: true, title: true, createdAt: true, updatedAt: true } as const;
@@ -39,6 +40,56 @@ export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
     async create(title, ownerId) {
       const row = await prisma.board.create({ data: { id: randomUUID(), title, ownerId }, select: metadataSelect });
       return toMetadata(row);
+    },
+    async createPage(input, ownerId) {
+      // The HTTP boundary normalizes both title and UUID before this hash.
+      const payloadHash = createHash("sha256").update(JSON.stringify({
+        version: 1, title: input.title, initializeDocument: input.initializeDocument,
+      })).digest("hex");
+      return prisma.$transaction(async (tx) => {
+        // Serialize creations by actor across connections/processes. No network
+        // work occurs here; M4 can reuse this lock for workspace initialization.
+        const actors = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM users WHERE id = ${ownerId}::uuid FOR UPDATE
+        `;
+        if (!actors[0]) throw new HttpError(401, "UNAUTHENTICATED", "Sign in required");
+        const key = { actorId_requestId: { actorId: ownerId, requestId: input.requestId } };
+        const receipt = await tx.boardCreationReceipt.findUnique({ where: key });
+        if (receipt) {
+          if (receipt.payloadHash !== payloadHash) {
+            throw new HttpError(409, "CREATION_REQUEST_CONFLICT", "This creation request was already used with a different payload");
+          }
+          const expired = await tx.$queryRaw<{ expired: boolean }[]>`
+            SELECT expires_at <= clock_timestamp() AS expired FROM board_creation_receipts
+            WHERE actor_id = ${ownerId}::uuid AND request_id = ${input.requestId}::uuid
+          `;
+          if (expired[0].expired) throw new HttpError(410, "CREATION_REQUEST_EXPIRED", "This creation request has expired");
+          if (!receipt.boardId) throw new HttpError(410, "CREATION_DESTINATION_GONE", "The page created by this request was deleted");
+          const access = await lockBoardAccess(tx, receipt.boardId, ownerId, "read");
+          if (!access) {
+            // A concurrent deletion may have cleared the FK while the board lock
+            // was pending. Access revocation must reveal no board metadata.
+            const current = await tx.boardCreationReceipt.findUnique({ where: key });
+            if (!current?.boardId) throw new HttpError(410, "CREATION_DESTINATION_GONE", "The page created by this request was deleted");
+            throw new HttpError(404, "BOARD_NOT_FOUND", "Board not found");
+          }
+          const row = await tx.board.findUniqueOrThrow({ where: { id: receipt.boardId }, select: metadataSelect });
+          return { board: toMetadata({ ...row, role: access.role }), creation: {
+            requestId: input.requestId, documentRevision: 1, replayed: true, expiresAt: receipt.expiresAt.getTime(),
+          } };
+        }
+        const row = await tx.board.create({ data: { id: randomUUID(), title: input.title, ownerId }, select: metadataSelect });
+        await tx.$executeRaw`
+          INSERT INTO board_documents (board_id, schema_version, revision, content, updated_at)
+          SELECT id, 1, 1, '{"objects":[]}'::jsonb, updated_at FROM boards WHERE id = ${row.id}::uuid
+        `;
+        const created = await tx.boardCreationReceipt.create({ data: {
+          actorId: ownerId, requestId: input.requestId, payloadHash, boardId: row.id, documentRevision: 1,
+        } });
+        return { board: toMetadata(row), creation: {
+          requestId: input.requestId, documentRevision: 1, replayed: false, expiresAt: created.expiresAt.getTime(),
+        } };
+      });
     },
     async rename(id, title, ownerId) {
       // Keep the atomic no-op/monotonic timestamp behavior in SQL. Tagged

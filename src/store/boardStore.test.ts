@@ -21,6 +21,18 @@ describe("local tab ownership and server access", () => {
       expect(useBoardStore.getState().readOnly).toBe(true);
     }
   });
+  it("blocks unverified and unavailable ownership while retaining role restrictions on recovery", () => {
+    for (const ownership of ["acquiring", "unverified", "unavailable", "contended"] as const) {
+      useBoardStore.getState().setTabOwnership(ownership);
+      useBoardStore.getState().setAccessRole("owner");
+      expect(useBoardStore.getState().readOnly).toBe(true);
+      expect(useBoardStore.getState().tabReadOnly).toBe(true);
+    }
+    useBoardStore.getState().setAccessRole("viewer");
+    useBoardStore.getState().setTabOwnership("owned");
+    expect(useBoardStore.getState().tabReadOnly).toBe(false);
+    expect(useBoardStore.getState().readOnly).toBe(true);
+  });
   it("blocks title, object and undo mutations while preserving the current snapshot", () => {
     useBoardStore.getState().setAccessRole(null);
     const card = createCardObject({ x: 1, y: 2 }, 1);

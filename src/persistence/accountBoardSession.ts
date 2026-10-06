@@ -1,4 +1,5 @@
 import { boardTabCoordinator, BOARD_TAB_READ_ONLY_MESSAGE } from "./boardTabCoordinator";
+import { accountEditorJournals, activeBoardLeaseId, journalIsDirty } from "./accountEditorJournals";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
@@ -18,7 +19,7 @@ import { deserializeCanvasDocument, serializeDocumentSnapshot } from "./canvasDo
 import type { CanvasDocument } from "./canvasDocument";
 import {
   accountBoardStorageId, CURRENT_BOARD_ID, LOCAL_BOARD_SCHEMA_VERSION,
-  loadLocalBoard, saveLocalBoard, latestDetachedRecovery, type AccountBoardLink, type LocalBoardRecord,
+  loadLocalBoard, loadLegacyLocalBoard, saveLocalBoard, latestDetachedRecovery, type AccountBoardLink, type LocalBoardRecord,
 } from "./localBoardStorage";
 import { captureLocalBoard } from "./useLocalBoardPersistence";
 import { waitForLocalBoardSave } from "./waitForLocalBoardSave";
@@ -39,6 +40,7 @@ type SessionState = {
   hasRecovery: boolean;
   accountVersion: number;
   imageUpload: { completed: number; total: number } | null;
+  editorDrafts: { id: string; title: string; updatedAt: number }[];
 };
 
 const blankDocument = (): CanvasDocument => serializeDocumentSnapshot({});
@@ -57,7 +59,7 @@ const livePresenceSchema = z.object({ participants: z.array(z.object({
 
 /** Only committed store changes enter this queue. Pointer previews stay in the editor. */
 export class AccountBoardSession {
-  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, accountVersion: 0, imageUpload: null };
+  private state: SessionState = { userId: null, busy: false, status: "local", error: null, hasRecovery: false, accountVersion: 0, imageUpload: null, editorDrafts: [] };
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private request: AbortController | null = null;
@@ -221,6 +223,7 @@ export class AccountBoardSession {
     });
     const boardUnsubscribe = useBoardStore.subscribe((state, previous) => {
       if (state.tabReadOnly && !previous.tabReadOnly) { this.clearTimer(); this.request?.abort(); }
+      if (!state.tabReadOnly && previous.tabOwnership === "unavailable") changed();
       if (state.sessionVersion !== previous.sessionVersion || state.isHydrated !== previous.isHydrated) this.connectLive();
       if (state.isHydrated && previous.isHydrated && state.sessionVersion === previous.sessionVersion &&
           state.title !== previous.title) changed();
@@ -240,7 +243,7 @@ export class AccountBoardSession {
     this.clearTimer(); this.request?.abort();
     this.queries.clear();
     clearCloudImageAccess(userId);
-    this.update({ userId, error: null });
+    this.update({ userId, error: null, editorDrafts: [] });
     this.closeLive();
     this.liveKey = "";
     this.connectLive();
@@ -295,6 +298,47 @@ export class AccountBoardSession {
     } finally { clearTimeout(timeout); }
   };
 
+  refreshEditorDrafts = async () => {
+    const board = useBoardStore.getState();
+    if (!board.account || board.account.ownerId !== this.state.userId || !boardTabCoordinator.enabled) { this.update({ editorDrafts: [] }); return; }
+    try {
+      const journals = await accountEditorJournals.list(board.id);
+      if (useBoardStore.getState().sessionVersion !== board.sessionVersion || this.state.userId !== board.account.ownerId) return;
+      this.update({ editorDrafts: journals.filter((journal) => journal.id !== activeBoardLeaseId(board.id) && journalIsDirty(journal.board))
+        .map((journal) => ({ id: journal.id, title: journal.board.title, updatedAt: journal.board.updatedAt })) });
+    } catch (error) { if (useBoardStore.getState().sessionVersion === board.sessionVersion) this.update({ error: message(error) }); }
+  };
+
+  restoreEditorDraft = (key: string) => this.operation(async (signal) => {
+    const board = useBoardStore.getState(), account = board.account;
+    if (!account || account.ownerId !== this.state.userId || board.readOnly) throw new Error("Sign in with editing access before recovering a draft");
+    this.assertIdle();
+    await waitForLocalBoardSave(signal);
+    const before = captureLocalBoard();
+    const remote = await this.readDocument(account.boardId, signal);
+    if (remote.role === "viewer") throw new Error("You can only view this page now. Its drafts were preserved.");
+    const draft = await accountEditorJournals.reserve(board.id, key);
+    this.assertIdle();
+    if (signal.aborted || this.state.userId !== account.ownerId || useBoardStore.getState().sessionVersion !== board.sessionVersion ||
+        useDocumentStore.getState().objects !== before.objects || titleNow() !== before.title) throw new Error("The canvas changed. Try recovering that draft again.");
+    const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
+    const link = draft.account!;
+    let record = draft;
+    let status: CloudStatus = link.pendingOperation ? (link.pendingOperation.conflicted ? "conflict" : "error") : link.pendingSave ? "error" : "unsaved";
+    if (!link.pendingOperation && !link.pendingSave) {
+      const local = accountDocument(draft.objects, link);
+      const merged = mergeCollaborativeDocuments(link.savedDocument, local, document);
+      if (merged.conflicts.length) status = "conflict";
+      else record = { ...draft, objects: deserializeCanvasDocument(merged.document, link.boardId), account: { ...link, revision: remote.revision, savedDocument: document } };
+    }
+    // Current journal remains intact. Switch the selected journal and live
+    // document together, with no await that could route old edits into it.
+    accountEditorJournals.select(board.id, key);
+    this.applyRecord(record, signal, true, remote.role ?? "owner");
+    this.update({ status, error: null });
+    await this.refreshEditorDrafts();
+  });
+
   private fail(error: unknown) {
     if (error instanceof BoardSignInRequired) { this.expire(); return; }
     const conflict = error instanceof BoardApiError && ["REVISION_CONFLICT", "COLLABORATION_CONFLICT"].includes(error.code);
@@ -321,7 +365,7 @@ export class AccountBoardSession {
       id: record.id, title: record.title, createdAt: record.createdAt,
       updatedAt: record.updatedAt, account: record.account,
     }, true);
-    useBoardStore.getState().setTabReadOnly(boardTabCoordinator.enabled && !boardTabCoordinator.owns(record.id));
+    useBoardStore.getState().setTabOwnership(boardTabCoordinator.enabled ? boardTabCoordinator.status(activeBoardLeaseId(record.id)) : "owned");
     useBoardStore.getState().setAccessRole(record.account ? role : null);
     if (record.account && (role === "viewer" || role === "none")) this.access(role);
     this.operationSession = useBoardStore.getState().sessionVersion;
@@ -332,7 +376,7 @@ export class AccountBoardSession {
   private async replace(record: LocalBoardRecord, signal: AbortSignal, persist = false, role: BoardRole | "none" = "owner") {
     await waitForLocalBoardSave(signal);
     this.applyRecord(record, signal, persist, role);
-    if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(record.id);
+    if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(activeBoardLeaseId(record.id));
   }
 
   private async preserveAndReplace(record: LocalBoardRecord, signal: AbortSignal, role: BoardRole | "none" = "owner") {
@@ -348,7 +392,7 @@ export class AccountBoardSession {
       if (useDocumentStore.getState().objects !== recovery.objects ||
           titleNow() !== recovery.title || useViewportStore.getState().viewport !== recovery.viewport) continue;
       this.applyRecord({ ...record, viewport: recovery.viewport }, signal, true, role);
-      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(record.id);
+      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(activeBoardLeaseId(record.id));
       return;
     }
   }
@@ -376,7 +420,7 @@ export class AccountBoardSession {
         void this.back();
       }
       else if (this.state.status === "unsaved" && !this.state.busy) void this.save();
-      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(useBoardStore.getState().id);
+      if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(activeBoardLeaseId(useBoardStore.getState().id));
       if (this.liveRefreshPending) void this.refreshLive();
     }
   }
@@ -401,8 +445,10 @@ export class AccountBoardSession {
     this.assertIdle();
     const id = accountBoardStorageId(ownerId, board.id);
     await waitForLocalBoardSave(signal);
-    const writable = !boardTabCoordinator.enabled || !!await boardTabCoordinator.acquire(id);
-    const draft = await loadLocalBoard(id);
+    const draft = boardTabCoordinator.enabled
+      ? await accountEditorJournals.open(id, () => loadLegacyLocalBoard(id))
+      : await loadLocalBoard(id);
+    const writable = !boardTabCoordinator.enabled || boardTabCoordinator.owns(activeBoardLeaseId(id));
     const remote = await this.readDocument(board.id, signal);
     if (signal.aborted || this.state.userId !== ownerId) return;
     const document: CanvasDocument = { schemaVersion: remote.schemaVersion, content: remote.content };
@@ -427,7 +473,14 @@ export class AccountBoardSession {
         record = { ...draft, account: { ...draft.account, revision: remote.revision, savedDocument: document, pendingSave: undefined } };
         status = "unsaved";
       } else if (draft.account.pendingOperation) status = draft.account.pendingOperation.conflicted ? "conflict" : "error";
-      else if (remote.revision !== draft.account.revision) status = "conflict";
+      else if (remote.revision !== draft.account.revision && draftDocument && !unsupportedDraft) {
+        const merged = mergeCollaborativeDocuments(draft.account.savedDocument, draftDocument, document);
+        if (merged.conflicts.length) status = "conflict";
+        else {
+          record = { ...draft, objects: deserializeCanvasDocument(merged.document, board.id), account: { ...draft.account, revision: remote.revision, savedDocument: document } };
+          status = "unsaved";
+        }
+      }
       else status = pending || unsupportedDraft ? "error" : "unsaved";
     } else {
       record = {
@@ -485,7 +538,7 @@ export class AccountBoardSession {
       createdAt: remote.createdAt ?? Date.now(), updatedAt: Date.now(),
       account: { ownerId, boardId: remote.id, revision: 0, savedDocument: blankDocument(), savedTitle: title },
     };
-    if (boardTabCoordinator.enabled && !await boardTabCoordinator.acquire(record.id)) throw new Error(BOARD_TAB_READ_ONLY_MESSAGE);
+    if (boardTabCoordinator.enabled) await accountEditorJournals.open(record.id, () => loadLegacyLocalBoard(record.id));
     await saveLocalBoard(record);
     await this.replace(record, signal);
     if (!signal.aborted) {
