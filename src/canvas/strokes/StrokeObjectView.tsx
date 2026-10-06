@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
@@ -28,13 +29,13 @@ import {
 } from "../objects/types";
 import type { Point } from "../viewport/viewportMath";
 import { CANCEL_TOUCH_INTERACTIONS_EVENT } from "../viewport/pointerInteractionEvents";
-import {
-  buildSmoothedStrokePath,
-  buildVariableWidthStrokePath,
-} from "./strokeGeometry";
+import { getStrokeGeometry } from "./strokeRenderer";
+import { chooseStrokeDetail, simpleStrokeWidthStyle, strokeHitWidthStyle } from "./strokePresentation";
 
 type StrokeObjectViewProps = {
   object: StrokeCanvasObject;
+  zoom: number;
+  visible: boolean;
 };
 
 type DragInteraction = {
@@ -46,9 +47,10 @@ type DragInteraction = {
   elements: Map<string, MovementElement>;
 };
 
-export function StrokeObjectView({ object }: StrokeObjectViewProps) {
+export const StrokeObjectView = memo(function StrokeObjectView({ object, zoom, visible }: StrokeObjectViewProps) {
   const opacity = useObjectOpacity(object.id, object.opacity);
   const dragRef = useRef<DragInteraction | null>(null);
+  const simpleRef = useRef(false);
   const activeTool = useUiStore((state) => state.activeTool);
   const isMultiSelectMode = useUiStore((state) => state.isMultiSelectMode);
   const isSelected = useSelectionStore((state) =>
@@ -171,11 +173,13 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
     if (dragRef.current?.pointerId === event.pointerId) endDrag(event);
   };
 
-  const centerlinePath = buildSmoothedStrokePath(object.points);
-  const strokePath = object.mode === "solid" ? centerlinePath : buildVariableWidthStrokePath(
-    object.points,
-    object.strokeWidth,
-  );
+  if (!visible && !isSelected) return <g className="stroke-object" data-stroke-object-id={object.id} />;
+  const geometry = getStrokeGeometry(object);
+  simpleRef.current = object.mode !== "solid" && chooseStrokeDetail(object.strokeWidth, object.inputKind, zoom, simpleRef.current);
+  const simple = simpleRef.current;
+  const solid = object.mode === "solid" || simple;
+  const centerlinePath = geometry.centerlinePath;
+  const strokePath = solid ? centerlinePath : geometry.outlinePath;
   return (
     <g
       className={`stroke-object${isSelected ? " is-selected" : ""}`}
@@ -185,6 +189,7 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
         className="stroke-hit-area"
         d={centerlinePath}
         strokeWidth={Math.max(14, object.strokeWidth + 10)}
+        style={{ strokeWidth: strokeHitWidthStyle(object.strokeWidth) }}
         onPointerDown={beginDrag}
         onPointerMove={continueDrag}
         onPointerUp={endDrag}
@@ -193,9 +198,11 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
       />
       <path
         className="stroke-shape"
+        data-simple={simple}
         d={strokePath}
-        fill={object.mode === "solid" ? "none" : object.color}
-        stroke={object.mode === "solid" ? object.color : "none"}
+        fill={solid ? "none" : object.color}
+        stroke={solid ? object.color : "none"}
+        style={simple ? { strokeWidth: simpleStrokeWidthStyle(object.strokeWidth, object.inputKind) } : undefined}
         strokeWidth={object.strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -203,4 +210,4 @@ export function StrokeObjectView({ object }: StrokeObjectViewProps) {
       />
     </g>
   );
-}
+});

@@ -151,12 +151,17 @@ function isCanvasObjectRecord(value: unknown): value is CanvasObject {
     (value.mode === undefined || value.mode === "draw" || value.mode === "solid") &&
     (value.opacity === undefined || isOpacity(value.opacity)) &&
     Array.isArray(value.points) &&
+    (value.rendererVersion === undefined
+      ? value.inputKind === undefined && value.points.every((point) => isRecord(point) && point.inkPressure === undefined)
+      : value.rendererVersion === 2 && ["mouse", "touch", "pen"].includes(String(value.inputKind)) &&
+        value.points.length > 0 && value.points.every((point) => isRecord(point) && isOpacity(point.inkPressure))) &&
     value.points.every(
       (point) =>
         isRecord(point) &&
         isFiniteNumber(point.x) &&
         isFiniteNumber(point.y) &&
         (point.pressure === undefined || isOpacity(point.pressure)) &&
+        (point.inkPressure === undefined || isOpacity(point.inkPressure)) &&
         (point.widthRatio === undefined || (isOpacity(point.widthRatio) && point.widthRatio > 0)) &&
         (point.velocity === undefined || (isFiniteNumber(point.velocity) && point.velocity >= 0)),
     )

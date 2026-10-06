@@ -69,6 +69,17 @@ function expectInvalid(value: unknown, path?: (string | number)[]) {
 }
 
 describe("canvas document v1", () => {
+  it("round trips renderer 2 pressure through the strict cloud adapter alongside legacy ink", () => {
+    const modern: StrokeCanvasObject = { ...stroke, id: "modern", rendererVersion: 2, inputKind: "pen",
+      points: [{ x: 0, y: 0, pressure: 0.01, inkPressure: 0.05 }] };
+    const mixed = { [stroke.id]: stroke, [modern.id]: modern };
+    expect(deserializeCanvasDocument(JSON.parse(JSON.stringify(serializeDocumentSnapshot(mixed))))).toEqual(mixed);
+    for (const updates of [
+      { rendererVersion: 3 }, { inputKind: "stylus" }, { inputKind: undefined },
+      { points: [{ x: 0, y: 0, inkPressure: Infinity }] }, { points: [{ x: 0, y: 0 }] },
+    ]) expectInvalid(documentWith([{ ...modern, ...updates }]));
+    expectInvalid(documentWith([{ ...stroke, points: [{ x: 0, y: 0, inkPressure: 0.5 }] }]));
+  });
   it("round trips every non-image field through JSON, preserving map order and zIndex", () => {
     const serialized = serializeDocumentSnapshot(snapshot);
     expect(serialized).toEqual(documentWith());

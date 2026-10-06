@@ -56,6 +56,16 @@ function accountBoard(): LocalBoardRecord & { account: AccountBoardLink } {
 }
 
 describe("local board format", () => {
+  it("round trips mixed renderer versions and rejects malformed new profiles", () => {
+    const legacy = createStrokeObject([{ x: 0, y: 0, pressure: 0.4, widthRatio: 0.3 }], 1);
+    const modern = createStrokeObject([{ x: 0, y: 20, pressure: 0.1, inkPressure: 0.25 }], 2, DEFAULT_PEN_SETTINGS, "pen");
+    const board = { ...validBoard(), objects: { [legacy.id]: legacy, [modern.id]: modern } };
+    expect(parseLocalBoard(JSON.parse(JSON.stringify(board)))).toEqual(board);
+    for (const updates of [
+      { rendererVersion: 3 }, { inputKind: "stylus" }, { inputKind: undefined },
+      { points: [{ x: 0, y: 0, inkPressure: 2 }] }, { points: [{ x: 0, y: 0 }] },
+    ]) expect(parseLocalBoard({ ...board, objects: { [modern.id]: { ...modern, ...updates } } })).toBeNull();
+  });
   it("round trips new appearance data alongside legacy objects without a schema migration", () => {
     const board = validBoard();
     const text = createTextObject({ x: 0, y: 0 }, 1, { ...DEFAULT_TEXT_SETTINGS, size: "xl", weight: "bold", align: "right", opacity: 0 });

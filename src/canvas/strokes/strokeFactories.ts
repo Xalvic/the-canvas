@@ -1,5 +1,5 @@
-import type { StrokeCanvasObject, StrokePoint } from "../objects/types";
-import { getStrokeBounds } from "./strokeGeometry";
+import type { StrokeCanvasObject, StrokeInputKind, StrokePoint } from "../objects/types";
+import { getStrokeGeometry } from "./strokeRenderer";
 import { DEFAULT_PEN_SETTINGS, PEN_WIDTHS, type PenToolSettings } from "../../tools/toolSettings";
 
 export const DEFAULT_STROKE_COLOR = "#3f413d";
@@ -9,6 +9,7 @@ export function createStrokeObject(
   points: StrokePoint[],
   zIndex: number,
   settings: PenToolSettings | string = DEFAULT_PEN_SETTINGS,
+  inputKind?: StrokeInputKind,
 ): StrokeCanvasObject {
   const timestamp = Date.now();
   const preferences = typeof settings === "string" ? { ...DEFAULT_PEN_SETTINGS, color: settings } : settings;
@@ -21,7 +22,10 @@ export function createStrokeObject(
     color: preferences.color,
     mode: preferences.mode,
     opacity: preferences.opacity,
-    ...getStrokeBounds(points, strokeWidth),
+    ...(inputKind ? { rendererVersion: 2 as const, inputKind } : {}),
+    ...getStrokeGeometry({ points, strokeWidth, mode: preferences.mode,
+      ...(inputKind ? { rendererVersion: 2 as const, inputKind } : {}),
+    }).bounds,
     zIndex,
     createdAt: timestamp,
     updatedAt: timestamp,

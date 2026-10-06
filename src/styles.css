@@ -529,16 +529,21 @@ button {
   pointer-events: none;
 }
 
-:root[data-theme="dark"] .stroke-shape[fill="#252622"],
-:root[data-theme="dark"] .stroke-shape[fill="#3f413d"],
-:root[data-theme="dark"] .stroke-shape[stroke="#252622"],
-:root[data-theme="dark"] .stroke-shape[stroke="#3f413d"] {
-  filter: drop-shadow(0 0 1.25px rgb(255 255 255 / 0.55));
+:root[data-theme="dark"] :is(.stroke-shape, .stroke-draft-path)[fill="#252622"] {
+  fill: #eceee8;
+}
+:root[data-theme="dark"] :is(.stroke-shape, .stroke-draft-path)[stroke="#252622"] {
+  stroke: #eceee8;
+}
+:root[data-theme="dark"] :is(.stroke-shape, .stroke-draft-path)[fill="#3f413d"] {
+  fill: #c8cbc4;
+}
+:root[data-theme="dark"] :is(.stroke-shape, .stroke-draft-path)[stroke="#3f413d"] {
+  stroke: #c8cbc4;
 }
 
 .stroke-hit-area {
   stroke: transparent;
-  vector-effect: non-scaling-stroke;
   pointer-events: stroke;
   cursor: move;
 }

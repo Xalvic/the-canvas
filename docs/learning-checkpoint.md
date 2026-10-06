@@ -4,6 +4,26 @@ Updated: 2026-10-06. Read once per new project session.
 
 ## Current handoff
 
+Pen drawing update is implemented locally on 2026-10-06. Guide and validation:
+`docs/pen-drawing-validation.md`. The root `PEN_DRAWING_UPDATE_PLAN.md` is still
+ignored/untracked and records progress. Single pointer ownership, provisional
+touch pinch, pen preference, interrupted ink preservation, versioned
+perfect-freehand geometry, calibrated mouse/touch/pen profiles, stationary force,
+exact endpoints, actual low-zoom pixel widths, theme paint and conservative
+culling/bounded caching are implemented. Legacy ink stays on its original renderer;
+IndexedDB keys/schema and atomic history stay unchanged. Shared cloud validation
+accepts the optional new fields; no SQL migration or deployment was performed.
+599 fast tests and the standard browser regressions pass; production DPR/browser
+visuals and desktop replay are documented. Physical Redmi tracing, touch-policy
+tuning, real pressure hardware and tablet/120 Hz performance remain pending.
+User confirmed the reported failure happened on the deployed HTTPS URL with the
+palm off-screen; do not claim palm interference caused it. Next: physical acceptance
+and coordinated API/frontend release after authorization. User authorized this pen
+update's local commit on 2026-10-06. Push/deployment and future commits still require
+fresh authorization.
+
+## Previous UX handoff
+
 Current focus: UI/UX simplification implementation completed locally through phases
 0–4; phase 5 local regression checks passed. Read `docs/ux-simplification-plan.md`
 and `docs/ux-validation.md`. `docs/ux-wireframe.html` remains a fake-data clickable

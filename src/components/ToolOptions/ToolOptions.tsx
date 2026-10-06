@@ -26,7 +26,7 @@ import type {
   StrokeCanvasObject,
   TextCanvasObject,
 } from "../../canvas/objects/types";
-import { getStrokeBounds } from "../../canvas/strokes/strokeGeometry";
+import { getStrokeGeometry } from "../../canvas/strokes/strokeRenderer";
 import { measureStyledTextHeight } from "../../canvas/objects/textAppearance";
 import { performRedo, performUndo } from "../../history/historyCommands";
 
@@ -225,10 +225,10 @@ export function ToolOptions({
       object.id,
       {
         ...appearance,
-        ...(size
+        ...(size || appearance.mode
           ? {
-              strokeWidth: PEN_WIDTHS[size],
-              ...getStrokeBounds(object.points, PEN_WIDTHS[size]),
+              strokeWidth: size ? PEN_WIDTHS[size] : object.strokeWidth,
+              ...getStrokeGeometry({ ...object, ...appearance, strokeWidth: size ? PEN_WIDTHS[size] : object.strokeWidth }).bounds,
             }
           : {}),
       },

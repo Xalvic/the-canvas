@@ -121,7 +121,7 @@ test("Draw responds to real mouse velocity on lines and curves; Solid uses const
   const width = (o: any) => {
     const settled = o.points.slice(Math.ceil(o.points.length / 3));
     return (
-      settled.reduce((sum: number, p: any) => sum + p.widthRatio, 0) /
+      settled.reduce((sum: number, p: any) => sum + p.inkPressure, 0) /
       settled.length
     );
   };
@@ -300,13 +300,13 @@ test("mobile contextual panels stay on screen and touch velocity is expressive",
   }
   const strokes = (await snapshot(page)).objects;
   expect(strokes).toHaveLength(2);
-  expect(strokes[0].points.at(-1).widthRatio).toBeGreaterThan(
-    strokes[1].points.at(-1).widthRatio,
+  expect(strokes[0].points.at(-1).inkPressure).toBeGreaterThan(
+    strokes[1].points.at(-1).inkPressure,
   );
   await page.screenshot({ path: "test-results/mobile-pen.png" });
 });
 
-test("simulated stylus pressure and speed combine; Solid stays constant for every size", async ({
+test("simulated stylus force controls thickness; Solid stays constant for every size", async ({
   page,
 }) => {
   await page.getByRole("button", { name: "Pen tool", exact: true }).click();
@@ -346,8 +346,8 @@ test("simulated stylus pressure and speed combine; Solid stays constant for ever
     });
   }
   const strokes = (await snapshot(page)).objects;
-  expect(strokes[1].points.at(-1).widthRatio).toBeGreaterThan(
-    strokes[0].points.at(-1).widthRatio * 1.4,
+  expect(strokes[1].points.at(-1).inkPressure).toBeGreaterThan(
+    strokes[0].points.at(-1).inkPressure * 1.4,
   );
   await page.getByRole("button", { name: "Solid", exact: true }).click();
   for (const [i, [name, width]] of [

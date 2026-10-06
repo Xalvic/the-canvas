@@ -38,8 +38,11 @@ import {
 } from "../groups/groupCommands";
 import { expandIdsToGroups } from "../groups/grouping";
 import { createStrokeObject } from "../strokes/strokeFactories";
-import { buildSmoothedStrokePath, buildVariableWidthStrokePath } from "../strokes/strokeGeometry";
-import { createStrokeDynamics, sampleStrokeDynamics, type StrokeDynamics } from "../strokes/strokeDynamics";
+import { getStrokeGeometry } from "../strokes/strokeRenderer";
+import { chooseStrokeDetail, simpleStrokeWidthStyle, strokeZoomBucket } from "../strokes/strokePresentation";
+import { updateStrokeRenderWindow, type StrokeRenderWindow } from "../strokes/strokeVisibility";
+import { createInkDynamics, strokeInputKind, type InkDynamics } from "../strokes/strokeDynamics";
+import { appendInkSample, getConfirmedPointerSamples, isProvisionalTouch, trackStrokeTravel, type StrokeContact } from "../strokes/strokeInput";
 import { PEN_WIDTHS, type PenToolSettings } from "../../tools/toolSettings";
 import { useToolPreferencesStore } from "../../store/toolPreferencesStore";
 import type { StrokePoint } from "../objects/types";
@@ -121,12 +124,13 @@ type FrameCreationInteraction = {
   moved: boolean;
 };
 
-type StrokeInteraction = {
+type StrokeInteraction = StrokeContact & {
   pointerId: number;
   pointerType: string;
-  dynamics: StrokeDynamics;
+  dynamics: InkDynamics;
   settings: PenToolSettings;
   points: StrokePoint[];
+  simple: boolean;
 };
 
 const GRID_SIZE = 24;
@@ -172,6 +176,7 @@ export function CanvasViewport() {
   const frameRef = useRef<number | null>(null);
   const panRef = useRef<PanInteraction | null>(null);
   const touchPointsRef = useRef(new Map<number, Point>());
+  const ignoredContactsRef = useRef(new Set<number>());
   const pinchRef = useRef<PinchInteraction | null>(null);
   const marqueeRef = useRef<MarqueeInteraction | null>(null);
   const connectorRef = useRef<ConnectorInteraction | null>(null);
@@ -188,6 +193,8 @@ export function CanvasViewport() {
   const dragDepthRef = useRef(0);
   const noticeTimerRef = useRef<number | null>(null);
   const [displayZoom, setDisplayZoom] = useState(viewportRef.current.zoom);
+  const [strokeZoom, setStrokeZoom] = useState(strokeZoomBucket(viewportRef.current.zoom));
+  const [strokeWindow, setStrokeWindow] = useState<StrokeRenderWindow | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isPinching, setIsPinching] = useState(false);
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
@@ -348,10 +355,74 @@ export function CanvasViewport() {
     setIsDrawing(false);
   }, []);
 
+  const settleStroke = useCallback((preserve: boolean) => {
+    const stroke = strokeRef.current;
+    if (!stroke) return;
+    // Finalize before releasing capture: lost capture can be dispatched again.
+    clearStrokePreview();
+    touchPointsRef.current.delete(stroke.pointerId);
+    const surface = surfaceRef.current;
+    if (surface?.hasPointerCapture(stroke.pointerId)) surface.releasePointerCapture(stroke.pointerId);
+    if (preserve && stroke.points.length && !useBoardStore.getState().readOnly) {
+      const store = useDocumentStore.getState();
+      store.addObject(createStrokeObject([...stroke.points], store.getNextZIndex(), stroke.settings, strokeInputKind(stroke.pointerType)));
+      suppressDoubleClickUntilRef.current = performance.now() + 450;
+    }
+    useInteractionStore.getState().endInteraction();
+  }, [clearStrokePreview]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !surfaceRef.current) return;
+    let cleanup: (() => void) | undefined;
+    let mounted = true;
+    void import("../strokes/penDiagnostics").then(({ installPenDiagnostics }) => {
+      if (mounted && surfaceRef.current) cleanup = installPenDiagnostics(surfaceRef.current, () => ({
+        owner: strokeRef.current?.pointerId ?? null,
+        contacts: touchPointsRef.current.size, pinching: pinchRef.current !== null,
+      }));
+    });
+    return () => { mounted = false; cleanup?.(); };
+  }, []);
+
+  useEffect(() => {
+    const interrupt = () => {
+      settleStroke(true);
+      if (pinchRef.current || panRef.current) useViewportStore.getState().setViewport(viewportRef.current);
+      touchPointsRef.current.clear();
+      ignoredContactsRef.current.clear();
+      pinchRef.current = null;
+      panRef.current = null;
+      setIsPinching(false);
+      setIsPanning(false);
+    };
+    const visibility = () => { if (document.hidden) interrupt(); };
+    window.addEventListener("blur", interrupt);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      window.removeEventListener("blur", interrupt);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [settleStroke]);
+
+  useEffect(() => {
+    if (activeTool !== "pen" || readOnly) settleStroke(false);
+  }, [activeTool, readOnly, settleStroke]);
+
+  useEffect(() => useBoardStore.subscribe((state, previous) => {
+    if (state.sessionVersion !== previous.sessionVersion) {
+      settleStroke(false);
+      touchPointsRef.current.clear();
+      ignoredContactsRef.current.clear();
+    }
+  }), [settleStroke]);
+
   const paintViewport = useCallback((viewport: Viewport) => {
     if (worldRef.current) {
       worldRef.current.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`;
+      worldRef.current.style.setProperty("--stroke-zoom", String(viewport.zoom));
     }
+    setStrokeZoom(strokeZoomBucket(viewport.zoom));
+    setStrokeWindow((previous) => updateStrokeRenderWindow(previous, viewport, sizeRef.current));
 
     if (gridRef.current) {
       const gridSize = GRID_SIZE * viewport.zoom;
@@ -384,6 +455,7 @@ export function CanvasViewport() {
 
   const zoomAt = useCallback(
     (screenPoint: Point, requestedZoom: number) => {
+      if (strokeRef.current) return;
       const next = zoomViewportAtPoint(
         viewportRef.current,
         screenPoint,
@@ -410,6 +482,7 @@ export function CanvasViewport() {
   );
 
   const resetViewport = useCallback(() => {
+    if (strokeRef.current) return;
     const element = surfaceRef.current;
     if (!element) return;
     const rect = element.getBoundingClientRect();
@@ -436,6 +509,10 @@ export function CanvasViewport() {
     const resizeObserver = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       const previous = sizeRef.current;
+      if (strokeRef.current) {
+        sizeRef.current = { width, height };
+        return;
+      }
       const isFirstMeasurement = previous.width === 0 && previous.height === 0;
       const hasSavedViewport = useBoardStore.getState().hasSavedViewport;
 
@@ -463,6 +540,7 @@ export function CanvasViewport() {
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
+      if (strokeRef.current) return;
       const delta = normalizedWheelDelta(event);
       const rect = element.getBoundingClientRect();
       const isPinchGesture = event.ctrlKey || event.metaKey;
@@ -604,11 +682,7 @@ export function CanvasViewport() {
           surfaceRef.current.releasePointerCapture(frameCreation.pointerId);
         }
         clearFramePreview();
-        const stroke = strokeRef.current;
-        if (stroke && surfaceRef.current?.hasPointerCapture(stroke.pointerId)) {
-          surfaceRef.current.releasePointerCapture(stroke.pointerId);
-        }
-        clearStrokePreview();
+        settleStroke(false);
         useUiStore.getState().setActiveTool("select");
         useSelectionStore.getState().clearSelection();
         useInteractionStore.getState().endInteraction();
@@ -664,6 +738,7 @@ export function CanvasViewport() {
     clearConnectorPreview,
     clearFramePreview,
     clearStrokePreview,
+    settleStroke,
     resetViewport,
     zoomAtCenter,
   ]);
@@ -804,17 +879,23 @@ export function CanvasViewport() {
   const paintStrokeDraft = (interaction: StrokeInteraction) => {
     if (!strokeDraftRef.current) return;
     const { mode, color, size, opacity } = interaction.settings;
+    const width = PEN_WIDTHS[size];
+    const inputKind = strokeInputKind(interaction.pointerType);
+    interaction.simple = mode !== "solid" && chooseStrokeDetail(width, inputKind, viewportRef.current.zoom, interaction.simple);
+    const solid = mode === "solid" || interaction.simple;
+    const geometry = getStrokeGeometry({ points: interaction.points, strokeWidth: width,
+      mode, rendererVersion: 2, inputKind }, false);
     strokeDraftRef.current.style.display = "block";
-    strokeDraftRef.current.setAttribute("fill", mode === "solid" ? "none" : color);
-    strokeDraftRef.current.setAttribute("stroke", mode === "solid" ? color : "none");
-    strokeDraftRef.current.setAttribute("stroke-width", String(PEN_WIDTHS[size]));
+    strokeDraftRef.current.setAttribute("fill", solid ? "none" : color);
+    strokeDraftRef.current.setAttribute("stroke", solid ? color : "none");
+    strokeDraftRef.current.setAttribute("stroke-width", String(width));
+    strokeDraftRef.current.style.strokeWidth = interaction.simple
+      ? simpleStrokeWidthStyle(width, inputKind) : "";
+    strokeDraftRef.current.dataset.simple = String(interaction.simple);
     strokeDraftRef.current.setAttribute("opacity", String(opacity));
     strokeDraftRef.current.setAttribute(
       "d",
-      mode === "solid" ? buildSmoothedStrokePath(interaction.points) : buildVariableWidthStrokePath(
-        interaction.points,
-        PEN_WIDTHS[size],
-      ),
+      solid ? geometry.centerlinePath : geometry.outlinePath,
     );
   };
 
@@ -822,36 +903,16 @@ export function CanvasViewport() {
     event: ReactPointerEvent<HTMLDivElement>,
     interaction: StrokeInteraction,
   ) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const coalesced = event.nativeEvent.getCoalescedEvents?.() ?? [];
-    const samples = coalesced.length > 0 ? coalesced : [event.nativeEvent];
+    const rect = surfaceRef.current!.getBoundingClientRect();
+    const samples = getConfirmedPointerSamples(event.nativeEvent);
     for (const sample of samples) {
+      trackStrokeTravel(interaction, { x: sample.clientX, y: sample.clientY });
       const point = screenToWorld(
         { x: sample.clientX - rect.left, y: sample.clientY - rect.top },
         viewportRef.current,
       );
-      const previous = interaction.points.at(-1);
-      const segmentDistance = previous
-        ? Math.hypot(point.x - previous.x, point.y - previous.y)
-        : 0;
-      if (
-        previous &&
-        segmentDistance < 0.65 / viewportRef.current.zoom
-      ) {
-        continue;
-      }
-      const dynamics = sampleStrokeDynamics(
-        interaction.dynamics,
-        { x: sample.clientX, y: sample.clientY },
-        sample.timeStamp,
-        // Releasing the pen reports zero pressure; keep the last contact force.
-        sample.type === "pointerup" ? (previous?.pressure ?? 0.5) : sample.pressure,
-        interaction.pointerType,
-      );
-      interaction.points.push({
-        ...point,
-        ...dynamics,
-      });
+      appendInkSample(interaction.points, interaction.dynamics, strokeInputKind(interaction.pointerType),
+        sample, point, viewportRef.current.zoom, event.type === "pointerup");
     }
     // Coalesced input stays in refs. Rebuild the draft at most once per frame,
     // without publishing pointer samples to React or the document store.
@@ -864,44 +925,35 @@ export function CanvasViewport() {
   };
 
   const beginStroke = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (strokeRef.current) return;
     const interaction: StrokeInteraction = {
       pointerId: event.pointerId,
       pointerType: event.pointerType,
-      dynamics: createStrokeDynamics(),
+      startedAt: event.timeStamp,
+      travel: 0,
+      lastClientPoint: { x: event.clientX, y: event.clientY },
+      dynamics: createInkDynamics(),
       settings: { ...useToolPreferencesStore.getState().pen },
       points: [],
+      simple: false,
     };
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    surfaceRef.current!.setPointerCapture(event.pointerId);
     strokeRef.current = interaction;
     setIsDrawing(true);
     useSelectionStore.getState().clearSelection();
     useInteractionStore.getState().beginInteraction("drawing");
     appendStrokeSamples(event, interaction);
+    paintStrokeDraft(interaction);
   };
 
   const finishStroke = (
     event: ReactPointerEvent<HTMLDivElement>,
     interaction: StrokeInteraction,
   ) => {
-    const wasCancelled = event.type === "pointercancel";
-    if (!wasCancelled) {
-      appendStrokeSamples(event, interaction);
-      const documentStore = useDocumentStore.getState();
-      documentStore.addObject(
-        createStrokeObject(
-          [...interaction.points],
-          documentStore.getNextZIndex(),
-          interaction.settings,
-        ),
-      );
-      suppressDoubleClickUntilRef.current = performance.now() + 450;
-    }
-    clearStrokePreview();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    useInteractionStore.getState().endInteraction();
+    if (strokeRef.current !== interaction) return;
+    if (event.type === "pointerup") appendStrokeSamples(event, interaction);
+    settleStroke(true);
   };
 
   const paintConnectorDraft = (interaction: ConnectorInteraction) => {
@@ -1138,7 +1190,8 @@ export function CanvasViewport() {
 
   const cancelCanvasPointerInteractionsForPinch = () => {
     window.dispatchEvent(new Event(CANCEL_TOUCH_INTERACTIONS_EVENT));
-    clearStrokePreview();
+    // The caller has already decided that this is a provisional touch draft.
+    settleStroke(false);
     clearFramePreview();
     clearConnectorPreview();
     panRef.current = null;
@@ -1168,6 +1221,8 @@ export function CanvasViewport() {
   const handleViewportPointerDownCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    // IDs may be reused after a real lift, including a rejected contact.
+    ignoredContactsRef.current.delete(event.pointerId);
     const target = event.target;
     const focused = document.activeElement;
     if (
@@ -1190,6 +1245,13 @@ export function CanvasViewport() {
       return;
     }
 
+    const stroke = strokeRef.current;
+    if (stroke && (stroke.pointerType !== "touch" || !isProvisionalTouch(stroke, event.timeStamp))) {
+      ignoredContactsRef.current.add(event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     touchPointsRef.current.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
@@ -1200,6 +1262,9 @@ export function CanvasViewport() {
       const entries = [...touchPointsRef.current.entries()].slice(0, 2);
       const [[firstId, first], [secondId, second]] = entries;
       cancelCanvasPointerInteractionsForPinch();
+      touchPointsRef.current.set(firstId, first);
+      surfaceRef.current!.setPointerCapture(firstId);
+      surfaceRef.current!.setPointerCapture(secondId);
       pinchRef.current = {
         pointerIds: [firstId, secondId],
         lastMidpoint: {
@@ -1222,6 +1287,11 @@ export function CanvasViewport() {
   const handleViewportPointerMoveCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    if (ignoredContactsRef.current.has(event.pointerId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (
       event.pointerType !== "touch" ||
       !touchPointsRef.current.has(event.pointerId)
@@ -1274,6 +1344,10 @@ export function CanvasViewport() {
   const handleViewportPointerEndCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    if (ignoredContactsRef.current.delete(event.pointerId)) {
+      event.stopPropagation();
+      return;
+    }
     if (
       event.pointerType !== "touch" ||
       !touchPointsRef.current.has(event.pointerId)
@@ -1289,6 +1363,11 @@ export function CanvasViewport() {
     event.stopPropagation();
     if (pinch.pointerIds.includes(event.pointerId)) {
       pinchRef.current = null;
+      for (const id of touchPointsRef.current.keys()) ignoredContactsRef.current.add(id);
+      touchPointsRef.current.clear();
+      for (const id of pinch.pointerIds) {
+        if (surfaceRef.current?.hasPointerCapture(id)) surfaceRef.current.releasePointerCapture(id);
+      }
       setIsPinching(false);
       commitViewport();
     }
@@ -1297,6 +1376,26 @@ export function CanvasViewport() {
   const beginSurfaceInteraction = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
+    const owner = strokeRef.current;
+    if (owner) {
+      if (event.button === 0 && activeTool === "pen" && event.pointerType === "pen" && owner.pointerType === "touch") {
+        ignoredContactsRef.current.add(owner.pointerId);
+        settleStroke(!isProvisionalTouch(owner, event.timeStamp));
+      } else return;
+    }
+    if (event.button === 0 && event.pointerType === "pen" && activeTool === "pen") {
+      // Prefer recognized pen input over a pending touch pan/pinch.
+      if (pinchRef.current || panRef.current) commitViewport();
+      pinchRef.current = null;
+      panRef.current = null;
+      for (const id of touchPointsRef.current.keys()) {
+        ignoredContactsRef.current.add(id);
+        if (surfaceRef.current?.hasPointerCapture(id)) surfaceRef.current.releasePointerCapture(id);
+      }
+      touchPointsRef.current.clear();
+      setIsPinching(false);
+      setIsPanning(false);
+    }
     pointerLocationRef.current = {
       clientPoint: { x: event.clientX, y: event.clientY },
       isOverCanvas: true,
@@ -1392,6 +1491,7 @@ export function CanvasViewport() {
       appendStrokeSamples(event, stroke);
       return;
     }
+    if (stroke) return;
 
     const frameCreation = frameCreationRef.current;
     if (frameCreation?.pointerId === event.pointerId) {
@@ -1550,9 +1650,12 @@ export function CanvasViewport() {
   const handleLostPointerCapture = (
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (strokeRef.current?.pointerId === event.pointerId) {
-      clearStrokePreview();
-      useInteractionStore.getState().endInteraction();
+    if (event.target === surfaceRef.current && pinchRef.current?.pointerIds.includes(event.pointerId)) {
+      handleViewportPointerEndCapture(event);
+      return;
+    }
+    if (event.target === surfaceRef.current && strokeRef.current?.pointerId === event.pointerId) {
+      settleStroke(true);
       return;
     }
 
@@ -1721,7 +1824,7 @@ export function CanvasViewport() {
         <div ref={frameDraftRef} className="frame-draft" aria-hidden="true" />
         <ConnectorLayer />
         <ObjectLayer />
-        <StrokeLayer />
+        <StrokeLayer zoom={strokeZoom} window={strokeWindow} />
         <SelectionLayer />
         <svg className="connector-draft-layer" aria-hidden="true">
           <path ref={connectorDraftRef} className="connector-draft-path" />

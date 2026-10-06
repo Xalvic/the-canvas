@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "pen-production.spec.ts",
   fullyParallel: true,
   workers: 2,
   use: {

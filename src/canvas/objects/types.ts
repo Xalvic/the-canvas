@@ -50,11 +50,15 @@ export type StrokePoint = {
   x: number;
   y: number;
   pressure?: number;
-  // New Draw strokes store the smoothed width as a fraction of strokeWidth.
+  // Legacy Draw strokes store the smoothed width as a fraction of strokeWidth.
   // A ratio keeps thickness edits independent of captured expressive dynamics.
   widthRatio?: number;
   velocity?: number;
+  // Renderer 2 pressure, calibrated at capture; never reinterpret widthRatio.
+  inkPressure?: number;
 };
+
+export type StrokeInputKind = "mouse" | "touch" | "pen";
 
 export type StrokeCanvasObject = BaseSpatialObject & {
   type: "stroke";
@@ -63,6 +67,8 @@ export type StrokeCanvasObject = BaseSpatialObject & {
   color: string;
   mode?: "draw" | "solid";
   opacity?: number;
+  rendererVersion?: 2;
+  inputKind?: StrokeInputKind;
 };
 
 export type ConnectionAnchor = "top" | "right" | "bottom" | "left";

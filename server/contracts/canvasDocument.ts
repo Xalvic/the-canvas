@@ -45,6 +45,7 @@ const pointSchema = z.strictObject({
   pressure: unitInterval.optional(),
   widthRatio: finiteNumber.positive().max(1).optional(),
   velocity: finiteNumber.nonnegative().optional(),
+  inkPressure: unitInterval.optional(),
 });
 
 const canvasObjectSchema = z.discriminatedUnion("type", [
@@ -79,7 +80,12 @@ const canvasObjectSchema = z.discriminatedUnion("type", [
     color,
     mode: z.enum(["draw", "solid"]).default("draw"),
     opacity: unitInterval.default(1),
-  }),
+    rendererVersion: z.literal(2).optional(),
+    inputKind: z.enum(["mouse", "touch", "pen"]).optional(),
+  }).refine((stroke) => stroke.rendererVersion === 2
+    ? stroke.inputKind !== undefined && stroke.points.every((point) => point.inkPressure !== undefined)
+    : stroke.inputKind === undefined && stroke.points.every((point) => point.inkPressure === undefined),
+  { message: "Stroke renderer metadata and pressure must use the same version" }),
   z.strictObject({
     ...baseFields,
     type: z.literal("connector"),
