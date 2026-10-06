@@ -6,6 +6,7 @@ import { useCollaborationStore } from "../store/collaborationStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useViewportStore } from "../store/viewportStore";
+import { Dialog } from "./Dialog";
 
 export type PublishCollaborationPresence = (cursor: Point | null, selectedIds: string[]) => void;
 const PRESENCE_INTERVAL_MS = 100;
@@ -79,6 +80,24 @@ export function collaborationColor(clientId: string) {
   return colors[hash % colors.length];
 }
 
+export function CollaborationSummary() {
+  const [peopleOpen, setPeopleOpen] = useState(false);
+  const { clientId, status, participants } = useCollaborationStore();
+  useEffect(() => { if (status === "disconnected") setPeopleOpen(false); }, [status]);
+  const others = status === "connected" ? participants.filter((participant) => participant.clientId !== clientId) : [];
+  const label = status === "connected" ? `Live · ${others.length} ${others.length === 1 ? "collaborator" : "collaborators"}` :
+    status === "error" ? "Live updates unavailable" : status === "reconnecting" ? "Reconnecting live updates…" : "Connecting live updates…";
+  if (status === "disconnected") return null;
+  return <>
+    {others.length > 0 ? <button type="button" className="collaboration-summary" data-collaboration-status={status} aria-haspopup="dialog" onClick={() => setPeopleOpen(true)}>{label}</button> :
+      <span className="collaboration-summary" data-collaboration-status={status}>{label}</span>}
+    <Dialog open={peopleOpen} title="People on this board" close={() => setPeopleOpen(false)}>
+      <p>Other people currently connected to live updates:</p>
+      {others.length === 0 ? <p>No other collaborators connected.</p> : <ul>{others.map((participant) => <li key={participant.clientId}>{participant.displayName?.trim() || "Collaborator"}</li>)}</ul>}
+    </Dialog>
+  </>;
+}
+
 export function CollaborationPresence() {
   const { clientId, status, participants } = useCollaborationStore();
   const objects = useDocumentStore((state) => state.objects);
@@ -88,13 +107,7 @@ export function CollaborationPresence() {
   if (!surface || status === "disconnected") return null;
   const world = surface.querySelector<HTMLElement>(".world-layer");
   const others = status === "connected" ? participants.filter((participant) => participant.clientId !== clientId) : [];
-  const label = status === "connected" ? `Live · ${others.length} ${others.length === 1 ? "collaborator" : "collaborators"}` :
-    status === "error" ? "Live updates unavailable" : status === "reconnecting" ? "Reconnecting live updates…" : "Connecting live updates…";
   return <>
-    {createPortal(<div data-collaboration-status={status} role="status" style={{
-      position: "absolute", top: 16, right: 16, zIndex: 90, pointerEvents: "none", borderRadius: 10,
-      padding: "8px 12px", background: "rgba(25,25,30,.88)", color: "#fff", fontSize: 12,
-    }}><span>{label}</span>{others.length > 0 && <div style={{ opacity: .8, marginTop: 4 }}>{others.slice(0, 4).map((participant) => participant.displayName?.trim() || "Collaborator").join(", ")}</div>}</div>, surface)}
     {world && createPortal(<div aria-hidden="true" style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none", zIndex: 2_147_483_647 }}>
       {others.map((participant) => {
         const color = collaborationColor(participant.clientId);

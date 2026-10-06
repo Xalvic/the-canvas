@@ -1,8 +1,63 @@
 # Scribble: resume here
 
-Updated: 2026-10-05. Read once per new project session.
+Updated: 2026-10-06. Read once per new project session.
 
 ## Current handoff
+
+Current focus: UI/UX simplification implementation completed locally through phases
+0–4; phase 5 local regression checks passed. Read `docs/ux-simplification-plan.md`
+and `docs/ux-validation.md`. `docs/ux-wireframe.html` remains a fake-data clickable
+proposal, not application behavior.
+
+Implemented: compact board header, separate truthful device/account/access/live
+status, account dialog with bounded checks, board drawer with loaded-list search and
+My boards / Shared with me / Invitations, explicit account-copy/image confirmation
+and progress, focused owner sharing, manual clipboard fallback, Google-redirect
+invitation intent without auto-accept, keyboard-accessible collaborator names,
+recovery details/confirmed replacement,
+device-save retry, responsive layouts, modal keyboard/focus isolation and Help.
+One mounted account session/cursor lifetime remains; local IndexedDB, permissions,
+SSE, selective undo, cross-tab leases and existing durable boundaries are preserved.
+Sign-in still uploads nothing. No new API/database contract or dependency was added.
+
+Human usability/timings, screen-reader, physical soft keyboard/IME and actual browser
+chrome zoom checks are pending. Automated reduced-viewport/IME and equivalent 200%
+layout checks are recorded separately. Metadata copy creation still lacks an
+idempotency receipt: on an unknown creation response, inspect My boards before
+creating another copy; no silent replay is advertised. Completed image mappings and
+known destination document operations reuse the existing recovery paths.
+
+Local evidence: 582 fast tests, 49 standard browser cases and 17 actual API/DB
+scenarios passed; build, integration-fixture typecheck and diff validation passed.
+Zero disposable browser fixture schemas remain. Desktop/mobile live SSE screenshots
+are in `docs/ux-evidence/`. The existing Docker PostgreSQL container was started for
+tests and is left running. No production/provider mutations were made.
+
+Next: human acceptance using the saved task script and controlled release.
+The user authorized this UX delivery’s commit and push on 2026-10-06. This
+commit uses `[CF-Pages-Skip]` to omit the Cloudflare Pages deployment while
+GitHub CI remains enabled. Deployment still needs fresh authorization; review
+Pages settings separately. Render auto-deploy remains OFF. Existing user data
+and offsite-backup/monitoring follow-ups are preserved. Free tiers, Google-only auth,
+PWA/Postman exclusions remain.
+Deployment update (user-reported, 2026-10-06): frontend is Cloudflare Pages
+`the-canvas-c3o.pages.dev`, served at `https://milanputhukkudy.com/scribble/` by
+dashboard Worker `scribble-router`. The updated Worker forwards `/api/*`, `/health`
+and `/ready` to Render Free `https://scribble-api-003m.onrender.com`. Render
+auto-deploy is OFF; Pages deployment is independent. Neon Free project
+`muddy-shadow-82970904`, production branch, database `scribble` is configured and
+SQL migrations succeeded. Production Google callback was registered. The user
+verified readiness, Google sign-in/cloud APIs and two-account live collaboration.
+These are user-reported live results; this UX session uses local disposable fixtures.
+Encrypted offsite backups, active schedulers/monitoring, remaining deployed failure
+checks and hosted CI review are still follow-ups. Stay on free tiers. PWA/Postman
+remain out of scope. Commit `d5bf489` and the two preceding commits were pushed to
+main after explicit authorization; future commits/pushes/deployments need fresh
+authorization. The original 2026-10-06 request authorized local UX implementation and validation;
+the follow-up authorized this delivery’s commit and push. Future commits/pushes
+and any deployment require fresh authorization. Keep secrets in ignored local/provider settings.
+
+## Previous local implementation handoff (2026-10-05)
 
 Active implementation queue (2026-10-05): frontend cloud images are implemented
 and locally verified with six actual browser/API/Prisma/PostgreSQL scenarios,

@@ -1,6 +1,19 @@
 # Scribble implementation status
 
-Updated: 2026-10-05. Implementation only; lesson topics are excluded.
+Updated: 2026-10-06. Implementation only; lesson topics are excluded.
+
+Current deployment update (user-reported): Cloudflare Pages frontend plus
+`scribble-router` proxy, Render Free API `scribble-api-003m.onrender.com` and Neon
+Free production database `scribble` are connected. Migrations and public readiness
+succeeded; the user verified Google sign-in, cloud APIs and two-account live
+collaboration. Render auto-deploy is off. Operational schedules, encrypted offsite
+backups/restore, remaining live failure checks and hosted CI review remain pending.
+The 2026-10-05 delivery queue below is historical where it says deployment is
+pending. UX simplification is implemented and locally validated through phases 0–4;
+phase 5 local regression checks passed. Human usability and controlled release remain
+pending. See [ux-simplification-plan.md](ux-simplification-plan.md) and
+[ux-validation.md](ux-validation.md); [ux-wireframe.html](ux-wireframe.html) remains
+a simulated design proposal.
 
 Scope update: PWA installation/offline app loading and Postman collection
 maintenance were cancelled by the user. Their project tooling is removed.

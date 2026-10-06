@@ -20,14 +20,15 @@ async function mouseStroke(
   slow: boolean,
   curved = false,
 ) {
-  await page.mouse.move(160, y);
+  // The compact header moves contextual settings lower; start in exposed canvas.
+  await page.mouse.move(280, y);
   await page.mouse.down();
   const steps = slow ? 35 : 14;
   for (let i = 1; i <= steps; i++) {
     if (slow) await page.waitForTimeout(25);
     const progress = i / steps;
     await page.mouse.move(
-      160 + progress * 245,
+      280 + progress * 245,
       y + (curved ? 50 * Math.sin((progress * 35) / 8) : 0),
     );
   }

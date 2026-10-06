@@ -72,6 +72,9 @@ export async function restoreInterruptedLocalBoard(): Promise<void> {
 }
 
 const AUTOSAVE_DELAY_MS = 500;
+const RETRY_LOCAL_SAVE = "scribble:retry-device-save";
+// Retry enters the same serial queue; it cannot race a separate persistence write.
+export function retryLocalBoardSave() { window.dispatchEvent(new Event(RETRY_LOCAL_SAVE)); }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Local save failed";
@@ -238,12 +241,14 @@ export function useLocalBoardPersistence(): void {
     };
 
     window.addEventListener("pagehide", flushPendingSave);
+    window.addEventListener(RETRY_LOCAL_SAVE, scheduleSave);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       unsubscribeDocument();
       unsubscribeViewport();
       unsubscribeBoard();
       window.removeEventListener("pagehide", flushPendingSave);
+      window.removeEventListener(RETRY_LOCAL_SAVE, scheduleSave);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       flushPendingSave();
     };

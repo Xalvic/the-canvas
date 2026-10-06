@@ -1,178 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
-import type { CanvasObject, CardCanvasObject } from "../src/canvas/objects/types";
-import type { BoardDocument } from "../server/documents";
-import { isDeepStrictEqual } from "node:util";
-
-const user = { id: "11111111-1111-4111-8111-111111111111", email: "owner@example.com", displayName: "Owner" };
-const guest = { error: { code: "UNAUTHENTICATED", message: "Sign in to use account boards", details: { googleSignInEnabled: true } } };
-const firstId = "22222222-2222-4222-8222-222222222222";
-const secondId = "33333333-3333-4333-8333-333333333333";
-
-type Metadata = { id: string; title: string; createdAt: number; updatedAt: number; role?: "owner" | "editor" | "viewer" };
-type SavedBoard = Metadata & { document: BoardDocument | null };
-type Mutation = { method: string; path: string; body: any };
-
-function note(id: string, title: string): CardCanvasObject {
-  return { id, type: "card", title, body: "", x: 300, y: 450, width: 260, height: 150, zIndex: 1, createdAt: 1, updatedAt: 1 };
-}
-
-function savedBoard(id: string, title: string, objects: CanvasObject[] = [note(`note-${id}`, title)]): SavedBoard {
-  return { id, title, createdAt: 1, updatedAt: 1, document: { boardId: id, schemaVersion: 1, revision: 1, updatedAt: 1, content: { objects } } };
-}
-
-async function mockAccount(page: Page, initial: SavedBoard[] = []) {
-  // This suite isolates finite HTTP/draft behavior; the integration suite
-  // exercises actual authorized SSE streams with two browser contexts.
-  await page.addInitScript(() => { Object.defineProperty(window, "EventSource", { value: undefined }); });
-  const receipts = new Map<string, string>();
-  const cloud = {
-    signedIn: true,
-    failSaves: false,
-    failLists: false,
-    loseNextSaveResponse: false,
-    listRequests: 0,
-    conflictOnNextSave: false,
-    mutations: [] as Mutation[],
-    boards: new Map(initial.map((board) => [board.id, structuredClone(board)])),
-    documentGate: null as Promise<void> | null,
-    documentStarted: null as (() => void) | null,
-    listGate: null as Promise<void> | null,
-    listStarted: null as (() => void) | null,
-  };
-  let nextId = 4;
-  await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: [] } }));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user } : guest }));
-  await page.route("**/api/auth/logout", (route) => {
-    cloud.signedIn = false;
-    return route.fulfill({ status: 204 });
-  });
-  await page.route(/\/api\/boards(?:\/[^/?]+(?:\/(?:document|operations|presence))?)?(?:\?.*)?$/, async (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    const method = request.method();
-    const body = ["POST", "PATCH", "PUT"].includes(method) ? request.postDataJSON() : null;
-    if (path.endsWith("/presence")) { await route.fulfill({ status: 204 }); return; }
-    if (method !== "GET") {
-      expect(request.headers()["x-scribble-request"]).toBe("1");
-      cloud.mutations.push({ method, path, body });
-    }
-    if (!cloud.signedIn) { await route.fulfill({ status: 401, json: guest }); return; }
-    if (path === "/api/boards") {
-      if (method === "GET") {
-        cloud.listRequests++;
-        const boards = [...cloud.boards.values()].map(({ document: _document, ...board }) => board);
-        cloud.listStarted?.();
-        if (cloud.listGate) await cloud.listGate;
-        await route.fulfill(cloud.failLists
-          ? { status: 503, json: { error: { code: "UNAVAILABLE", message: "Try later" } } }
-          : { json: { boards } }).catch(() => {});
-      } else if (method === "POST") {
-        const id = `${String(nextId++).padStart(8, "0")}-4444-4444-8444-444444444444`;
-        const board = { id, title: body.title, createdAt: 1, updatedAt: 1, document: null };
-        cloud.boards.set(id, board);
-        await route.fulfill({ status: 201, json: { board } });
-      }
-      return;
-    }
-    const [, , , id, documentPath] = path.split("/");
-    const board = cloud.boards.get(id);
-    if (!board) { await route.fulfill({ status: 404, json: { error: { code: "BOARD_NOT_FOUND", message: "Board not found" } } }); return; }
-    if (documentPath === "document" || documentPath === "operations") {
-      if (method === "GET") {
-        cloud.documentStarted?.();
-        if (cloud.documentGate) await cloud.documentGate;
-        await route.fulfill(board.document ? { json: { document: board.document } } : { status: 404, json: { error: { code: "DOCUMENT_NOT_FOUND", message: "This board has no saved document" } } }).catch(() => {});
-        return;
-      }
-      if (cloud.failSaves) { await route.fulfill({ status: 503, json: { error: { code: "SERVER_ERROR", message: "Account save temporarily unavailable" } } }); return; }
-      if (cloud.conflictOnNextSave) {
-        cloud.conflictOnNextSave = false;
-        board.document = { boardId: id, schemaVersion: 1, revision: (board.document?.revision ?? 0) + 1, updatedAt: 2, content: { objects: [note("remote-change", "Changed on another device")] } };
-      }
-      const revision = board.document?.revision ?? 0;
-      if (documentPath === "operations") {
-        const receipt = receipts.get(`${id}:${body.operationId}`);
-        if (receipt) {
-          expect(receipt).toBe(JSON.stringify(body));
-          await route.fulfill({ json: { document: board.document, replayed: true } }); return;
-        }
-        const objects = new Map(board.document!.content.objects.map((object) => [object.id, object]));
-        if (body.baseRevision > revision || body.changes.some((change: any) => !isDeepStrictEqual(objects.get(change.id) ?? null, change.before))) {
-          await route.fulfill({ status: 409, json: { error: { code: "COLLABORATION_CONFLICT", message: "This board changed elsewhere.", details: { currentRevision: revision } } } }); return;
-        }
-        for (const change of body.changes) { if (change.after === null) objects.delete(change.id); else objects.set(change.id, change.after); }
-        board.document = { ...board.document!, revision: revision + 1, updatedAt: Date.now(), content: { objects: [...objects.values()] } };
-        receipts.set(`${id}:${body.operationId}`, JSON.stringify(body));
-        if (cloud.loseNextSaveResponse) { cloud.loseNextSaveResponse = false; await route.abort("failed"); return; }
-        await route.fulfill({ json: { document: board.document, replayed: false } }); return;
-      }
-      if (body.expectedRevision !== revision) {
-        await route.fulfill({ status: 409, json: { error: { code: "REVISION_CONFLICT", message: "Document revision does not match", details: { currentRevision: revision } } } });
-        return;
-      }
-      board.document = { boardId: id, schemaVersion: body.schemaVersion, revision: revision + 1, updatedAt: Date.now(), content: body.content };
-      if (cloud.loseNextSaveResponse) { cloud.loseNextSaveResponse = false; await route.abort("failed"); return; }
-      await route.fulfill({ status: revision === 0 ? 201 : 200, json: { document: board.document } });
-      return;
-    }
-    if (method === "PATCH") {
-      board.title = body.title;
-      board.updatedAt = Date.now();
-    } else if (method === "DELETE") {
-      cloud.boards.delete(id);
-      await route.fulfill({ status: 204 });
-      return;
-    }
-    const { document: _document, ...metadata } = board;
-    await route.fulfill({ json: { board: metadata } });
-  });
-  return cloud;
-}
-
-async function canvasState(page: Page) {
-  return page.evaluate(async () => {
-    const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
-    const { useViewportStore } = await import(/* @vite-ignore */ "/scribble/src/store/viewportStore.ts");
-    const { objects, past, future } = useDocumentStore.getState();
-    return { objects, past, future, viewport: useViewportStore.getState().viewport };
-  });
-}
-
-async function localBoard(page: Page) {
-  return page.evaluate(async () => {
-    const { loadLocalBoard } = await import(/* @vite-ignore */ "/scribble/src/persistence/localBoardStorage.ts");
-    return loadLocalBoard();
-  });
-}
-
-async function createNote(page: Page, title: string) {
-  await page.getByRole("button", { name: "Note tool", exact: true }).click();
-  await page.mouse.click(330, 500);
-  await page.getByLabel("Card title", { exact: true }).fill(title);
-  await page.keyboard.press("Escape");
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
-}
-
-async function editNote(page: Page, before: string, after: string) {
-  await page.locator(".card-object-value").filter({ has: page.getByText(before, { exact: true }) }).dblclick();
-  await page.getByLabel("Card title", { exact: true }).fill(after);
-  await page.keyboard.press("Escape");
-}
-
-async function openBoard(page: Page, title: string) {
-  await page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) }).getByRole("button", { name: "Open", exact: true }).click();
-  await expect(page.getByLabel("Board title")).toHaveValue(title);
-}
-
-function documentWrites(cloud: Awaited<ReturnType<typeof mockAccount>>) {
-  return cloud.mutations.filter((mutation) => mutation.method === "PUT" || mutation.path.endsWith("/operations"));
-}
+import { browse, closeDialogs, details, accountMenu, backToDevice, newAccountBoard, explicitSave, rowActions } from "./fixtures/ui";
+import { expect, test } from "@playwright/test";
+import { user, firstId, secondId, savedBoard, mockAccount, canvasState, localBoard, createNote, editNote, openBoard, documentWrites } from "./fixtures/account";
 
 test("viewers can navigate and copy but cannot change the canvas, title or history", async ({ page }) => {
   const board = savedBoard(firstId, "Viewer drawing"); board.role = "viewer"; board.document!.role = "viewer";
   const cloud = await mockAccount(page, [board]);
   await page.goto("/scribble/"); await openBoard(page, board.title);
-  await expect(page.getByText("Viewer access. This board is read-only.")).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Can view · account board");
   await expect(page.getByLabel("Board title")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
   const before = await canvasState(page);
@@ -191,10 +25,11 @@ test("viewers can navigate and copy but cannot change the canvas, title or histo
   expect(after.objects).toEqual(before.objects); expect(after.past).toEqual(before.past); expect(after.future).toEqual(before.future);
   expect(cloud.mutations).toEqual([]);
   const row = page.getByRole("listitem").filter({ has: page.getByText(board.title, { exact: true }) });
-  await expect(row.getByRole("button", { name: "Rename", exact: true })).toBeDisabled();
+  await browse(page, "Shared with me");
+  await expect(row.getByRole("button", { name: "Rename", exact: true })).toHaveCount(0);
   await expect(row.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
   await expect(row.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await createNote(page, "Guest still editable");
 });
 
@@ -217,7 +52,7 @@ test("editors save changes and a later downgrade stops edits while retaining the
   expect(Object.values((await canvasState(page)).objects)[0]).toMatchObject({ body: "Unsent draft" });
   cloud.boards.delete(firstId);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByText("Access removed. This local draft is read-only.")).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Access removed");
 });
 
 test("owners create link invitations, change roles and remove members", async ({ page }) => {
@@ -236,17 +71,17 @@ test("owners create link invitations, change roles and remove members", async ({
     else sharing.invitations = [];
     await route.fulfill({ status: 204 });
   });
-  await page.goto("/scribble/"); await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.goto("/scribble/"); await rowActions(page, "Owner drawing"); await page.getByRole("button", { name: "Share", exact: true }).click();
   await page.getByLabel("Google email").fill("friend@example.com");
   await page.getByLabel("Invite role").selectOption("editor");
   await page.getByRole("button", { name: "Create invitation", exact: true }).click();
   await expect(page.getByText(/friend@example.com · editor/)).toBeVisible();
   await page.getByRole("button", { name: "Copy invitation link", exact: true }).click();
-  await expect(page.getByRole("status").filter({ hasText: /Invitation link copied|Copy this invitation link/ })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /Invitation link copied|Clipboard unavailable/ })).toBeVisible();
   await page.getByLabel("Role for member@example.com").selectOption("editor");
   await expect.poll(() => sharing.members[0].role).toBe("editor");
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Remove access", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
   await expect(page.getByText("No invited members yet.")).toBeVisible();
   await page.getByRole("button", { name: "Cancel invitation", exact: true }).click();
   await expect(page.getByText("No pending invitations.", { exact: true })).toBeVisible();
@@ -265,7 +100,7 @@ test("recipients explicitly accept an invitation before its shared board appears
   await page.goto(`/scribble/?invite=${id}`);
   await expect(page.getByRole("list", { name: "Boards from server" })).toHaveCount(0);
   await page.getByRole("button", { name: "Accept invitation", exact: true }).click();
-  await openBoard(page, "Invited drawing");
+  await page.getByRole("button", { name: "Open board", exact: true }).click();
   await expect(page.getByLabel("Board title")).toBeDisabled();
   expect(cloud.mutations).toEqual([]);
 });
@@ -280,7 +115,9 @@ test("signing in lists owned boards without uploading or changing guest IndexedD
   const guestBoard = await localBoard(page);
   cloud.signedIn = true;
   await page.reload();
+  await browse(page);
   await expect(page.getByText("Account sketch", { exact: true })).toBeVisible();
+  await closeDialogs(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest sketch");
   expect((await canvasState(page)).objects).toEqual(guestBoard?.objects);
   expect(cloud.mutations).toEqual([]);
@@ -293,8 +130,8 @@ test("explicit upload creates a copy, then saves committed edits with increasing
   await page.getByLabel("Board title").fill("My local board");
   await createNote(page, "Local idea");
   const localObjects = (await canvasState(page)).objects;
-  await page.getByRole("button", { name: "Upload local board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Save to account");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)[0].body).toMatchObject({ expectedRevision: 0, schemaVersion: 1, content: { objects: Object.values(localObjects) } });
   const guestBoard = await localBoard(page);
@@ -304,10 +141,10 @@ test("explicit upload creates a copy, then saves committed edits with increasing
   expect(documentWrites(cloud)).toHaveLength(1);
   await page.keyboard.press("Escape");
   await expect.poll(() => documentWrites(cloud).length).toBe(2);
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(documentWrites(cloud)[1].body).toMatchObject({ baseRevision: 1, changes: [{ after: expect.objectContaining({ title: "Uncommitted note edit" }) }] });
   expect(await localBoard(page)).toEqual(guestBoard);
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await expect(page.getByRole("button", { name: "Back to local board", exact: true })).toBeHidden();
   expect((await canvasState(page)).objects).toEqual(localObjects);
   await page.reload();
@@ -330,7 +167,7 @@ test("opening and switching account boards restores guest objects, viewport and 
   expect((await canvasState(page)).past).toHaveLength(0);
   await openBoard(page, "Second account board");
   expect(Object.values((await canvasState(page)).objects)).toEqual(cloud.boards.get(secondId)?.document?.content.objects);
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest before opening");
   const restored = await canvasState(page);
   expect(restored.objects).toEqual(guestState.objects);
@@ -350,14 +187,18 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
   await openBoard(page, "Shared between my devices");
   cloud.conflictOnNextSave = true;
   await editNote(page, "Shared between my devices", "My conflicting draft");
-  await expect(page.getByText("This board changed elsewhere. Your edits are saved on this device.", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere");
   const draftObjects = (await canvasState(page)).objects;
   expect(documentWrites(cloud)).toHaveLength(1);
   expect(documentWrites(cloud)[0].body.baseRevision).toBe(1);
+  await page.evaluate(async () => {
+    const { waitForLocalBoardSave } = await import(/* @vite-ignore */ "/scribble/src/persistence/waitForLocalBoardSave.ts");
+    await waitForLocalBoardSave(new AbortController().signal);
+  });
   await page.reload();
   await expect(page.getByLabel("Board title")).toHaveValue("Untouched guest");
   await openBoard(page, "Shared between my devices");
-  await expect(page.getByText("This board changed elsewhere. Your edits are saved on this device.", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere");
   expect((await canvasState(page)).objects).toEqual(draftObjects);
   await page.waitForTimeout(1100); // Outlast the account debounce: reopening a conflict must not schedule a PUT.
   expect(documentWrites(cloud)).toHaveLength(1);
@@ -366,8 +207,8 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: "test-results/account-boards-mobile.png" });
   await page.setViewportSize({ width: 1360, height: 900 });
-  await page.getByRole("button", { name: "Save as new account board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Save a copy");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(documentWrites(cloud)[1]).toMatchObject({ body: { expectedRevision: 0, content: { objects: Object.values(draftObjects) } } });
@@ -381,18 +222,18 @@ test("reloading a conflicting account version preserves the previous draft for e
   await openBoard(page, "Account original");
   cloud.conflictOnNextSave = true;
   await editNote(page, "Account original", "Recoverable previous draft");
-  await expect(page.getByText("This board changed elsewhere. Your edits are saved on this device.", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere");
   const draftObjects = (await canvasState(page)).objects;
-  page.once("dialog", (dialog) => {
-    expect(dialog.type()).toBe("confirm");
-    expect(dialog.message()).toContain("Your current draft will be kept on this device");
-    return dialog.accept();
-  });
-  await page.getByRole("button", { name: "Reload account version", exact: true }).click();
+  await details(page);
+  await page.getByRole("button", { name: "Use account version", exact: true }).click();
+  await page.getByRole("dialog", { name: "Use account version", exact: true }).getByRole("button", { name: "Use account version", exact: true }).click();
+  await closeDialogs(page);
   await expect(page.getByText("Changed on another device", { exact: true })).toBeVisible();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await details(page);
   await page.getByRole("button", { name: "Restore previous draft", exact: true }).click();
-  await expect(page.getByText("This board changed elsewhere. Your edits are saved on this device.", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere");
   expect((await canvasState(page)).objects).toEqual(draftObjects);
   expect(documentWrites(cloud)).toHaveLength(1);
 });
@@ -405,8 +246,10 @@ test("images remain local and are rejected before account metadata is created", 
     const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
     useDocumentStore.getState().addObject({ id: "local-image", type: "image", assetId: "image-asset", name: "Local image", x: 300, y: 450, width: 40, height: 40, originalWidth: 40, originalHeight: 40, zIndex: 1, createdAt: 1, updatedAt: 1 });
   });
-  await page.getByRole("button", { name: "Upload local board", exact: true }).click();
+  await explicitSave(page, "Save to account");
+  await details(page);
   await expect(page.getByRole("alert").filter({ hasText: /image/i })).toBeVisible();
+  await closeDialogs(page);
   expect(cloud.mutations).toEqual([]);
   await expect.poll(async () => (await localBoard(page))?.objects["local-image"]?.type).toBe("image");
   await page.reload();
@@ -423,14 +266,14 @@ test("an account draft containing an unsupported image is restored locally when 
     const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
     useDocumentStore.getState().addObject({ id: "account-local-image", type: "image", assetId: "account-image-asset", name: "Image only on this device", x: 650, y: 450, width: 40, height: 40, originalWidth: 40, originalHeight: 40, zIndex: 2, createdAt: 1, updatedAt: 1 });
   });
-  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
   const draftObjects = (await canvasState(page)).objects;
   expect(documentWrites(cloud)).toHaveLength(0);
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest before image draft");
   await openBoard(page, "Account image draft");
   expect((await canvasState(page)).objects).toEqual(draftObjects);
-  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
   expect(cloud.mutations).toEqual([]);
   await page.reload();
   await expect(page.getByLabel("Board title")).toHaveValue("Guest before image draft");
@@ -445,12 +288,14 @@ test("an account save failure retains edits and retries the same expected revisi
   await openBoard(page, "Retry board");
   cloud.failSaves = true;
   await editNote(page, "Retry board", "Retry this draft");
-  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
   const draftObjects = (await canvasState(page)).objects;
   expect(documentWrites(cloud)).toHaveLength(1);
   cloud.failSaves = false;
+  await details(page);
   await page.getByRole("button", { name: "Retry account save", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(documentWrites(cloud).map((mutation) => mutation.body.baseRevision)).toEqual([1, 1]);
   expect(documentWrites(cloud)[0].body.operationId).toBe(documentWrites(cloud)[1].body.operationId);
@@ -466,17 +311,20 @@ test("session expiry during save returns to the guest board and keeps the privat
   await openBoard(page, "Expired-session board");
   cloud.signedIn = false;
   await editNote(page, "Expired-session board", "Private draft before expiry");
-  await expect(page.getByText("Sign in to see your server boards.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   await expect(page.getByLabel("Board title")).toHaveValue("Guest remains mine");
   expect((await canvasState(page)).objects).toEqual(guestObjects);
   await expect(page.getByText("Expired-session board", { exact: true })).toHaveCount(0);
   cloud.signedIn = true;
   await page.reload();
+  await browse(page);
   await expect(page.getByText("Expired-session board", { exact: true })).toBeVisible();
   await openBoard(page, "Expired-session board");
   await expect(page.getByText("Private draft before expiry", { exact: true })).toBeVisible();
+  await details(page);
   await page.getByRole("button", { name: "Retry account save", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(cloud.boards.get(firstId)?.document?.content.objects[0]).toMatchObject({ title: "Private draft before expiry" });
 });
 
@@ -491,10 +339,13 @@ test("a delayed account document cannot replace the guest canvas after sign-out"
   cloud.documentGate = new Promise<void>((resolve) => { release = resolve; });
   const requestStarted = new Promise<void>((resolve) => { started = resolve; });
   cloud.documentStarted = started;
-  await page.getByRole("listitem").filter({ has: page.getByText("Delayed board", { exact: true }) }).getByRole("button", { name: "Open", exact: true }).click();
+  await browse(page);
+  await page.getByRole("listitem").filter({ has: page.getByText("Delayed board", { exact: true }) }).locator(".board-open").click();
   await requestStarted;
+  await accountMenu(page);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByText("Sign in to see your server boards.", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   release();
   await expect(page.getByLabel("Board title")).toHaveValue("Guest during account request");
   expect((await canvasState(page)).objects).toEqual(guestObjects);
@@ -511,17 +362,21 @@ test("sign-out during an account reload returns to the guest board and ignores t
   await openBoard(page, "Reloading account board");
   cloud.failSaves = true;
   await editNote(page, "Reloading account board", "Unsent private draft");
-  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
   let release!: () => void;
   let started!: () => void;
   cloud.documentGate = new Promise<void>((resolve) => { release = resolve; });
   const requestStarted = new Promise<void>((resolve) => { started = resolve; });
   cloud.documentStarted = started;
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Reload account version", exact: true }).click();
+  await details(page);
+  await page.getByRole("button", { name: "Use account version", exact: true }).click();
+  await page.getByRole("dialog", { name: "Use account version", exact: true }).getByRole("button", { name: "Use account version", exact: true }).click();
+  await closeDialogs(page);
   await requestStarted;
+  await accountMenu(page);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByText("Sign in to see your server boards.", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   release();
   await expect(page.getByLabel("Board title")).toHaveValue("Guest during reload");
   expect((await canvasState(page)).objects).toEqual(guestObjects);
@@ -535,17 +390,21 @@ test("new account boards and explicit rename/delete leave the guest board intact
   await page.getByLabel("Board title").fill("Guest title stays");
   await createNote(page, "Guest stays too");
   const guestObjects = (await canvasState(page)).objects;
-  await page.getByRole("button", { name: "New account board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await newAccountBoard(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect((await canvasState(page)).objects).toEqual({});
   const created = [...cloud.boards.values()][0];
   expect(created.document?.content.objects).toEqual([]);
   const row = page.getByRole("listitem").filter({ has: page.getByText(created.title, { exact: true }) });
-  page.once("dialog", (dialog) => dialog.accept("Renamed account board"));
+  await rowActions(page, created.title);
   await row.getByRole("button", { name: "Rename", exact: true }).click();
+  await page.getByLabel("New board title").fill("Renamed account board");
+  await page.getByRole("button", { name: "Save title", exact: true }).click();
   await expect(page.getByLabel("Board title")).toHaveValue("Renamed account board");
-  page.once("dialog", (dialog) => dialog.accept());
+  await rowActions(page, "Renamed account board");
   await page.getByRole("listitem").filter({ has: page.getByText("Renamed account board", { exact: true }) }).getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete board", exact: true }).click();
+  await closeDialogs(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest title stays");
   expect((await canvasState(page)).objects).toEqual(guestObjects);
   expect(cloud.boards.size).toBe(0);
@@ -555,15 +414,18 @@ test("new account boards and explicit rename/delete leave the guest board intact
 test("cached board titles stay visible during refresh failure and recover on retry", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Cached board")]);
   await page.goto("/scribble/");
+  await browse(page);
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   let release!: () => void;
   cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
   cloud.failLists = true;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(page.getByText("Refreshing boards…", { exact: true })).toBeVisible();
+  await browse(page);
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   release();
   await expect(page.getByRole("alert").filter({ hasText: "Showing the last loaded list" })).toBeVisible();
+  await browse(page);
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   cloud.failLists = false;
   cloud.listGate = null;
@@ -598,6 +460,7 @@ test("fresh lists avoid focus requests and stale focus refresh leaves the active
   cloud.boards.get(firstId)!.document = savedBoard(firstId, "Remote canvas change").document;
   await page.clock.fastForward(31_000);
   await refocus();
+  await browse(page);
   await expect(page.getByText("Changed title elsewhere", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Board title")).toHaveValue("Focus board");
   expect(await canvasState(page)).toEqual(before);
@@ -607,8 +470,11 @@ test("fresh lists avoid focus requests and stale focus refresh leaves the active
 test("reconnect refreshes the board list without submitting guest work", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before reconnect")]);
   await page.goto("/scribble/");
+  await browse(page);
   await expect(page.getByText("Before reconnect", { exact: true })).toBeVisible();
+  await closeDialogs(page);
   await page.getByLabel("Board title").fill("Local reconnect draft");
+  await browse(page);
   cloud.boards.get(firstId)!.title = "After reconnect";
   await page.evaluate(() => window.dispatchEvent(new Event("offline")));
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
@@ -620,6 +486,7 @@ test("reconnect refreshes the board list without submitting guest work", async (
 test("an older list refresh cannot roll back an acknowledged rename", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before rename")]);
   await page.goto("/scribble/");
+  await browse(page);
   await expect(page.getByText("Before rename", { exact: true })).toBeVisible();
   let release!: () => void;
   let started!: () => void;
@@ -629,8 +496,10 @@ test("an older list refresh cannot roll back an acknowledged rename", async ({ p
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await requestStarted;
   cloud.listGate = null;
-  page.once("dialog", (dialog) => dialog.accept("Acknowledged rename"));
+  await rowActions(page, "Before rename");
   await page.getByRole("listitem").filter({ has: page.getByText("Before rename", { exact: true }) }).getByRole("button", { name: "Rename", exact: true }).click();
+  await page.getByLabel("New board title").fill("Acknowledged rename");
+  await page.getByRole("button", { name: "Save title", exact: true }).click();
   await expect(page.getByText("Acknowledged rename", { exact: true })).toBeVisible();
   release();
   await expect(page.getByText("Before rename", { exact: true })).toHaveCount(0);
@@ -644,11 +513,13 @@ test("a lost save acknowledgement reconciles a fresh revision without duplicatin
   await openBoard(page, "Lost response board");
   cloud.loseNextSaveResponse = true;
   await editNote(page, "Lost response board", "Accepted before response loss");
-  await expect(page.getByRole("button", { name: "Retry account save", exact: true })).toBeVisible();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
   expect(documentWrites(cloud)).toHaveLength(1);
   expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);
+  await details(page);
   await page.getByRole("button", { name: "Retry account save", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(new Set(documentWrites(cloud).map((mutation) => mutation.body.operationId)).size).toBe(1);
   expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);

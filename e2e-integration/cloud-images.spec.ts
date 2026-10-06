@@ -1,3 +1,4 @@
+import { browse, closeDialogs, details, backToDevice, newAccountBoard, explicitSave } from "../e2e/fixtures/ui";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
@@ -48,9 +49,12 @@ async function flushLocalDraft(page: Page) {
   });
 }
 async function openBoard(page: Page, title: string) {
-  await page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) }).getByRole("button", { name: "Open", exact: true }).click();
+  await browse(page);
+  if (!await page.getByText(title, { exact: true }).isVisible()) await page.getByRole("button", { name: "Shared with me", exact: true }).click();
+  await page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) }).locator(".board-open").click();
   await expect(page.getByLabel("Board title")).toHaveValue(title);
-  await expect(page.getByRole("button", { name: "New account board", exact: true })).toBeEnabled();
+  await closeDialogs(page);
+  await expect(page.getByLabel("Board title")).toBeVisible();
   // Each device owns its viewport. Center the world origin with the real canvas
   // control before checking image rendering, including negative world positions.
   await page.getByRole("button", { name: "Reset viewport", exact: true }).click();
@@ -59,8 +63,8 @@ async function uploadGuestImage(page: Page, title: string) {
   await page.goto("/scribble/");
   await page.getByLabel("Board title").fill(title);
   await dropImage(page);
-  await page.getByRole("button", { name: "Upload local board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Save to account");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const boardId = await currentBoard(page);
   expect(boardId).not.toBeNull();
   return boardId!;
@@ -77,6 +81,36 @@ async function newSignedInPage(context: BrowserContext, subject?: string) {
 
 test.afterEach(async ({ request }) => { await provider(request, {}); });
 
+test("stopping an explicit image request preserves the destination draft and retry creates no second board", async ({ page, context }) => {
+  await signIn(context.request);
+  await page.goto("/scribble/");
+  await page.getByLabel("Board title").fill("Cancelled upload fixture");
+  await dropImage(page);
+  await provider(context.request, { uploadDelayMs: 1500 });
+  await page.getByRole("button", { name: "Save to account", exact: true }).click();
+  await page.getByRole("dialog", { name: "Save to account", exact: true }).getByRole("button", { name: "Save to account", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Save to account", exact: true }).getByText("Uploading images… 0/1", { exact: true })).toBeVisible();
+  const boardId = (await currentBoard(page))!;
+  await page.getByRole("button", { name: "Stop request", exact: true }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.locator(".save-status")).toContainText("Account save failed");
+  await flushLocalDraft(page);
+  expect((await (await context.request.get(`${baseURL}/api/boards`)).json()).boards).toHaveLength(1);
+  await renderedImage(page);
+  await provider(context.request, { uploadDelayMs: 0 });
+  // Aborting the browser does not cancel the provider's already accepted work.
+  // Wait for that bounded request to release the existing per-user upload gate.
+  await expect.poll(async () => (await state(context.request, boardId)).assets.filter((asset) => asset.status === "pending").length).toBe(0);
+  await explicitSave(page, "Upload and save");
+  await details(page);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await closeDialogs(page);
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  expect(await currentBoard(page)).toBe(boardId);
+  expect((await (await context.request.get(`${baseURL}/api/boards`)).json()).boards).toHaveLength(1);
+  expect((await state(context.request, boardId)).document?.content.objects).toHaveLength(1);
+});
+
 test("guest image stays local through login; explicit upload persists a same-board asset and fresh-device reopen renders signed bytes", async ({ page, context, browser }) => {
   await page.goto("/scribble/");
   await page.getByLabel("Board title").fill("Explicit image upload");
@@ -85,10 +119,10 @@ test("guest image stays local through login; explicit upload persists a same-boa
   await flushLocalDraft(page);
   const account = await signIn(context.request);
   await page.reload();
-  await expect(page.getByRole("button", { name: "Upload local board", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save to account", exact: true })).toBeVisible();
   expect((await (await context.request.get(`${baseURL}/api/boards`)).json()).boards).toEqual([]);
-  await page.getByRole("button", { name: "Upload local board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Save to account");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const boardId = (await currentBoard(page))!;
   const persisted = await state(context.request, boardId);
   expect(persisted.document?.revision).toBe(1);
@@ -103,7 +137,7 @@ test("guest image stays local through login; explicit upload persists a same-boa
     await renderedImage(reopened);
     expect(await reopened.locator(".image-object-value").getAttribute("src")).toContain("/api/__fixture/image?");
   } finally { await fresh.close(); }
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await renderedImage(page);
   expect(await page.locator(".image-object-value").getAttribute("src")).toMatch(/^blob:/);
 });
@@ -111,24 +145,29 @@ test("guest image stays local through login; explicit upload persists a same-boa
 test("account insertion waits for explicit image upload; failure and reload keep the local file retryable", async ({ page, context }) => {
   await signIn(context.request);
   await page.goto("/scribble/");
-  await page.getByRole("button", { name: "New account board", exact: true }).click();
-  await expect(page.getByRole("button", { name: "New account board", exact: true })).toBeEnabled();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await newAccountBoard(page);
+  await closeDialogs(page);
+  await expect(page.getByLabel("Board title")).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const boardId = (await currentBoard(page))!;
   await dropImage(page);
-  await expect(page.getByRole("button", { name: "Upload pending images (1)", exact: true })).toBeVisible();
+  await details(page);
+  await expect(page.getByRole("dialog", { name: "Save details", exact: true }).getByRole("button", { name: "Upload and save", exact: true })).toBeVisible();
+  await closeDialogs(page);
   expect((await state(context.request, boardId)).assets).toEqual([]);
   await provider(context.request, { failUploads: 1 });
-  await page.getByRole("button", { name: "Upload pending images (1)", exact: true }).click();
-  await expect(page.getByText("Account save needs attention. Your draft stays on this device.", { exact: true })).toBeVisible();
+  await explicitSave(page, "Upload and save");
+  await expect(page.locator(".save-status")).toHaveText("Account save failed · saved on this device");
   expect((await state(context.request, boardId)).document?.content.objects).toEqual([]);
   await flushLocalDraft(page);
   await page.reload();
   await openBoard(page, "Untitled board");
-  await expect(page.getByRole("button", { name: "Upload pending images (1)", exact: true })).toBeVisible();
+  await details(page);
+  await expect(page.getByRole("dialog", { name: "Save details", exact: true }).getByRole("button", { name: "Upload and save", exact: true })).toBeVisible();
+  await closeDialogs(page);
   await renderedImage(page);
-  await page.getByRole("button", { name: "Upload pending images (1)", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Upload and save");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const persisted = await state(context.request, boardId);
   expect(persisted.document?.content.objects).toHaveLength(1);
   expect(persisted.assets.filter((asset) => asset.status === "ready")).toHaveLength(1);
@@ -138,7 +177,7 @@ test("cross-board copy uploads a new asset instead of saving the source referenc
   await signIn(context.request);
   const sourceId = await uploadGuestImage(page, "Copy source");
   const sourceAsset = (await state(context.request, sourceId)).assets[0].id;
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await openBoard(page, "Copy source");
   await renderedImage(page);
   await page.evaluate(async () => {
@@ -148,19 +187,22 @@ test("cross-board copy uploads a new asset instead of saving the source referenc
     useSelectionStore.getState().setSelection(Object.keys(useDocumentStore.getState().objects));
     copySelection();
   });
-  await page.getByRole("button", { name: "New account board", exact: true }).click();
+  await newAccountBoard(page);
   await expect.poll(() => currentBoard(page)).not.toBe(sourceId);
-  await expect(page.getByRole("button", { name: "New account board", exact: true })).toBeEnabled();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await expect(page.getByLabel("Board title")).toBeVisible();
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const targetId = (await currentBoard(page))!;
   await page.evaluate(async () => {
     const { pasteClipboard } = await import(/* @vite-ignore */ "/scribble/src/clipboard/clipboardCommands.ts");
     pasteClipboard();
   });
-  await expect(page.getByRole("button", { name: "Upload pending images (1)", exact: true })).toBeVisible();
+  await details(page);
+  await expect(page.getByRole("dialog", { name: "Save details", exact: true }).getByRole("button", { name: "Upload and save", exact: true })).toBeVisible();
+  await closeDialogs(page);
   expect((await state(context.request, targetId)).document?.content.objects).toEqual([]);
-  await page.getByRole("button", { name: "Upload pending images (1)", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await explicitSave(page, "Upload and save");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const target = await state(context.request, targetId);
   expect(target.assets).toHaveLength(1);
   expect(target.assets[0].id).not.toBe(sourceAsset);
@@ -171,7 +213,7 @@ test("cross-board copy uploads a new asset instead of saving the source referenc
 test("save-as-new copies cloud image bytes into the new board and leaves the original asset retained", async ({ page, context }) => {
   await signIn(context.request);
   const sourceId = await uploadGuestImage(page, "Save a cloud copy");
-  await page.getByRole("button", { name: "Back to local board", exact: true }).click();
+  await backToDevice(page);
   await openBoard(page, "Save a cloud copy");
   // Cause a real revision conflict to expose the recovery save-as-new control.
   const original = await state(context.request, sourceId);
@@ -186,9 +228,11 @@ test("save-as-new copies cloud image bytes into the new board and leaves the ori
     if (image.type !== "image") throw new Error("Expected the reopened cloud image");
     useDocumentStore.getState().updateObject(image.id, { x: image.x + 10 });
   });
-  await expect(page.getByRole("button", { name: "Save as new account board", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Save as new account board", exact: true }).click();
-  await expect(page.getByText("Saved to account", { exact: true })).toBeVisible();
+  await details(page);
+  await expect(page.getByRole("button", { name: "Save a copy", exact: true })).toBeVisible();
+  await closeDialogs(page);
+  await explicitSave(page, "Save a copy");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
   const targetId = (await currentBoard(page))!;
   expect(targetId).not.toBe(sourceId);
   const target = await state(context.request, targetId);
@@ -217,13 +261,13 @@ test("editor uploads persist, viewer reads are signed, and revoked membership bl
     expect((await member.request.put(`${baseURL}/api/boards/${boardId}/document`, { headers: mutationHeaders, data: { schemaVersion: 1, expectedRevision: document.revision, content: { objects: [image] } } })).ok()).toBeTruthy();
     await membership(context.request, boardId, account.user.id, "viewer");
     await editor.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(editor.getByText("Viewer access. This board is read-only.", { exact: true })).toBeVisible();
+    await expect(editor.locator(".save-status")).toHaveText("Can view · account board");
     expect((await member.request.get(`${baseURL}/api/boards/${boardId}/assets/${assetId}`)).status()).toBe(200);
     expect((await member.request.post(`${baseURL}/api/boards/${boardId}/assets`, { headers: { ...mutationHeaders, "Content-Type": "image/png" }, data: bytes })).status()).toBe(403);
     expect((await member.request.put(`${baseURL}/api/boards/${boardId}/document`, { headers: mutationHeaders, data: { schemaVersion: 1, expectedRevision: document.revision + 1, content: { objects: [image] } } })).status()).toBe(403);
     await membership(context.request, boardId, account.user.id, null);
     await editor.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(editor.getByText("Access removed. This local draft is read-only.", { exact: true })).toBeVisible();
+    await expect(editor.locator(".save-status")).toHaveText("Access removed");
     expect((await member.request.get(`${baseURL}/api/boards/${boardId}/assets/${assetId}`)).status()).toBe(404);
     await expect(editor.locator(".image-object-value")).toHaveCount(0);
   } finally { await member.close(); }

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scribble UX planning preview</title>
+  <style>
+    :root { color-scheme: light; --bg:#faf9f6; --surface:#fff; --ink:#242333; --muted:#686777; --line:#e6e4ed; --accent:#6954e8; --soft:#f0edff; --warn:#fff3d8; --danger:#a12e36; --shadow:0 6px 28px #2423330d; font:14px/1.5 system-ui,sans-serif; }
+    [data-theme="dark"] { color-scheme:dark; --bg:#17171c; --surface:#23232c; --ink:#f0eef7; --muted:#b6b2c4; --line:#3c3949; --soft:#322b52; --warn:#392e21; --danger:#ffafb4; --shadow:0 6px 28px #0003; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); }
+    button,input,select { font:inherit; color:inherit; }
+    button { border:1px solid var(--line); background:var(--surface); border-radius:10px; min-height:44px; padding:8px 13px; cursor:pointer; }
+    button:hover { background:var(--soft); }
+    button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+    button:disabled { opacity:.55; cursor:default; }
+    button.primary { background:var(--accent); color:white; border-color:var(--accent); }
+    button.quiet { border-color:transparent; background:transparent; }
+    .preview-controls { min-height:56px; padding:8px 20px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); background:var(--surface); }
+    .preview-controls strong { font-size:12px; letter-spacing:.04em; }
+    .preview-controls label { display:flex; gap:8px; align-items:center; }
+    select,input { border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:9px; min-height:44px; max-width:100%; }
+    .preview-controls select { font-size:12px; min-height:36px; max-width:260px; }
+    .preview-controls button { min-height:36px; margin-left:auto; font-size:12px; }
+    .preview-caption { color:var(--muted); font-size:12px; }
+    .workspace { height:calc(100dvh - 56px); min-height:650px; position:relative; overflow:hidden; background-image:radial-gradient(var(--line) 1px,transparent 1px); background-size:24px 24px; }
+    .header { position:absolute; inset:14px 18px auto; display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:10px; box-shadow:var(--shadow); z-index:2; }
+    .mark { width:32px; height:32px; display:grid; place-items:center; background:var(--accent); color:white; border-radius:10px; font-size:22px; font-weight:750; }
+    .identity { min-width:0; }
+    .title { font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .location { color:var(--muted); font-size:12px; }
+    .status { margin-left:auto; color:var(--muted); font-size:12px; }
+    .status.attention { color:var(--danger); }
+    .presence { border-radius:100px; background:var(--soft); padding:5px 9px; font-size:12px; white-space:nowrap; }
+    .notice { position:absolute; top:104px; left:50%; transform:translateX(-50%); width:min(700px,calc(100% - 36px)); padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--warn); z-index:2; display:flex; align-items:center; gap:12px; font-size:13px; box-shadow:var(--shadow); }
+    .notice span { flex:1; }
+    .notice[hidden], [hidden] { display:none !important; }
+    .tools { position:absolute; top:104px; left:50%; transform:translateX(-50%); display:flex; gap:4px; padding:7px; border-radius:14px; background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow); z-index:1; }
+    .workspace.has-notice .tools { top:184px; }
+    .tools button { width:44px; padding:5px; font-size:20px; position:relative; }
+    .tools button[aria-pressed="true"] { background:var(--accent); color:white; border-color:var(--accent); }
+    .tool-label { position:absolute; left:50%; transform:translateX(-50%); top:50px; padding:4px 8px; background:var(--ink); color:var(--surface); font-size:12px; white-space:nowrap; border-radius:5px; opacity:0; pointer-events:none; }
+    .tools button:hover .tool-label,.tools button:focus-visible .tool-label { opacity:1; }
+    .notes { position:absolute; top:39%; left:50%; transform:translateX(-50%); width:min(590px,80%); display:flex; gap:32px; align-items:center; justify-content:center; }
+    .note { background:#fff0ba; color:#413815; padding:23px; border-radius:3px; min-height:180px; width:240px; box-shadow:0 7px 16px #312b1d12; transform:rotate(-2deg); font-size:17px; }
+    .note + .note { background:#e1d9ff; color:#352950; transform:rotate(2deg); }
+    .note small { display:block; font-size:11px; opacity:.7; letter-spacing:.04em; margin-bottom:15px; }
+    .canvas-hint { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:6px 12px; white-space:nowrap; }
+    .history { position:absolute; bottom:20px; left:20px; display:flex; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:4px; }
+    .zoom { position:absolute; bottom:20px; right:20px; display:flex; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:4px; }
+    .history button,.zoom button { border:0; min-width:44px; }
+    .zoom span { padding:11px 5px; }
+    dialog { width:min(520px,calc(100% - 32px)); max-height:85dvh; overflow:auto; margin:auto; border:1px solid var(--line); border-radius:18px; background:var(--surface); color:var(--ink); padding:24px; box-shadow:0 24px 90px #0003; }
+    dialog::backdrop { background:#19162455; }
+    .dialog-title { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    h1 { margin:0; font-size:20px; } h2 { font-size:14px; margin:22px 0 10px; }
+    p { color:var(--muted); margin:8px 0 16px; }
+    .dialog-title button { width:44px; padding:6px; }
+    .tabs,.actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+    .tabs button { font-size:12px; }
+    .tabs button[aria-pressed="true"] { background:var(--soft); border-color:var(--accent); }
+    .search { width:100%; margin:8px 0 16px; }
+    .board-row { display:flex; align-items:center; gap:10px; border-top:1px solid var(--line); padding:12px 0; }
+    .board-open { flex:1; text-align:left; border:0; background:transparent; padding:0 8px; }
+    .board-open span { display:block; font-size:12px; color:var(--muted); }
+    .board-row small { color:var(--muted); }
+    .field { display:grid; gap:6px; margin:12px 0; }
+    .person { display:flex; justify-content:space-between; gap:10px; padding:12px 0; border-top:1px solid var(--line); }
+    .person small { display:block; color:var(--muted); }
+    .footnote { font-size:12px; background:var(--soft); border-radius:10px; padding:10px; }
+    .live-message { color:var(--accent); font-size:13px; min-height:20px; }
+    @media(max-width:767px) {
+      .preview-controls { padding:8px 12px; gap:6px 10px; }
+      .preview-caption { display:none; }
+      .preview-controls strong { flex:1; }
+      .preview-controls label { width:100%; order:3; justify-content:space-between; }
+      .workspace { height:calc(100dvh - 102px); min-height:620px; }
+      .header { inset:10px 10px auto; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"boards identity account" "status status share"; gap:6px 8px; padding:8px; }
+      .mark,.presence { display:none; }
+      .identity { grid-area:identity; max-width:none; }
+      .location { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .header .status { grid-area:status; margin:0; min-width:0; text-align:left; padding:4px 8px; min-height:36px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #share { grid-area:share; min-height:36px; font-size:12px; }
+      #account { grid-area:account; font-size:12px; }
+      #boards { grid-area:boards; padding:6px 10px; }
+      .tools { top:auto !important; bottom:18px; max-width:calc(100% - 24px); width:340px; justify-content:space-around; }
+      .tools .advanced { display:none; }
+      .tools button { width:52px; min-height:52px; font-size:22px; }
+      .tool-label { opacity:1; background:transparent; color:inherit; padding:0; font-size:10px; top:35px; }
+      .tools button { padding-bottom:17px; }
+      .notice { top:138px; padding:10px; gap:8px; font-size:12px; }
+      .notice button { font-size:12px; padding:5px 9px; }
+      .notes { top:43%; width:85%; gap:12px; }
+      .note { width:150px; min-height:160px; padding:16px; font-size:15px; }
+      .note small { font-size:10px; }
+      .canvas-hint { bottom:149px; font-size:11px; }
+      .history { bottom:92px; left:12px; }
+      .zoom { bottom:92px; right:12px; }
+      .history button,.zoom button { min-height:36px; min-width:36px; padding:3px; }
+      .zoom span { padding:6px 0; font-size:12px; }
+      dialog { padding:18px; max-height:85dvh; }
+    }
+    @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto; } }
+  </style>
+</head>
+<body>
+  <div class="preview-controls">
+    <strong>SCRIBBLE · PLANNING PREVIEW</strong>
+    <span class="preview-caption">Fake data. No accounts, requests or saves.</span>
+    <label for="scenario">View state
+      <select id="scenario">
+        <option value="guest">Guest / saved on device</option>
+        <option value="cloud">Account / saved</option>
+        <option value="images">Account / image upload required</option>
+        <option value="error">Account / cloud save failed</option>
+        <option value="localError">Device and account save failed</option>
+        <option value="conflict">Account / conflicting edits</option>
+        <option value="reconnecting">Account / live updates reconnecting</option>
+        <option value="editor">Account / editor</option>
+        <option value="viewer">Account / viewer</option>
+      </select>
+    </label>
+    <button id="theme">Dark preview</button>
+  </div>
+  <main class="workspace" id="workspace" aria-label="Proposed canvas layout">
+    <header class="header">
+      <div class="mark" aria-hidden="true">s</div>
+      <button id="boards">Boards</button>
+      <div class="identity"><div class="title">A little room for ideas</div><div class="location" id="location">On this device</div></div>
+      <button class="status quiet" id="status">✓ Saved on this device</button>
+      <span class="presence" id="presence" hidden>2 here</span>
+      <button id="share">Save to account</button>
+      <button id="account" class="quiet">Sign in</button>
+    </header>
+    <div class="notice" id="notice" hidden><span id="notice-text"></span><button id="notice-action">Details</button></div>
+    <nav class="tools" aria-label="Canvas tools preview">
+      <button aria-label="Select tool" aria-pressed="true" data-tool="Select">↖<span class="tool-label">Select · V</span></button>
+      <button class="advanced" aria-label="Hand tool" aria-pressed="false" data-tool="Hand">✋<span class="tool-label">Hand · H</span></button>
+      <button aria-label="Note tool" aria-pressed="false" data-tool="Note">▧<span class="tool-label">Note · N</span></button>
+      <button aria-label="Text tool" aria-pressed="false" data-tool="Text">T<span class="tool-label">Text · T</span></button>
+      <button class="advanced" aria-label="Connector tool" aria-pressed="false" data-tool="Connect">↗<span class="tool-label">Connect · C</span></button>
+      <button class="advanced" aria-label="Frame tool" aria-pressed="false" data-tool="Frame">▣<span class="tool-label">Frame · F</span></button>
+      <button aria-label="Pen tool" aria-pressed="false" data-tool="Pen">✎<span class="tool-label">Pen · P</span></button>
+      <button id="more" aria-label="More tools">···<span class="tool-label">More</span></button>
+    </nav>
+    <section class="notes" aria-label="Invented example content">
+      <div class="note"><small>THE GOAL</small>Less managing.<br>More creating.</div>
+      <div class="note"><small>A CLEAR NEXT STEP</small>Know where your work lives.</div>
+    </section>
+    <div class="history" aria-label="History preview"><button aria-label="Undo preview">↶</button><button aria-label="Redo preview">↷</button></div>
+    <div class="zoom" aria-label="Zoom preview"><button aria-label="Zoom out preview">−</button><span>100%</span><button aria-label="Zoom in preview">+</button></div>
+    <div class="canvas-hint" id="hint">Space + drag to pan · Double-click for a note</div>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-heading">
+    <div class="dialog-title"><h1 id="dialog-heading"></h1><button id="close" aria-label="Close dialog">×</button></div>
+    <div id="dialog-body"></div>
+  </dialog>
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const scenarios = {
+      guest: {location:'On this device',status:'✓ Saved on this device',share:'Save to account',account:'Sign in'},
+      cloud: {location:'In your account · Owner',status:'✓ Saved to account',share:'Share',account:'AM',presence:'2 here'},
+      images: {location:'In your account · Owner',status:'1 image waiting to upload',share:'Share',account:'AM',presence:'2 here',notice:'This image is on your device. Upload it to save it with your account board.',action:'Upload and save'},
+      error: {location:'In your account · Owner',status:'Account save failed',share:'Share',account:'AM',notice:'Your latest edits are saved on this device. They haven’t reached your account.',action:'Retry save'},
+      localError: {location:'In your account · Owner',status:'Changes haven’t been saved',share:'Share',account:'AM',notice:'Device saving and account saving both failed. Your edits are still in this open canvas.',action:'Review options'},
+      conflict: {location:'In your account · Owner',status:'This board changed elsewhere',share:'Share',account:'AM',notice:'Your device draft is saved. Review the options before replacing either version.',action:'Review options'},
+      reconnecting: {location:'In your account · Owner',status:'✓ Saved to account',share:'Share',account:'AM',presence:'Reconnecting…',notice:'Live updates are reconnecting. Your last save reached your account.',action:'Details'},
+      editor: {location:'Shared with you · Can edit',status:'✓ Saved to account',share:'Can edit',account:'AM',presence:'2 here'},
+      viewer: {location:'Shared with you · Can view',status:'Viewing account board',share:'Can view',account:'AM',presence:'2 here'}
+    };
+    let state = 'guest';
+    let lastTrigger;
+    function render() {
+      const item = scenarios[state];
+      for (const id of ['location','status','share','account']) byId(id).textContent = item[id];
+      byId('share').disabled = state === 'viewer' || state === 'editor';
+      byId('presence').hidden = !item.presence;
+      byId('presence').textContent = item.presence || '';
+      byId('notice').hidden = !item.notice;
+      byId('notice-text').textContent = item.notice || '';
+      byId('notice-action').textContent = item.action || 'Details';
+      byId('workspace').classList.toggle('has-notice',Boolean(item.notice));
+      byId('status').classList.toggle('attention',['error','localError','conflict'].includes(state));
+      document.querySelectorAll('[data-tool]').forEach(button => {button.disabled = state === 'viewer' && !['Select','Hand'].includes(button.dataset.tool);});
+    }
+    function openDialog(title, body, trigger) {
+      lastTrigger = trigger;
+      byId('dialog-heading').textContent = title;
+      byId('dialog-body').innerHTML = body;
+      byId('dialog').showModal();
+      byId('close').focus();
+    }
+    byId('close').onclick = () => byId('dialog').close();
+    byId('dialog').addEventListener('close',() => lastTrigger?.focus());
+    byId('scenario').onchange = event => {state=event.target.value;render();};
+    byId('theme').onclick = () => {const dark=document.documentElement.dataset.theme !== 'dark';document.documentElement.dataset.theme=dark?'dark':'light';byId('theme').textContent=dark?'Light preview':'Dark preview';};
+    function feedback(text) {const message=byId('dialog-message');if(message)message.textContent=text;}
+    function boardsView(trigger) {
+      openDialog('Your boards',`
+        <p>One place to open your work. Example data only.</p>
+        <div class="tabs" role="group" aria-label="Board category"><button data-category="mine" aria-pressed="true">My boards</button><button data-category="shared" aria-pressed="false">Shared with me</button><button data-category="invites" aria-pressed="false">Invitations</button></div>
+        <label for="search">Find a board</label><input class="search" id="search" placeholder="Search by title">
+        <h2>On this device</h2><div class="board-row"><button class="board-open" data-open="guest">A little room for ideas<span>Your current local board</span></button></div>
+        <h2 id="category-heading">In your account</h2><div id="board-list"></div>
+        <p class="live-message" id="dialog-message" role="status"></p>
+        <p class="footnote">Signing in alone never uploads the device board. This preview simulates an account list so its layout can be reviewed.</p>`,trigger);
+      const lists={mine:[['A little room for ideas','Owner · updated today'],['Weekend plans','Owner · updated yesterday']],shared:[['A project with friends','Can edit · updated today'],['Reading list','Can view · updated yesterday']],invites:[['Design catch-up','Invitation · Can view · expires in 7 days']]};
+      let category='mine';
+      const list = () => {
+        byId('category-heading').textContent=category==='invites'?'Waiting for your decision':category==='shared'?'Shared with you':'In your account';
+        const items=lists[category].filter(item=>item[0].toLowerCase().includes(byId('search').value.toLowerCase()));
+        byId('board-list').innerHTML=items.map(item=>`<div class="board-row"><button class="board-open" ${category==='invites'?'data-demo="Choose Accept explicitly before opening an invited board."':`data-open="${category==='shared'?(item[1].startsWith('Can edit')?'editor':'viewer'):'cloud'}"`}>${item[0]}<span>${item[1]}</span></button>${category==='invites'?'<button data-demo="Acceptance stays explicit; the real app must check the invited account.">Accept</button>':'<button aria-label="Board actions" data-demo="Rename, Share and Delete live in the contextual menu, filtered by your actual role.">···</button>'}</div>`).join('')||'<p>No matching example boards.</p>';
+      };
+      list(); byId('search').oninput=list;
+      document.querySelectorAll('[data-category]').forEach(button=>{button.onclick=()=>{category=button.dataset.category;document.querySelectorAll('[data-category]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));list();};});
+    }
+    function shareView(trigger) {
+      if(state==='guest') {
+        openDialog('Save to your account',`<p>Create an account copy of this board to access it across devices and share it. Your device board stays available.</p><p class="footnote">The real app requires Google sign-in and explicit upload. This button only switches the preview state.</p><button class="primary" data-open="cloud">Preview an account board</button>`,trigger);return;
+      }
+      openDialog('Share this board',`
+        <p>Only people you invite can access this account board.</p>
+        <form id="invite-form"><label class="field">Google email<input type="email" required placeholder="friend@example.com"></label><label class="field">Access<select><option>Can view</option><option>Can edit</option></select></label><button class="primary" type="submit">Create invitation</button></form>
+        <div id="new-invite" hidden><h2>Invitation ready</h2><p>Copy this link and send it yourself. No email has been sent.</p><button data-demo="Copy action preview. No actual invitation or link was created.">Copy invitation link</button></div>
+        <h2>People with access</h2><div class="person"><span>Alex Morgan<small>You</small></span><span>Owner</span></div><div class="person"><span>Sam Taylor<small>Invented collaborator</small></span><span>Can edit</span></div>
+        <p class="live-message" id="dialog-message" role="status"></p>
+        <p class="footnote">Invitations expire in 7 days and must be accepted using the invited Google account.</p>`,trigger);
+      byId('invite-form').onsubmit=event=>{event.preventDefault();byId('new-invite').hidden=false;feedback('Preview only: invitation creation completed.');};
+    }
+    function statusView(trigger) {
+      const item=scenarios[state];
+      const recovery = state==='conflict';
+      openDialog(recovery?'Review your versions':'Save details',`
+        <p>${item.status}.</p>
+        <div class="person"><span>On this device</span><strong>${state==='localError'?'Save failed':'Saved draft (simulated)'}</strong></div>
+        <div class="person"><span>In your account</span><strong>${state==='guest'?'Not uploaded':state==='localError'||state==='error'?'Latest save failed':state==='images'?'Image upload needed':recovery?'Another version exists':'Current'}</strong></div>
+        ${recovery?'<p>You can keep your edits as a new account board, or use the account version after preserving a device backup.</p><div class="actions"><button class="primary" data-demo="Creates a separate board; existing versions remain. Preview only.">Save a copy</button><button data-demo="A confirmed device backup is required before replacing the current content. Preview only.">Use account version</button></div>':state==='localError'?'<p>Your edits remain in memory in this preview. The real app must offer only recovery actions it actually supports.</p>':'<div class="actions"><button class="primary" data-demo="No request was sent. The actual app must verify the resulting save before changing this status.">Preview '+(state==='images'?'Upload and save':state==='error'?'Retry save':'save details')+'</button></div>'}
+        <p class="live-message" id="dialog-message" role="status"></p>
+        <p class="footnote">Status labels must come from actual persistence and access results. Closing this dialog never discards a draft.</p>`,trigger);
+    }
+    byId('boards').onclick=event=>boardsView(event.currentTarget);
+    byId('share').onclick=event=>shareView(event.currentTarget);
+    byId('status').onclick=event=>statusView(event.currentTarget);
+    byId('notice-action').onclick=event=>statusView(event.currentTarget);
+    byId('account').onclick=event=>openDialog(state==='guest'?'Your account':'Alex Morgan',`<p>${state==='guest'?'Google sign-in enables optional account saves and sharing. Your current board stays on this device.':'Example identity only. The real menu shows your Google account and sign-out action.'}</p><p class="footnote">No sign-in, sign-out or network request is performed by this preview.</p>`,event.currentTarget);
+    byId('more').onclick=event=>openDialog('More tools',`<div class="actions"><button data-demo="Hand tool remains reachable on mobile.">Hand</button><button data-demo="Connector tool remains reachable on mobile.">Connect</button><button data-demo="Frame tool remains reachable on mobile.">Frame</button></div><p class="live-message" id="dialog-message" role="status"></p>`,event.currentTarget);
+    byId('dialog-body').addEventListener('click',event=>{const item=event.target.closest('button');if(!item)return;if(item.dataset.open){state=item.dataset.open;byId('scenario').value=state;render();byId('dialog').close();}else if(item.dataset.demo)feedback(item.dataset.demo);});
+    document.querySelectorAll('[data-tool]').forEach(button=>button.onclick=()=>{document.querySelectorAll('[data-tool]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));byId('hint').textContent=button.dataset.tool+' selected · Layout preview only';});
+    render();
+  </script>
+</body>
+</html>

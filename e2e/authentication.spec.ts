@@ -1,3 +1,4 @@
+import { accountMenu, closeDialogs } from "./fixtures/ui";
 import { test, expect, type Page } from "@playwright/test";
 
 const user = { id: "550e8400-e29b-41d4-a716-446655440000", email: "artist@example.com", displayName: "Artist" };
@@ -23,17 +24,20 @@ test("optional Google account state, logout and retry preserve the guest drawing
   });
   await page.route("**/api/boards", (route) => route.fulfill({ json: { boards: [] } }));
   await page.goto("/scribble/");
+  await accountMenu(page);
   const account = page.getByRole("region", { name: "Your account" });
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toHaveAttribute("href", "/api/auth/google");
+  await closeDialogs(page);
   await page.getByRole("button", { name: "Note tool", exact: true }).click();
   await page.mouse.click(240, 420);
   await page.keyboard.press("Escape");
   const drawing = (await canvasState(page)).objects;
   const before = await canvasState(page);
+  await accountMenu(page);
   await account.getByRole("link").focus(); await page.keyboard.press("Backspace");
   expect(await canvasState(page)).toEqual(before);
   await page.waitForTimeout(800); // Allow the existing guest autosave debounce.
-  signedIn = true; await page.reload();
+  signedIn = true; await page.reload(); await accountMenu(page);
   await expect(account).toContainText("artist@example.com");
   expect((await canvasState(page)).objects).toEqual(drawing);
   const authenticated = await canvasState(page);
@@ -43,7 +47,7 @@ test("optional Google account state, logout and retry preserve the guest drawing
   logoutFailure = false; await account.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toBeVisible();
   expect(await canvasState(page)).toEqual(authenticated);
-  offline = true; await page.reload();
+  offline = true; await page.reload(); await accountMenu(page);
   await expect(account.getByRole("alert")).toContainText("Couldn’t check sign-in");
   offline = false; await account.getByRole("button", { name: "Retry sign-in check" }).click();
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toBeVisible();
@@ -55,6 +59,7 @@ test("cancelled Google sign-in is clear in Strict Mode, strips its query and kee
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: guest(false) }));
   await page.route("**/api/boards", (route) => route.fulfill({ json: { boards: [] } }));
   await page.goto("/scribble/?authError=denied");
+  await accountMenu(page);
   const account = page.getByRole("region", { name: "Your account" });
   await expect(account.getByRole("alert")).toContainText("Google sign-in was cancelled");
   await expect(account).toContainText("Google sign-in isn’t available");
@@ -70,6 +75,7 @@ test("Google navigation waits for a just-edited guest board to finish IndexedDB 
   await page.route("**/api/auth/google", (route) => route.fulfill({ status: 302, headers: { location: "/scribble/?authError=denied" } }));
   await page.goto("/scribble/");
   await page.getByLabel("Board title").fill("Fresh edit before Google");
+  await accountMenu(page);
   await page.getByRole("link", { name: "Sign in with Google" }).click();
   await expect(page.getByRole("region", { name: "Your account" }).getByRole("alert")).toContainText("Google sign-in was cancelled");
   await expect(page.getByLabel("Board title")).toHaveValue("Fresh edit before Google");

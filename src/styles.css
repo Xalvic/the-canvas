@@ -36,6 +36,7 @@
   --text-backdrop: transparent;
   --danger: #a6534f;
   --danger-surface: rgb(255 249 248 / 0.96);
+  --control-border: #85877f;
 }
 
 :root[data-theme="dark"] {
@@ -69,6 +70,7 @@
   --text-backdrop: rgb(244 244 238 / 0.9);
   --danger: #f3aaa4;
   --danger-surface: rgb(73 40 38 / 0.97);
+  --control-border: #8a8e84;
 }
 
 * {
@@ -102,6 +104,119 @@ button {
   height: 100dvh;
   color: var(--text-primary);
   background: var(--app-bg);
+}
+
+/* Board controls and modal surfaces share the existing palette. */
+.board-header {
+  position: absolute; inset: 12px 16px auto; z-index: 8;
+  display: grid; grid-template-columns: auto minmax(100px, 1fr) auto auto auto auto;
+  align-items: center; gap: 10px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface-raised); box-shadow: var(--shadow-sm);
+  font-size: 13px;
+}
+.board-header .brand-mark { position: static; min-width: 0; }
+.board-header .board-title-input { max-width: 100%; width: 100%; height: 32px; min-height: 32px; }
+.board-header .board-identity-copy { width: 100%; }
+.board-header .brand-symbol { width: 24px; height: 24px; }
+.board-location { color: var(--text-secondary); font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collaboration-summary { color: var(--text-secondary); font-size: 12px; }
+.board-header button.collaboration-summary { border-color: transparent; background: transparent; font-size: 12px; }
+.sharing-person[data-linked="true"], .invitation-ready { background: var(--accent-soft); padding: 12px; border-radius: 10px; display: grid; gap: 8px; }
+.app-dialog .board-sharing { border: 0; padding: 0; }
+.app-dialog .board-sharing :is(input, select) { min-height: 44px; }
+.board-header button, .board-notice button, .app-dialog button {
+  min-height: 44px; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 9px; background: var(--surface); cursor: pointer; font: inherit;
+}
+.board-header .save-status { border-color: transparent; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.save-status[data-attention="true"] { color: var(--danger); }
+.board-notice {
+  position: absolute; top: 150px; left: 16px; z-index: 8; max-width: min(420px, calc(100% - 32px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--danger-surface); color: var(--danger); border: 1px solid var(--border);
+  border-radius: 12px; font-size: 12px;
+}
+.app-dialog {
+  width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px);
+  margin: auto; padding: 20px; overflow: auto; color: var(--text-primary);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: var(--shadow-lg); font-size: 14px; overscroll-behavior: contain;
+}
+.app-dialog::backdrop { background: rgb(20 18 30 / .4); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.save-facts { margin: 0; }
+.save-facts > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.save-facts dt { font-weight: 600; }
+.save-facts dd { margin: 0; color: var(--text-secondary); }
+.app-dialog h3 { margin: 20px 0 8px; font-size: 14px; }
+.board-header button:disabled { cursor: default; opacity: .55; }
+.dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.dialog-heading h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.icon-button { min-width: 44px; display: inline-flex; justify-content: center; align-items: center; }
+.app-dialog p { line-height: 1.5; color: var(--text-secondary); }
+.app-dialog .server-boards-content { max-height: none; padding: 0; overflow: visible; }
+.app-dialog .account { margin: 0; padding: 0; border: 0; }
+.app-dialog button:disabled { opacity: .55; cursor: default; }
+.app-dialog button:hover:not(:disabled), .board-header button:hover { background: var(--surface-hover); }
+.app-dialog :is(button, input, select, a):focus-visible, .board-header :is(button, input):focus-visible, .board-notice button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.app-shell .toolbar-area { top: 88px; }
+.app-shell .history-dock { top: 88px; }
+.app-shell .tool-options { top: 150px; max-height: calc(100dvh - 220px); }
+.app-shell:has(.board-notice) .tool-options { top: 272px; max-height: calc(100dvh - 340px); }
+.dialog-field { display: grid; gap: 6px; margin: 16px 0; }
+.dialog-field input, .dialog-field select { width: 100%; min-height: 44px; padding: 8px 10px; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.app-dialog :is(input, select), .app-dialog .board-sharing :is(input, select) { border-color: var(--control-border); }
+.dialog-actions, .browser-categories, .board-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.app-dialog .primary-action, .board-header .primary-action { color: #fff; background: #5146df; border-color: #5146df; }
+.app-dialog .primary-action:hover:not(:disabled), .board-header .primary-action:hover:not(:disabled) { background: #4438c4; }
+.app-dialog .danger-action { color: var(--danger); border-color: var(--danger); }
+.dialog-footnote { font-size: 12px; padding: 10px; background: var(--surface-subtle); border-radius: 8px; }
+.board-browser { margin-left: 16px; width: min(440px, calc(100% - 24px)); }
+.device-board-row, .board-browser-row { display: flex; align-items: center; gap: 8px; }
+.device-board-row { justify-content: space-between; margin-bottom: 16px; }
+.device-board-row small, .board-open small { display: block; color: var(--text-secondary); font-size: 12px; font-weight: normal; }
+.browser-categories button { flex: 1; padding: 8px; font-size: 12px; }
+.browser-categories button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.board-browser-list { list-style: none; margin: 12px 0; padding: 0; }
+.board-browser-list li { padding: 8px 0; border-top: 1px solid var(--border); }
+.app-dialog .board-open { flex: 1; min-width: 0; text-align: left; border-color: transparent; overflow-wrap: anywhere; }
+.board-browser-list li[aria-current="true"] .board-open { background: var(--accent-soft); }
+
+@media (max-width: 1023px) {
+  .board-header { grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; }
+
+  .board-header .save-status { grid-row: 2; grid-column: 1 / -1; text-align: left; }
+  .board-header .account-trigger { grid-row: 1; grid-column: 3; }
+  .board-header .header-save { grid-row: 2; grid-column: 3; font-size: 12px; }
+  .board-header .collaboration-summary { grid-row: 3; grid-column: 1 / -1; font-size: 11px; }
+  .board-header:has(.header-save) .save-status { grid-column: 1 / 3; }
+  .board-notice { top: 220px; }
+  .app-shell .toolbar-area, .app-shell .history-dock { top: 152px; }
+  .app-shell .history-dock { top: auto; bottom: 18px; left: 18px; right: auto; }
+  .app-shell .tool-options { top: 220px; max-height: calc(100dvh - 290px); }
+  .app-shell:has(.board-notice) .tool-options { top: 350px; max-height: calc(100dvh - 420px); }
+}
+@media (max-width: 767px) {
+  .board-header { inset: calc(8px + env(safe-area-inset-top)) 8px auto; padding: 4px 6px; }
+  .board-header .brand-symbol { display: none; }
+  .board-header .board-title-input { min-width: 0; font-size: 14px; }
+  .board-header button.collaboration-summary { min-height: 24px; padding: 2px 4px; text-align: left; }
+  .app-shell .toolbar-area { top: auto; }
+  .app-shell .history-dock { top: auto; left: 12px; right: auto; bottom: calc(82px + env(safe-area-inset-bottom)); }
+  .app-shell:has(.mobile-selection-actions) .history-dock { bottom: calc(142px + env(safe-area-inset-bottom)); }
+  .app-shell .tool-options, .app-shell:has(.board-notice) .tool-options { top: auto; max-height: min(42dvh, 340px); }
+  .board-notice { top: 144px; }
+  .app-dialog { max-height: calc(100dvh - 16px); padding: 16px; }
+  .board-browser { margin: auto auto 8px; width: calc(100% - 16px); }
+  .app-shell:has(.canvas-viewport[data-editing-text="true"]) .board-header,
+  .app-shell:has(.canvas-viewport[data-editing-text="true"]) .board-notice { visibility: hidden; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dialog, .board-header, .board-notice { scroll-behavior: auto; transition: none; animation: none; }
 }
 
 .server-boards {

@@ -4,12 +4,10 @@ import {
   useBoardStore,
 } from "../../store/boardStore";
 
-export function BoardIdentity() {
+export function BoardIdentity({ location }: { location?: string }) {
   const title = useBoardStore((state) => state.title);
   const readOnly = useBoardStore((state) => state.readOnly);
   const isHydrated = useBoardStore((state) => state.isHydrated);
-  const saveStatus = useBoardStore((state) => state.saveStatus);
-  const saveError = useBoardStore((state) => state.saveError);
   const setTitle = useBoardStore((state) => state.setTitle);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -19,7 +17,7 @@ export function BoardIdentity() {
   };
 
   return (
-    <header
+    <div
       className="brand-mark"
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -45,16 +43,8 @@ export function BoardIdentity() {
           }}
           onFocus={(event) => event.currentTarget.select()}
         />
-        {saveStatus === "error" && <span
-          className="board-save-status"
-          data-status={saveStatus}
-          title={saveError ?? undefined}
-          role="alert"
-        >
-          <i aria-hidden="true" />
-          Save failed
-        </span>}
+        {location && <span className="board-location">{location}</span>}
       </div>
-    </header>
+    </div>
   );
 }

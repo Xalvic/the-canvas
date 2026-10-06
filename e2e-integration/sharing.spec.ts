@@ -1,3 +1,4 @@
+import { browse, closeDialogs, rowActions } from "../e2e/fixtures/ui";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { BASE_URL, canvasState, connected, contextPage, editNote, flushLocalDraft, mutationHeaders, openBoard, signIn, state } from "./fixture";
@@ -17,8 +18,8 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
   })).status()).toBe(201);
   await page.goto("/scribble/");
   await openBoard(page, title);
-  const boardRow = page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) });
-  await boardRow.getByRole("button", { name: "Share", exact: true }).click();
+
+  await page.getByRole("button", { name: "Share", exact: true }).click();
   const sharing = page.getByRole("region", { name: `Sharing ${title}`, exact: true });
   await sharing.getByLabel("Google email", { exact: true }).fill(editorEmail);
   await sharing.getByLabel("Invite role").selectOption("editor");
@@ -30,6 +31,7 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
   const editorContext = await browser.newContext({ viewport: { width: 1360, height: 900 } });
   try {
     const { page: editor, account } = await contextPage(editorContext, editorSubject);
+    await browse(editor, "Invitations");
     const inbox = editor.getByRole("region", { name: "Invitations", exact: true });
     await expect(inbox.getByText(title, { exact: true })).toBeVisible();
     expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(404);
@@ -40,16 +42,25 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     await expect.poll(async () => (await state(context.request, boardId)).document!.content.objects[0]).toMatchObject({ title: "Shared editor save" });
     await expect.poll(async () => (await canvasState(page)).objects[0]).toMatchObject({ title: "Shared editor save" });
 
+    await closeDialogs(page);
+    const people = page.getByRole("button", { name: "Live · 1 collaborator", exact: true });
+    await expect(people).toBeVisible();
+    await people.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: "People on this board", exact: true })).toContainText(editorSubject);
+    await page.keyboard.press("Escape");
+    await expect(people).toBeFocused();
+
     await editorContext.setOffline(true);
     await editNote(editor, "Shared editor save", "Private draft after invitation");
     await flushLocalDraft(editor);
-    await sharing.getByRole("button", { name: "Close sharing", exact: true }).click();
-    await boardRow.getByRole("button", { name: "Share", exact: true }).click();
+    await closeDialogs(page);
+    await page.getByRole("button", { name: "Share", exact: true }).click();
     await sharing.getByLabel(`Role for ${editorEmail}`, { exact: true }).selectOption("viewer");
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toBeEnabled();
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toHaveValue("viewer");
     await editorContext.setOffline(false);
-    await expect(editor.getByText("Viewer access. This board is read-only.", { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(editor.locator(".save-status")).toHaveText("Can view · account board", { timeout: 10_000 });
     await expect(editor.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
     expect((await canvasState(editor)).objects[0]).toMatchObject({ title: "Private draft after invitation" });
     const beforeRemoval = await state(context.request, boardId);
@@ -60,11 +71,11 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     })).status()).toBe(403);
     expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(200);
 
-    page.once("dialog", (dialog) => dialog.accept());
     await sharing.locator(".sharing-person").filter({ has: page.getByLabel(`Role for ${editorEmail}`, { exact: true }) })
       .getByRole("button", { name: "Remove access", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toHaveCount(0);
-    await expect(editor.getByText("Access removed. This local draft is read-only.", { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(editor.locator(".save-status")).toHaveText("Access removed", { timeout: 10_000 });
     expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(404);
     expect((await canvasState(editor)).objects[0]).toMatchObject({ title: "Private draft after invitation" });
     await flushLocalDraft(editor);
@@ -76,6 +87,11 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     const afterRemoval = await state(context.request, boardId);
     expect(afterRemoval.document).toEqual(beforeRemoval.document);
     expect(afterRemoval.receipts).toEqual(beforeRemoval.receipts);
+    await closeDialogs(page);
+    await connected(page);
+    await page.screenshot({ path: "docs/ux-evidence/after-live-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: "docs/ux-evidence/after-live-mobile.png" });
   } finally {
     await editorContext.setOffline(false);
     await editorContext.close();

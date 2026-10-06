@@ -46,7 +46,6 @@ import type { StrokePoint } from "../objects/types";
 import { Toolbar } from "../../components/Toolbar/Toolbar";
 import { ZoomControls } from "../../components/ZoomControls/ZoomControls";
 import { HistoryControls } from "../../components/HistoryControls/HistoryControls";
-import { BoardIdentity } from "../../components/BoardIdentity/BoardIdentity";
 import {
   createImportedImageObject,
   getClipboardImageFiles,
@@ -495,7 +494,7 @@ export function CanvasViewport() {
     const handleKeyDown = (event: KeyboardEvent) => {
       const commandKey = event.ctrlKey || event.metaKey;
       const shortcut = event.key.toLowerCase();
-      if (isTypingTarget(event.target)) return;
+      if (document.querySelector("dialog[open]") || isTypingTarget(event.target)) return;
       const editingShortcut = commandKey
         ? ["g", "z", "y", "d"].includes(shortcut)
         : ["a", "m", "n", "t", "c", "f", "p", "delete", "backspace"].includes(shortcut);
@@ -1754,8 +1753,6 @@ export function CanvasViewport() {
           </div>
         </div>
       )}
-
-      <BoardIdentity />
 
       {!isBoardHydrated && (
         <div className="board-loading-shield" aria-label="Opening local board" />

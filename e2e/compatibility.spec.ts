@@ -141,5 +141,6 @@ test("shows actual storage failures and cancels unfinished creation without hist
     };
   });
   await page.getByLabel("Board title").fill("Changed title");
-  await expect(page.locator(".board-save-status[role=alert]")).toContainText("Save failed");
+  await expect(page.locator(".save-status")).toHaveText("Couldn’t save on this device");
+  await expect(page.locator(".board-notice")).toContainText("Couldn’t save on this device");
 });

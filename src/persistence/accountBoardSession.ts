@@ -79,6 +79,8 @@ export class AccountBoardSession {
   }
 
   getState = () => this.state;
+  /** Explicit user cancellation; completed writes/mappings stay recoverable. */
+  cancelOperation = () => { this.request?.abort(); };
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(patch: Partial<SessionState>) {
     this.state = { ...this.state, ...patch };
