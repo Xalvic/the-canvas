@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { Board, PrismaClient } from "./generated/prisma/client.js";
+import type { Board, Prisma, PrismaClient } from "./generated/prisma/client.js";
 import type { BoardMetadata, BoardStore, BoardRole } from "./boards.js";
 import { boardRoleSql, lockBoardAccess } from "./boardPermissions.js";
 import { HttpError } from "./errors.js";
@@ -15,6 +15,26 @@ function toMetadata(row: BoardRow): BoardMetadata {
     updatedAt: row.updatedAt.getTime(),
     role: row.role ?? "owner",
   };
+}
+
+// Shared by explicit page creation and workspace initialization. Call these in
+// the caller's transaction; opening a nested transaction would wait on itself.
+export async function lockBoardActor(tx: Prisma.TransactionClient, ownerId: string) {
+  // Serialize actor mutations while allowing foreign-key KEY SHARE checks in
+  // board-locked sharing transactions. FOR UPDATE would invert that lock order.
+  const actors = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM users WHERE id = ${ownerId}::uuid FOR NO KEY UPDATE
+  `;
+  if (!actors[0]) throw new HttpError(401, "UNAUTHENTICATED", "Sign in required");
+}
+
+export async function createBlankPage(tx: Prisma.TransactionClient, title: string, ownerId: string): Promise<BoardMetadata> {
+  const row = await tx.board.create({ data: { id: randomUUID(), title, ownerId }, select: metadataSelect });
+  await tx.$executeRaw`
+    INSERT INTO board_documents (board_id, schema_version, revision, content, updated_at)
+    SELECT id, 1, 1, '{"objects":[]}'::jsonb, updated_at FROM boards WHERE id = ${row.id}::uuid
+  `;
+  return toMetadata(row);
 }
 
 export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
@@ -49,10 +69,7 @@ export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
       return prisma.$transaction(async (tx) => {
         // Serialize creations by actor across connections/processes. No network
         // work occurs here; M4 can reuse this lock for workspace initialization.
-        const actors = await tx.$queryRaw<{ id: string }[]>`
-          SELECT id FROM users WHERE id = ${ownerId}::uuid FOR UPDATE
-        `;
-        if (!actors[0]) throw new HttpError(401, "UNAUTHENTICATED", "Sign in required");
+        await lockBoardActor(tx, ownerId);
         const key = { actorId_requestId: { actorId: ownerId, requestId: input.requestId } };
         const receipt = await tx.boardCreationReceipt.findUnique({ where: key });
         if (receipt) {
@@ -78,15 +95,11 @@ export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
             requestId: input.requestId, documentRevision: 1, replayed: true, expiresAt: receipt.expiresAt.getTime(),
           } };
         }
-        const row = await tx.board.create({ data: { id: randomUUID(), title: input.title, ownerId }, select: metadataSelect });
-        await tx.$executeRaw`
-          INSERT INTO board_documents (board_id, schema_version, revision, content, updated_at)
-          SELECT id, 1, 1, '{"objects":[]}'::jsonb, updated_at FROM boards WHERE id = ${row.id}::uuid
-        `;
+        const board = await createBlankPage(tx, input.title, ownerId);
         const created = await tx.boardCreationReceipt.create({ data: {
-          actorId: ownerId, requestId: input.requestId, payloadHash, boardId: row.id, documentRevision: 1,
+          actorId: ownerId, requestId: input.requestId, payloadHash, boardId: board.id, documentRevision: 1,
         } });
-        return { board: toMetadata(row), creation: {
+        return { board, creation: {
           requestId: input.requestId, documentRevision: 1, replayed: false, expiresAt: created.expiresAt.getTime(),
         } };
       });

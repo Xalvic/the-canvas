@@ -66,10 +66,10 @@ describe.skipIf(!databaseUrl)("real PostgreSQL cloud image assets", () => {
     const { owner, board, documents } = await setup();
     await documents.save(board.id, document(), owner);
     const before = await state();
-    await pool.query("DROP TABLE board_assets, asset_request_budgets; DELETE FROM schema_migrations WHERE version=6; CREATE TABLE asset_request_budgets(marker text)");
+    await pool.query("DROP TABLE board_assets, asset_request_budgets; DELETE FROM schema_migrations WHERE version IN (6,11); CREATE TABLE asset_request_budgets(marker text)");
     await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });
     expect((await pool.query("SELECT to_regclass('board_assets') AS assets")).rows[0].assets).toBeNull();
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 7, 8, 9]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 7, 8, 9, 10]);
     await pool.query("DROP TABLE asset_request_budgets"); await migrateDatabase(pool); await migrateDatabase(pool);
     expect(await state()).toEqual(before);
   });

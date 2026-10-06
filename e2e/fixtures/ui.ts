@@ -22,7 +22,10 @@ export async function accountMenu(page: Page) {
   await page.locator(".account-trigger").click();
 }
 export async function backToDevice(page: Page) {
+  await expect(page.locator(".account-trigger")).not.toHaveText("Connecting…");
+  await expect(page.getByText("Opening your workspace…", { exact: true })).toHaveCount(0);
   await browse(page);
+  if (await page.getByRole("button", { name: "Current board", exact: true }).isVisible()) { await closeDialogs(page); return; }
   await page.getByRole("button", { name: "Open device board", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Your boards", exact: true })).toBeHidden();
 }

@@ -116,8 +116,17 @@ test("legacy account drafts migrate by copying while pending operations, saved m
   await page.goto("/scribble/");
   await openBoard(page, title); await flushLocalDraft(page);
   const existingKey = (await journal(page)).key;
+  // M6 opens the page automatically. Seed the pre-upgrade disk state before that
+  // opening, rather than injecting legacy data into an already mounted editor.
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const reading = new Promise<void>((resolve) => { started = resolve; });
+  await page.route("**/api/workspace", async (route) => {
+    if (route.request().method() === "GET") { started(); await gate; }
+    await route.continue();
+  });
   await page.reload();
-  await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await reading;
   const operationId = randomUUID(), mappedAsset = randomUUID();
   const legacy = await page.evaluate(async ({ ownerId, boardId, operationId, mappedAsset, title, card }) => {
     const { openCanvasDatabase } = await import(/* @vite-ignore */ "/scribble/src/persistence/database.ts");
@@ -135,6 +144,7 @@ test("legacy account drafts migrate by copying while pending operations, saved m
     });
     return board;
   }, { ownerId: account.user.id, boardId, operationId, mappedAsset, title, card });
+  release(); await page.unrouteAll({ behavior: "wait" });
   await openBoard(page, title);
   const migrated = await journal(page);
   expect(migrated.key).not.toBe(existingKey);

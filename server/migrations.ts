@@ -11,6 +11,8 @@ const migrations = [
   { version: 7, file: "007_create_board_operation_receipts.sql" },
   { version: 8, file: "008_create_api_request_budgets.sql" },
   { version: 9, file: "009_create_board_creation_receipts.sql" },
+  { version: 10, file: "010_create_workspace_state.sql" },
+  { version: 11, file: "011_add_asset_upload_identity.sql" },
 ] as const;
 
 export async function migrateDatabase(pool: Pool) {

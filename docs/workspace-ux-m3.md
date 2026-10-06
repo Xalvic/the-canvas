@@ -1,7 +1,8 @@
 # Workspace UX M3: retry-safe page creation
 
 Verified locally 2026-10-06. Authority: `../WORKSPACE_UX_IMPLEMENTATION_PLAN.md`.
-M4 is next. M0-M3 work is included in the user-authorized local commit.
+M4 is now verified; its contracts are in `workspace-ux-m4.md`. M0-M3 work is
+included in the user-authorized local commit.
 
 ## Request and response
 
@@ -85,9 +86,10 @@ caller-owned identity and echoed receipt, and checks the 201/200 acknowledgement
 It performs no automatic retries or legacy fallback. Existing `createServerBoard`
 and the current UI remain unchanged. M6/M7 will persist intent before dispatch.
 No workspace navigation, guest transfer, image-provider change or UI redesign is
-included. M4 starts with workspace state/read/update/initialization APIs; reuse
-the actor lock in one transaction, without calling another `createPage` transaction
-while already holding that lock. Next unused SQL migration number: **10**.
+included. M4 adds workspace state/read/update/initialization APIs and reuses
+same-transaction blank insertion and the actor lock (now FOR NO KEY UPDATE to
+permit sharing foreign-key checks). Never nest `createPage` transactions while
+holding that lock. Migration 10 is added in M4; next unused SQL number is **11**.
 
 Release order remains migration -> compatible backend -> future frontend.
 Old clients retain `{title}` compatibility. New clients must not silently downgrade

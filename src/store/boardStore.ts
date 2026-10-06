@@ -24,6 +24,7 @@ type BoardState = Omit<BoardMetadata, "account"> & {
   setTabOwnership: (value: BoardTabOwnership) => void;
   setAccessRole: (role: BoardRole | "none" | null) => void;
   isHydrated: boolean;
+  navigationPending: boolean;
   sessionVersion: number;
   hasSavedViewport: boolean;
   saveStatus: BoardSaveStatus;
@@ -55,6 +56,7 @@ export const useBoardStore = create<BoardState>((set) => ({
   setTabOwnership: (value) => set((state) => ({ tabOwnership: value, tabReadOnly: value !== "owned", readOnly: value !== "owned" || state.accessRole === "viewer" || state.accessRole === "none" })),
   setAccessRole: (role) => set((state) => ({ accessRole: role, readOnly: state.tabReadOnly || role === "viewer" || role === "none" })),
   isHydrated: false,
+  navigationPending: false,
   sessionVersion: 0,
   hasSavedViewport: false,
   saveStatus: "loading",

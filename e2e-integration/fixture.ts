@@ -44,7 +44,7 @@ export async function canvasState(page: Page) {
 }
 export async function openBoard(page: Page, title: string) {
   await browse(page);
-  if (!await page.getByText(title, { exact: true }).isVisible()) await page.getByRole("button", { name: "Shared with me", exact: true }).click();
+  if (!await page.getByRole("list", { name: "Account boards", exact: true }).getByText(title, { exact: true }).isVisible()) await page.getByRole("button", { name: "Shared with me", exact: true }).click();
   await page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) }).locator(".board-open").click();
   await expect(page.getByLabel("Board title")).toHaveValue(title);
   await closeDialogs(page);

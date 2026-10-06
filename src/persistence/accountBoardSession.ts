@@ -63,6 +63,7 @@ export class AccountBoardSession {
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private request: AbortController | null = null;
+  private pendingOperationRequest: AbortController | null = null;
   private saving: Promise<void> | null = null;
   private operationSession = 0;
   private returnToGuest = false;
@@ -75,6 +76,10 @@ export class AccountBoardSession {
   private liveReading = false;
   private applyingRemote = false;
   private readonly clientId = crypto.randomUUID();
+  // Installed by the mounted workspace controller; legacy callers remain usable.
+  onPageDeleted: (() => Promise<void>) | null = null;
+  private failure: unknown = null;
+  getFailure = () => this.failure;
 
   constructor(queryClient: QueryClient, private live = false) {
     this.queries = new AccountBoardQueries(queryClient);
@@ -82,7 +87,7 @@ export class AccountBoardSession {
 
   getState = () => this.state;
   /** Explicit user cancellation; completed writes/mappings stay recoverable. */
-  cancelOperation = () => { this.request?.abort(); };
+  cancelOperation = () => { this.request?.abort(); this.pendingOperationRequest?.abort(); };
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private update(patch: Partial<SessionState>) {
     this.state = { ...this.state, ...patch };
@@ -234,13 +239,13 @@ export class AccountBoardSession {
     const online = () => { this.closeLive(); this.liveKey = ""; this.liveAttempts = 0; this.connectLive(); };
     if (this.live && typeof window !== "undefined") window.addEventListener("online", online);
     this.connectLive();
-    return () => { documentUnsubscribe(); boardUnsubscribe(); interactionUnsubscribe(); this.clearTimer(); this.request?.abort(); this.closeLive();
+    return () => { documentUnsubscribe(); boardUnsubscribe(); interactionUnsubscribe(); this.clearTimer(); this.cancelOperation(); this.closeLive();
       if (typeof window !== "undefined") window.removeEventListener("online", online); };
   }
 
   setUser = (userId: string | null) => {
     if (userId === this.state.userId) return;
-    this.clearTimer(); this.request?.abort();
+    this.clearTimer(); this.cancelOperation();
     this.queries.clear();
     clearCloudImageAccess(userId);
     this.update({ userId, error: null, editorDrafts: [] });
@@ -340,6 +345,7 @@ export class AccountBoardSession {
   });
 
   private fail(error: unknown) {
+    this.failure = error;
     if (error instanceof BoardSignInRequired) { this.expire(); return; }
     const conflict = error instanceof BoardApiError && ["REVISION_CONFLICT", "COLLABORATION_CONFLICT"].includes(error.code);
     const account = useBoardStore.getState().account;
@@ -397,22 +403,35 @@ export class AccountBoardSession {
     }
   }
 
-  private async operation(work: (signal: AbortSignal) => Promise<void>, timeoutMs = 20_000) {
-    if (this.state.busy) return;
+  private async operation(work: (signal: AbortSignal) => Promise<void>, timeoutMs = 20_000, externalSignal?: AbortSignal) {
+    if (this.state.busy || externalSignal?.aborted) return false;
+    this.failure = null;
     this.clearTimer();
     this.update({ busy: true, error: null });
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    externalSignal?.addEventListener("abort", cancel, { once: true });
+    this.pendingOperationRequest = controller;
+    const ownerId = this.state.userId;
+    this.operationSession = useBoardStore.getState().sessionVersion;
     // Complete the current save before any metadata operation or board switch.
     await this.saving;
-    const controller = new AbortController();
     this.request = controller;
-    this.operationSession = useBoardStore.getState().sessionVersion;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try { await work(controller.signal); }
+    let completed = false;
+    try {
+      controller.signal.throwIfAborted();
+      if (this.state.userId !== ownerId) throw new Error("The account changed. Your draft stays on this device.");
+      await work(controller.signal);
+      completed = !controller.signal.aborted && this.state.userId === ownerId;
+    }
     catch (error) {
       if (!controller.signal.aborted) this.fail(error);
       else if (this.request === controller) this.update({ error: "The request was interrupted. Your draft stays on this device.", status: useBoardStore.getState().account ? "error" : "local" });
     } finally {
       clearTimeout(timeout);
+      externalSignal?.removeEventListener("abort", cancel);
+      if (this.pendingOperationRequest === controller) this.pendingOperationRequest = null;
       if (this.request === controller) { this.request = null; this.update({ busy: false }); }
       const account = useBoardStore.getState().account;
       if (this.returnToGuest && account && account.ownerId !== this.state.userId && !this.state.busy) {
@@ -423,6 +442,7 @@ export class AccountBoardSession {
       if (boardTabCoordinator.enabled) await boardTabCoordinator.releaseOthers(activeBoardLeaseId(useBoardStore.getState().id));
       if (this.liveRefreshPending) void this.refreshLive();
     }
+    return completed;
   }
 
   private async readDocument(boardId: string, signal: AbortSignal) {
@@ -438,10 +458,10 @@ export class AccountBoardSession {
     }
   }
 
-  open = (board: ServerBoard) => this.operation(async (signal) => {
+  open = (board: ServerBoard, externalSignal?: AbortSignal, force = false) => this.operation(async (signal) => {
     const ownerId = this.state.userId;
     if (!ownerId) throw new BoardSignInRequired();
-    if (useBoardStore.getState().account?.boardId === board.id && useBoardStore.getState().account?.ownerId === ownerId && !useBoardStore.getState().readOnly) return;
+    if (!force && useBoardStore.getState().account?.boardId === board.id && useBoardStore.getState().account?.ownerId === ownerId && !useBoardStore.getState().readOnly) return;
     this.assertIdle();
     const id = accountBoardStorageId(ownerId, board.id);
     await waitForLocalBoardSave(signal);
@@ -497,16 +517,16 @@ export class AccountBoardSession {
     if (!signal.aborted) useBoardStore.setState({ tabRecoveryId: interrupted?.id ?? null });
     if (!signal.aborted) this.update({ status: remote.role === "viewer" ? "read-only" : remote.revision === 0 && status === "saved" ? "unsaved" : status, hasRecovery: recovery !== null,
       error: !writable ? BOARD_TAB_READ_ONLY_MESSAGE : unsupportedDraft ? "Choose Upload pending images to save this draft’s images to your account. Your draft stays on this device." : null });
-  });
+  }, 20_000, externalSignal);
 
-  back = () => this.operation(async (signal) => {
+  back = (externalSignal?: AbortSignal) => this.operation(async (signal) => {
     await waitForLocalBoardSave(signal);
     if (boardTabCoordinator.enabled) await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
     const guest = await loadLocalBoard(CURRENT_BOARD_ID);
     if (!guest) throw new Error("The local board could not be opened. Your current draft is still available.");
     await this.replace(guest, signal);
     if (!signal.aborted) this.update({ status: "local", hasRecovery: false });
-  });
+  }, 20_000, externalSignal);
 
   private create = (copy: boolean) => this.operation(async (signal) => {
     const ownerId = this.state.userId;
@@ -754,21 +774,28 @@ export class AccountBoardSession {
     } else await this.queries.rename(ownerId, board.id, title, signal);
   });
 
-  remove = (board: ServerBoard) => this.operation(async (signal) => {
-    const ownerId = this.state.userId;
-    if (!ownerId) throw new BoardSignInRequired();
-    // Preserve any active draft before deletion; deleting never destroys IndexedDB records.
-    await waitForLocalBoardSave(signal);
-    await this.queries.remove(ownerId, board.id, signal);
-    if (signal.aborted) return;
-    if (useBoardStore.getState().account?.boardId === board.id) {
-      if (boardTabCoordinator.enabled) await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
-      const guest = await loadLocalBoard();
-      if (!guest) throw new Error("Deleted from your account. Your draft stays on this device.");
-      await this.replace(guest, signal);
-      this.update({ status: "local", hasRecovery: false });
-    }
-  });
+  remove = async (board: ServerBoard) => {
+    let activeDeleted = false;
+    const completed = await this.operation(async (signal) => {
+      const ownerId = this.state.userId;
+      if (!ownerId) throw new BoardSignInRequired();
+      // Preserve any active draft before deletion; deleting never destroys IndexedDB records.
+      await waitForLocalBoardSave(signal);
+      await this.queries.remove(ownerId, board.id, signal);
+      if (signal.aborted) return;
+      if (useBoardStore.getState().account?.boardId === board.id) {
+        activeDeleted = true;
+        if (this.onPageDeleted) return;
+        if (boardTabCoordinator.enabled) await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
+        const guest = await loadLocalBoard();
+        if (!guest) throw new Error("Deleted from your account. Your draft stays on this device.");
+        await this.replace(guest, signal);
+        this.update({ status: "local", hasRecovery: false });
+      }
+    });
+    if (completed && activeDeleted) await this.onPageDeleted?.();
+    return completed;
+  };
 }
 
 export function useAccountBoardSession() {

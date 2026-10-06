@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadBoardAsset, getBoardAsset, MAX_CLOUD_IMAGE_BYTES, uploadBoardAsset } from "./assets";
+import { downloadBoardAsset, getBoardAsset, getBoardAssetUpload, MAX_CLOUD_IMAGE_BYTES, uploadBoardAsset, uploadBoardAssetRequest } from "./assets";
 
 const boardId = "550e8400-e29b-41d4-a716-446655440000";
 const assetId = "550e8400-e29b-41d4-a716-446655440001";
@@ -103,5 +103,67 @@ describe("cloud asset API", () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("durable upload request adapters", () => {
+  const requestId = "550e8400-e29b-41d4-a716-446655440003";
+  const ready = { requestId, boardId, assetId, state: "ready", canRetry: false, retryAfterMs: null, asset };
+  const pending = { requestId, boardId, assetId, state: "pending", canRetry: true, retryAfterMs: 5000, asset: null };
+  const blob = new Blob(["png"], { type: "image/png" });
+  it("sends the caller's stable UUID and validates a completed acknowledgement", async () => {
+    const fetch = mockResponse({ upload: ready });
+    const controller = new AbortController();
+    expect(await uploadBoardAssetRequest(boardId, blob, requestId.toUpperCase(), controller.signal)).toEqual(ready);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(`/api/boards/${boardId}/assets`, {
+      credentials: "same-origin", method: "POST", headers: { "X-Scribble-Request": "1", "Content-Type": "image/png", "X-Scribble-Upload-Request": requestId }, body: blob, signal: expect.any(AbortSignal),
+    });
+    controller.abort(); expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+  it("returns pending as an explicit bounded state without polling or replacing identity", async () => {
+    const fetch = mockResponse({ upload: pending }, 202);
+    expect(await uploadBoardAssetRequest(boardId, blob, requestId)).toEqual(pending);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("reads status with no-store, preserves abort and recognizes terminal failed state", async () => {
+    const failed = { ...pending, state: "failed", canRetry: false, retryAfterMs: null };
+    const fetch = mockResponse({ upload: failed });
+    const controller = new AbortController();
+    expect(await getBoardAssetUpload(boardId, requestId, controller.signal)).toEqual(failed);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(`/api/boards/${boardId}/asset-uploads/${requestId}`, {
+      credentials: "same-origin", cache: "no-store", signal: expect.any(AbortSignal),
+    });
+    controller.abort(); expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+  it.each([
+    { requestId: otherId }, { boardId: otherId }, { assetId: otherId }, { state: "unknown" },
+    { canRetry: true }, { retryAfterMs: 5000 }, { asset: { ...asset, id: otherId } }, { asset: { ...asset, boardId: otherId } },
+  ])("rejects inconsistent ready identities/state %j", async (changes) => {
+    mockResponse({ upload: { ...ready, ...changes } });
+    await expect(getBoardAssetUpload(boardId, requestId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+  it.each([0, -1, 90_001, null])("rejects unbounded pending delay %s", async (retryAfterMs) => {
+    mockResponse({ upload: { ...pending, retryAfterMs } });
+    await expect(getBoardAssetUpload(boardId, requestId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+  it("rejects wrong status acknowledgements and cannot silently use the legacy response", async () => {
+    mockResponse({ upload: pending }, 200);
+    await expect(uploadBoardAssetRequest(boardId, blob, requestId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    mockResponse({ upload: ready }, 202);
+    await expect(uploadBoardAssetRequest(boardId, blob, requestId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    mockResponse({ asset }, 201);
+    await expect(uploadBoardAssetRequest(boardId, blob, requestId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+  it("does not dispatch malformed identities or invalid images", async () => {
+    const fetch = mockResponse({ upload: ready });
+    await expect(uploadBoardAssetRequest(boardId, blob, "bad-id")).rejects.toThrow();
+    await expect(getBoardAssetUpload("bad-board", requestId)).rejects.toThrow();
+    await expect(uploadBoardAssetRequest(boardId, new Blob(["bad"], { type: "image/svg+xml" }), requestId)).rejects.toThrow("Cloud images");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each([[401, "UNAUTHENTICATED"], [403, "BOARD_FORBIDDEN"], [404, "ASSET_UPLOAD_NOT_FOUND"], [409, "ASSET_UPLOAD_REQUEST_CONFLICT"], [410, "ASSET_UPLOAD_EXPIRED"], [429, "ASSET_UPLOAD_RATE_LIMIT"], [503, "IMAGE_STORAGE_UNAVAILABLE"]] as const)("preserves %s %s and sends no retry", async (status, code) => {
+    const fetch = mockResponse({ error: { code, message: "Upload cannot continue" } }, status);
+    await expect(uploadBoardAssetRequest(boardId, blob, requestId)).rejects.toMatchObject({ status, code });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

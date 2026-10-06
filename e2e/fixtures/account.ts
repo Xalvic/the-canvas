@@ -39,8 +39,17 @@ export async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     documentStarted: null as (() => void) | null,
     listGate: null as Promise<void> | null,
     listStarted: null as (() => void) | null,
+    // These legacy save/recovery fixtures represent an already initialized account.
+    // First-entry creation and simultaneous initialization use the real DB suite.
+    lastOpenedBoardId: null as string | null,
   };
   let nextId = 4;
+  await page.route("**/api/workspace", async (route) => {
+    if (!cloud.signedIn) { await route.fulfill({ status: 401, json: guest }); return; }
+    if (route.request().method() === "PATCH") cloud.lastOpenedBoardId = route.request().postDataJSON().lastOpenedBoardId;
+    const accessible = cloud.lastOpenedBoardId && cloud.boards.has(cloud.lastOpenedBoardId) ? cloud.lastOpenedBoardId : null;
+    await route.fulfill({ json: { workspace: { initialized: true, lastOpenedBoardId: accessible } } });
+  });
   await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: [] } }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user } : guest }));
   await page.route("**/api/auth/logout", (route) => {
@@ -162,9 +171,10 @@ export async function editNote(page: Page, before: string, after: string) {
 
 export async function openBoard(page: Page, title: string) {
   await browse(page);
+  const list = page.getByRole("list", { name: "Account boards", exact: true });
   const shared = page.getByRole("button", { name: "Shared with me", exact: true });
-  if (!await page.getByText(title, { exact: true }).isVisible()) await shared.click();
-  await page.getByRole("button", { name: title, exact: false }).filter({ has: page.getByText(title, { exact: true }) }).click();
+  if (!await list.getByText(title, { exact: true }).isVisible()) await shared.click();
+  await list.getByRole("button", { name: title, exact: false }).filter({ has: page.getByText(title, { exact: true }) }).click();
   await expect(page.getByLabel("Board title", { exact: true })).toHaveValue(title);
   await closeDialogs(page);
 }

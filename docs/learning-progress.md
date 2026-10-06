@@ -1,24 +1,30 @@
 # Scribble learning progress
 
-Updated: 2026-10-06. Record milestones and substantial implementation changes
+Updated: 2026-10-07. Record milestones and substantial implementation changes
 only. No individual questions, answers, or understanding assessments.
 
 Start with [the compact checkpoint](learning-checkpoint.md). Use relevant
 sections of [the learning plan](learning-plan.md) when needed.
 
-Workspace UX M0-M3 are implemented/verified locally. M3 adds retry-safe page
-creation with actor/request receipts, an atomic blank revision-one document,
-legacy compatibility and typed client support. Replay preserves later edits;
-expired/deleted requests are terminal and retain identity. Migration 9 was tested
-only in disposable schemas; normal data is unchanged. Verified 120 focused
-HTTP/client cases, 83 real PostgreSQL checks including actual API process restarts,
-SQL/Prisma no-drift, both builds and targeted typechecks. Contracts/commands:
-`workspace-ux-m3.md`. This records implementation, not a new assessment milestone.
-M2's guest handoff and independent IndexedDB v4 account journals remain preserved;
-their contracts/evidence are in `workspace-ux-m2.md`. Next: M4 workspace state and
-initialization; no M4 implementation yet. M0-M3 changes are included in the
-user-authorized local commit of all current updates (2026-10-06). No push/deployment;
-future commits require fresh approval.
+Workspace UX M0-M6 are implemented/verified locally; M6 completed 2026-10-07.
+Implemented one mounted account/workspace controller, base-compatible page URLs,
+Back/Forward/last-page restore, stable initialization intent, safe journaled
+switching and intentional final deletion. Service errors/timeouts retain the
+known account; confirmed expiry/sign-out preserve work and clear private access.
+Navigation waits for guest hydration and prevents guest recovery races; hidden
+canvas keeps its measured size, viewport and atomic history boundaries. Serialized
+return preferences stay independent of same-account auth checks and other devices.
+Verified 136 focused cases, 40 standard browser regressions and 15 actual browser/
+API/Prisma/PostgreSQL cases; both builds and strict touched-test/fixture typechecks
+pass. All 12 normal tables/14 rows are unchanged; zero browser schemas remain.
+Contract/commands: `workspace-ux-m6.md`. This records implementation/validation,
+not a new assessment. M2 v4 journals, M3/M4 receipt semantics, M5 immutable upload
+identities/mappings and the pen renderer remain intact. No new schema/API/package
+change. M7 supplies deliberate consent and account-bound transfer intent; automatic
+images/saving adoption remains M8 and the visual redesign M9. Next: M7 only.
+M4-M6 are included in the combined commit authorized 2026-10-07; M0-M3 were
+committed earlier. No normal/production migration, real provider change, push or
+deployment; future commits need fresh permission.
 
 ## Covered
 

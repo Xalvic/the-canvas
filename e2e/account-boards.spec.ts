@@ -5,7 +5,7 @@ import { user, firstId, secondId, savedBoard, mockAccount, canvasState, localBoa
 test("viewers can navigate and copy but cannot change the canvas, title or history", async ({ page }) => {
   const board = savedBoard(firstId, "Viewer drawing"); board.role = "viewer"; board.document!.role = "viewer";
   const cloud = await mockAccount(page, [board]);
-  await page.goto("/scribble/"); await openBoard(page, board.title);
+  await page.goto("/scribble/"); await backToDevice(page); await openBoard(page, board.title);
   await expect(page.locator(".save-status")).toHaveText("Can view · account board");
   await expect(page.getByLabel("Board title")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
@@ -36,7 +36,7 @@ test("viewers can navigate and copy but cannot change the canvas, title or histo
 test("editors save changes and a later downgrade stops edits while retaining the local draft", async ({ page }) => {
   const board = savedBoard(firstId, "Editor drawing"); board.role = "editor"; board.document!.role = "editor";
   const cloud = await mockAccount(page, [board]);
-  await page.goto("/scribble/"); await openBoard(page, board.title);
+  await page.goto("/scribble/"); await backToDevice(page); await openBoard(page, board.title);
   await expect(page.getByLabel("Board title")).toBeEnabled();
   await editNote(page, board.title, "Editor saved this");
   await expect.poll(() => documentWrites(cloud).length).toBe(1);
@@ -71,7 +71,7 @@ test("owners create link invitations, change roles and remove members", async ({
     else sharing.invitations = [];
     await route.fulfill({ status: 204 });
   });
-  await page.goto("/scribble/"); await rowActions(page, "Owner drawing"); await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.goto("/scribble/"); await backToDevice(page); await rowActions(page, "Owner drawing"); await page.getByRole("button", { name: "Share", exact: true }).click();
   await page.getByLabel("Google email").fill("friend@example.com");
   await page.getByLabel("Invite role").selectOption("editor");
   await page.getByRole("button", { name: "Create invitation", exact: true }).click();
@@ -108,13 +108,13 @@ test("recipients explicitly accept an invitation before its shared board appears
 test("signing in lists owned boards without uploading or changing guest IndexedDB", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Account sketch")]);
   cloud.signedIn = false;
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest sketch");
   await createNote(page, "Kept on this device");
   await expect.poll(async () => (await localBoard(page))?.title).toBe("Guest sketch");
   const guestBoard = await localBoard(page);
   cloud.signedIn = true;
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await browse(page);
   await expect(page.getByText("Account sketch", { exact: true })).toBeVisible();
   await closeDialogs(page);
@@ -126,7 +126,7 @@ test("signing in lists owned boards without uploading or changing guest IndexedD
 
 test("explicit upload creates a copy, then saves committed edits with increasing revisions", async ({ page }) => {
   const cloud = await mockAccount(page);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("My local board");
   await createNote(page, "Local idea");
   const localObjects = (await canvasState(page)).objects;
@@ -147,14 +147,14 @@ test("explicit upload creates a copy, then saves committed edits with increasing
   await backToDevice(page);
   await expect(page.getByRole("button", { name: "Back to local board", exact: true })).toBeHidden();
   expect((await canvasState(page)).objects).toEqual(localObjects);
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("My local board");
   expect((await canvasState(page)).objects).toEqual(localObjects);
 });
 
 test("opening and switching account boards restores guest objects, viewport and title without cloud writes", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "First account board"), savedBoard(secondId, "Second account board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest before opening");
   await createNote(page, "Guest note");
   await page.evaluate(async () => {
@@ -182,7 +182,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
     savedBoard(firstId, "Shared between my devices"),
     savedBoard(secondId, "Weekly planning and architecture notes for my October project"),
   ]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Untouched guest");
   await openBoard(page, "Shared between my devices");
   cloud.conflictOnNextSave = true;
@@ -195,7 +195,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
     const { waitForLocalBoardSave } = await import(/* @vite-ignore */ "/scribble/src/persistence/waitForLocalBoardSave.ts");
     await waitForLocalBoardSave(new AbortController().signal);
   });
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Untouched guest");
   await openBoard(page, "Shared between my devices");
   await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere");
@@ -218,7 +218,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
 
 test("reloading a conflicting account version preserves the previous draft for explicit restore", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Account original")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await openBoard(page, "Account original");
   cloud.conflictOnNextSave = true;
   await editNote(page, "Account original", "Recoverable previous draft");
@@ -240,7 +240,7 @@ test("reloading a conflicting account version preserves the previous draft for e
 
 test("images remain local and are rejected before account metadata is created", async ({ page }) => {
   const cloud = await mockAccount(page);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await expect(page.getByLabel("Board title")).toBeEnabled();
   await page.evaluate(async () => {
     const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
@@ -252,14 +252,14 @@ test("images remain local and are rejected before account metadata is created", 
   await closeDialogs(page);
   expect(cloud.mutations).toEqual([]);
   await expect.poll(async () => (await localBoard(page))?.objects["local-image"]?.type).toBe("image");
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await expect(page.getByLabel("Board title")).toBeEnabled();
   expect((await canvasState(page)).objects["local-image"]).toMatchObject({ type: "image", assetId: "image-asset" });
 });
 
 test("an account draft containing an unsupported image is restored locally when reopened", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Account image draft")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest before image draft");
   await openBoard(page, "Account image draft");
   await page.evaluate(async () => {
@@ -275,7 +275,7 @@ test("an account draft containing an unsupported image is restored locally when 
   expect((await canvasState(page)).objects).toEqual(draftObjects);
   await expect(page.locator(".save-status")).toContainText("Account save failed");
   expect(cloud.mutations).toEqual([]);
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest before image draft");
   await openBoard(page, "Account image draft");
   expect((await canvasState(page)).objects).toEqual(draftObjects);
@@ -284,7 +284,7 @@ test("an account draft containing an unsupported image is restored locally when 
 
 test("an account save failure retains edits and retries the same expected revision", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Retry board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await openBoard(page, "Retry board");
   cloud.failSaves = true;
   await editNote(page, "Retry board", "Retry this draft");
@@ -304,7 +304,7 @@ test("an account save failure retains edits and retries the same expected revisi
 
 test("session expiry during save returns to the guest board and keeps the private draft for later sign-in", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Expired-session board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest remains mine");
   await createNote(page, "Guest before expiry");
   const guestObjects = (await canvasState(page)).objects;
@@ -316,7 +316,7 @@ test("session expiry during save returns to the guest board and keeps the privat
   expect((await canvasState(page)).objects).toEqual(guestObjects);
   await expect(page.getByText("Expired-session board", { exact: true })).toHaveCount(0);
   cloud.signedIn = true;
-  await page.reload();
+  await page.reload(); await backToDevice(page);
   await browse(page);
   await expect(page.getByText("Expired-session board", { exact: true })).toBeVisible();
   await openBoard(page, "Expired-session board");
@@ -330,7 +330,7 @@ test("session expiry during save returns to the guest board and keeps the privat
 
 test("a delayed account document cannot replace the guest canvas after sign-out", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Delayed board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest during account request");
   await createNote(page, "Guest while opening");
   const guestObjects = (await canvasState(page)).objects;
@@ -355,7 +355,7 @@ test("a delayed account document cannot replace the guest canvas after sign-out"
 
 test("sign-out during an account reload returns to the guest board and ignores the pending remote version", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Reloading account board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest during reload");
   await createNote(page, "Guest remains visible after logout");
   const guestObjects = (await canvasState(page)).objects;
@@ -386,7 +386,7 @@ test("sign-out during an account reload returns to the guest board and ignores t
 
 test("new account boards and explicit rename/delete leave the guest board intact", async ({ page }) => {
   const cloud = await mockAccount(page);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await page.getByLabel("Board title").fill("Guest title stays");
   await createNote(page, "Guest stays too");
   const guestObjects = (await canvasState(page)).objects;
@@ -405,6 +405,8 @@ test("new account boards and explicit rename/delete leave the guest board intact
   await page.getByRole("listitem").filter({ has: page.getByText("Renamed account board", { exact: true }) }).getByRole("button", { name: "Delete", exact: true }).click();
   await page.getByRole("button", { name: "Delete board", exact: true }).click();
   await closeDialogs(page);
+  await expect(page.getByText("Your workspace is empty.", { exact: true })).toBeVisible();
+  await backToDevice(page);
   await expect(page.getByLabel("Board title")).toHaveValue("Guest title stays");
   expect((await canvasState(page)).objects).toEqual(guestObjects);
   expect(cloud.boards.size).toBe(0);
@@ -413,7 +415,7 @@ test("new account boards and explicit rename/delete leave the guest board intact
 
 test("cached board titles stay visible during refresh failure and recover on retry", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Cached board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await browse(page);
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   let release!: () => void;
@@ -449,7 +451,7 @@ test("fresh lists avoid focus requests and stale focus refresh leaves the active
   }
   await page.clock.install();
   const cloud = await mockAccount(page, [savedBoard(firstId, "Focus board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await openBoard(page, "Focus board");
   const before = await canvasState(page);
   const reads = cloud.listRequests;
@@ -469,7 +471,7 @@ test("fresh lists avoid focus requests and stale focus refresh leaves the active
 
 test("reconnect refreshes the board list without submitting guest work", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before reconnect")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await browse(page);
   await expect(page.getByText("Before reconnect", { exact: true })).toBeVisible();
   await closeDialogs(page);
@@ -485,7 +487,7 @@ test("reconnect refreshes the board list without submitting guest work", async (
 
 test("an older list refresh cannot roll back an acknowledged rename", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before rename")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await browse(page);
   await expect(page.getByText("Before rename", { exact: true })).toBeVisible();
   let release!: () => void;
@@ -509,7 +511,7 @@ test("an older list refresh cannot roll back an acknowledged rename", async ({ p
 
 test("a lost save acknowledgement reconciles a fresh revision without duplicating the write", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Lost response board")]);
-  await page.goto("/scribble/");
+  await page.goto("/scribble/"); await backToDevice(page);
   await openBoard(page, "Lost response board");
   cloud.loseNextSaveResponse = true;
   await editNote(page, "Lost response board", "Accepted before response loss");

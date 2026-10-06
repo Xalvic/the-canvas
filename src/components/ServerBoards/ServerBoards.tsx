@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BoardIdentity } from "../BoardIdentity/BoardIdentity";
 import { RecoveryDialog } from "./RecoveryDialog";
@@ -16,10 +16,13 @@ import { BoardSharing } from "./Sharing";
 import { BoardBrowser } from "./BoardBrowser";
 import { SaveFlow, type SaveFlowKind } from "./SaveFlow";
 import { invitationIntent } from "./invitationIntent";
+import { useWorkspaceController } from "../../persistence/workspaceController";
 
 export function ServerBoards() {
   const { session, state: accountBoards } = useAccountBoardSession();
-  const userId = accountBoards.userId;
+  const { workspace, state: lifecycle } = useWorkspaceController(session);
+  const lifecycleUser = lifecycle.account?.status === "signed-in" ? lifecycle.account.user.id : null;
+  const userId = accountBoards.userId === lifecycleUser ? accountBoards.userId : null;
   const boards = useQuery({ ...accountBoardListOptions(userId ?? ""), enabled: !!userId });
   const activeAccount = useBoardStore((board) => board.account);
   const accessRole = useBoardStore((board) => board.accessRole);
@@ -49,10 +52,6 @@ export function ServerBoards() {
       setBrowserOpen(false);
     }
   }), []);
-  const accountChanged = useCallback((id: string | null) => {
-    session.setUser(id);
-  }, [session]);
-
   useEffect(() => {
     if (userId && boards.error instanceof BoardSignInRequired) session.expire();
   }, [boards.error, userId, session]);
@@ -68,27 +67,45 @@ export function ServerBoards() {
     return () => { clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [userId, activeAccount?.boardId, session]);
 
+  const blocked = lifecycle.status === "signing-out" || !!activeAccount && activeAccount.ownerId !== lifecycleUser ||
+    !!lifecycleUser && lifecycle.phase !== "device" && (lifecycle.phase !== "ready" || !activeAccount);
+  useLayoutEffect(() => {
+    const editor = document.getElementById("canvas-editor");
+    // Keep its measured size: display:none would recenter the world on every open.
+    if (editor) { editor.inert = blocked; editor.style.visibility = blocked ? "hidden" : ""; editor.setAttribute("aria-hidden", String(blocked)); }
+    return () => { if (editor) { editor.inert = false; editor.style.visibility = ""; editor.removeAttribute("aria-hidden"); } };
+  }, [blocked]);
+
   return (
     <>
       <header className="board-header" aria-label="Board controls" onKeyDown={(event) => event.stopPropagation()}>
         <button className="boards-trigger" type="button" aria-haspopup="dialog" onClick={() => setBrowserOpen(true)}>Boards</button>
-        <BoardIdentity location={activeAccount ? accessRole === "owner" ? "In your account · Owner" : `Shared with you · ${accessRole === "editor" ? "Can edit" : accessRole === "viewer" ? "Can view" : "Access removed"}` : "On this device"} />
-        <button className="save-status" type="button" data-attention={status.attention} onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">{status.label}</button>
-        <CollaborationSummary />
-        {!activeAccount && <button className="primary-action header-save" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => setSaveFlow("account")}>Save to account</button>}
-        {activeAccount && userId && accessRole === "owner" && <button className="primary-action header-save" type="button" disabled={accountBoards.busy} onClick={() => setSharingId(activeAccount.boardId)}>Share</button>}
-        <Account onAccountChange={accountChanged} refreshVersion={accountBoards.accountVersion} openRequest={accountOpenRequest} />
+        {!blocked && <BoardIdentity location={activeAccount ? accessRole === "owner" ? "In your account · Owner" : `Shared with you · ${accessRole === "editor" ? "Can edit" : accessRole === "viewer" ? "Can view" : "Access removed"}` : "On this device"} />}
+        {!blocked && <button className="save-status" type="button" data-attention={status.attention} onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">{status.label}</button>}
+        {!blocked && <CollaborationSummary />}
+        {!blocked && !activeAccount && <button className="primary-action header-save" type="button" disabled={accountBoards.busy || !isHydrated} onClick={() => setSaveFlow("account")}>Save to account</button>}
+        {!blocked && activeAccount && userId && accessRole === "owner" && <button className="primary-action header-save" type="button" disabled={accountBoards.busy} onClick={() => setSharingId(activeAccount.boardId)}>Share</button>}
+        <Account workspace={workspace} lifecycle={lifecycle} openRequest={accountOpenRequest} />
       </header>
+      {blocked && <section className="workspace-gate" aria-label="Workspace" aria-live="polite">
+        <p>{lifecycle.status === "signing-out" ? "Signing out…" : lifecycle.phase === "empty" ? "Your workspace is empty." : lifecycle.phase === "transfer-pending" ? "Your drawing transfer is ready to resume." : lifecycle.phase === "error" || lifecycle.status === "service-error" ? "Couldn’t open your workspace." : "Opening your workspace…"}</p>
+        {lifecycle.phase === "empty" && <button type="button" disabled={accountBoards.busy} onClick={() => void session.createBlank()}>New page</button>}
+        {(lifecycle.error || accountBoards.error) && <p role="alert">{lifecycle.error ?? accountBoards.error}</p>}
+        {(lifecycle.error || lifecycle.phase === "error") && <button type="button" onClick={() => void workspace.retry()}>Retry workspace</button>}
+      </section>}
+      {!blocked && lifecycle.error && <aside className="board-notice" aria-label="Workspace needs attention"><span role="alert">{lifecycle.error}</span><button type="button" onClick={() => void workspace.retry()}>Retry workspace</button></aside>}
       <StatusAnnouncement message={status.label} urgent={localSaveStatus === "error" && !tabReadOnly} />
-      {(status.attention || accountBoards.error || historyError || accountBoards.busy) && <aside className="board-notice" aria-label="Board needs attention">
+      {!blocked && (status.attention || accountBoards.error || historyError || accountBoards.busy) && <aside className="board-notice" aria-label="Board needs attention">
         <span>{status.attention ? status.label : accountBoards.error ?? historyError ?? "Updating board…"}{(tabRecoveryId || accountBoards.hasRecovery) && " · Device draft available"}</span>
         {accountBoards.imageUpload && <span>Uploading images… {accountBoards.imageUpload.completed}/{accountBoards.imageUpload.total}</span>}
         {userId && activeAccount && !readOnly && pendingImages > 0 && !accountBoards.busy && <button type="button" onClick={() => setSaveFlow("images")}>Upload and save</button>}
         {userId && activeAccount && !readOnly && pendingImages === 0 && accountBoards.status === "error" && !accountBoards.busy && <button type="button" onClick={() => void session.save()}>Retry save</button>}
         <button type="button" onClick={() => setDetailsOpen(true)}>Details</button>
       </aside>}
-      <RecoveryDialog open={detailsOpen} close={() => setDetailsOpen(false)} session={session} pendingImages={pendingImages} save={(kind) => { setDetailsOpen(false); setSaveFlow(kind); }} />
+      <RecoveryDialog open={detailsOpen && !blocked} close={() => setDetailsOpen(false)} session={session} pendingImages={pendingImages} save={(kind) => { setDetailsOpen(false); setSaveFlow(kind); }} />
       <BoardBrowser key={userId ?? "guest"} open={browserOpen} close={() => setBrowserOpen(false)} userId={userId} session={session}
+        navigate={workspace.openPage} openDevice={workspace.openDevice} navigationError={lifecycle.error}
+        deviceActive={!activeAccount && !blocked}
         boards={boards.data} activeId={activeAccount?.boardId} busy={accountBoards.busy} hydrated={isHydrated}
         loading={!!userId && boards.isPending} refreshing={boards.isFetching} error={boards.isError && !(boards.error instanceof BoardSignInRequired)}
         initialCategory={inviteLink ? "invitations" : "mine"} refresh={() => void boards.refetch()} share={(board) => setSharingId(board.id)} signIn={() => { setBrowserOpen(false); setAccountOpenRequest((value) => value + 1); }} />

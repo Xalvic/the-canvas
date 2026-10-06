@@ -1,0 +1,146 @@
+{
+  "milestone": "M4",
+  "verifiedDate": "2026-10-06",
+  "normalDatabaseUnchanged": true,
+  "before": {
+    "tables": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "hash": "82b6c05c1c6626f444ae1f95fd19c5bf16f26ad31e4d13c2d7c5daffab5d1400"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "hash": "ef30ca5750c334cea82b306d1aa8f328087f7cd4dada13a0a3ffc35264979a8f"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "hash": "0cc7943cad5eecd671fe9e64dab4bebf2b06eddfada8d6e3f429c11a974af9e3"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "hash": "2446bfa7b49ee67c528952aeab04cdbd29f01d5a9eb0ec3c69f842dae1182741"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "hash": "75dae422d53636ee318c56ceb7ac41f374b8e35aed80aae11384635c8de52f4f"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "hash": "25ccf96f494deda6a96b81899eccc6ba75f8c51180985031421d545172e7151b"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "hash": "bd53f644d4c9201f43d35cf35fe6f9f800cdb83138b65afadbfb209d12aaf18e"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "hash": "81bbf3f7f6522dc9a418d51547c69ddd4cfb109a6348c9e0e8a61bac416365e0"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "hash": "1d21a02f9d43f3dead57bf9a76f88e6b242466dd857a5352776119b1a87c391e"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "hash": "bc55b40aa27593f050e22828bdbb2edeecebc224cd6b8190701a733da55888c6"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "hash": "851d0b5c49cb0a219bfda3bb642263aa024a365869677a76589c6cef3a89fb0f"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "hash": "921d7b44fbb9c8c2983201094c647a53f7c12bca783e365170c6e062c0c7c051"
+      }
+    ],
+    "schemas": []
+  },
+  "after": {
+    "tables": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "hash": "82b6c05c1c6626f444ae1f95fd19c5bf16f26ad31e4d13c2d7c5daffab5d1400"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "hash": "ef30ca5750c334cea82b306d1aa8f328087f7cd4dada13a0a3ffc35264979a8f"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "hash": "0cc7943cad5eecd671fe9e64dab4bebf2b06eddfada8d6e3f429c11a974af9e3"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "hash": "2446bfa7b49ee67c528952aeab04cdbd29f01d5a9eb0ec3c69f842dae1182741"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "hash": "75dae422d53636ee318c56ceb7ac41f374b8e35aed80aae11384635c8de52f4f"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "hash": "25ccf96f494deda6a96b81899eccc6ba75f8c51180985031421d545172e7151b"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "hash": "bd53f644d4c9201f43d35cf35fe6f9f800cdb83138b65afadbfb209d12aaf18e"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "hash": "81bbf3f7f6522dc9a418d51547c69ddd4cfb109a6348c9e0e8a61bac416365e0"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "hash": "1d21a02f9d43f3dead57bf9a76f88e6b242466dd857a5352776119b1a87c391e"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "hash": "bc55b40aa27593f050e22828bdbb2edeecebc224cd6b8190701a733da55888c6"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "hash": "851d0b5c49cb0a219bfda3bb642263aa024a365869677a76589c6cef3a89fb0f"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "hash": "921d7b44fbb9c8c2983201094c647a53f7c12bca783e365170c6e062c0c7c051"
+      }
+    ],
+    "schemas": []
+  },
+  "validation": {
+    "httpClientCases": 171,
+    "postgresCases": 119,
+    "postgresWorkspaceCases": 21,
+    "apiProcessRestart": true,
+    "sqlPrismaNoDrift": true,
+    "correctedAssertions": [
+      "migration JSON ledger sort order",
+      "older asset/collaboration fixture ledger lists include migration 10"
+    ]
+  }
+}

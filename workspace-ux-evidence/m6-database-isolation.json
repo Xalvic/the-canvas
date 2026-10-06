@@ -1,0 +1,157 @@
+{
+  "before": {
+    "fingerprints": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "451d8891c31c130e6ccbeb895eb25d9296e5493b922c7153d043c224bdb89805"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "5177805a5923a9843218add6479ad327362debf506762dae5203b2063bc7214d"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "data": "28c53e24c911a7f85317ca2533acc984f8c7790ce87eb0965a94cfb3850a597b",
+        "definition": "fcbf84d1b48592d430dc682d8afdd556473d9391bfb2c814d39d2662eda67382"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "fbe4b8c52ea2ee3f3f96440e8a46558246f04be5e2c86bc7497aa701af261e6d"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "data": "67243825bfb6335aa75dc91556c8ac5aac9d8969427f2a54d384fdef09c4bf38",
+        "definition": "c6522063bae25e489b2f631ab166cffd40ea27cdb0f0ad21487845352a5e8d1c"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "6f99313694f2872324dc218f3f89d0b5a99c838c25e8d12d4c9efb7cc4f20fb0"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "f50c4533b7e7bf2d4bd3eb63f282365302c807bf71be578dcbd9896e02a39f39"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "4101a8f38a58e7eb41a7e7d5dda383a0c65415c0dad48de065094a93243d01db"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "data": "a54b7f2cf4c855f53c62ab2fc31d3303e436f0fa755b6275cb9f64c95ab4096f",
+        "definition": "ba4dfeeac138efef1c0b10d5148705b490c93e8e8f96e38c1441b4c10733508e"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "data": "b42cfae86f08f7657c2104e8eaaa2f3ee1e1c91050896260d4272023afc52dc3",
+        "definition": "a585a90a8dc951bae4ad799901c05fa4a81b3f11c5a29a26790d92c8e97cee86"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "data": "2463197d3716ac2c6d6a94831d82d80a343bf7b00fae3594607260493afffb8d",
+        "definition": "ef6d04757c411e8e348a8f4fa34c90f310f2a695aaf35c14e6c0ce72ddf430ea"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "data": "b00fdc1de8747eb15af7e85110604eb1792afb969ee1f09d7f27007c67f2ca10",
+        "definition": "23f698f7dbd6ef02babc81a4f05e2e3750df7aca82c30320ef46e3eb08831f56"
+      }
+    ],
+    "fixtures": []
+  },
+  "after": {
+    "fingerprints": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "451d8891c31c130e6ccbeb895eb25d9296e5493b922c7153d043c224bdb89805"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "5177805a5923a9843218add6479ad327362debf506762dae5203b2063bc7214d"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "data": "28c53e24c911a7f85317ca2533acc984f8c7790ce87eb0965a94cfb3850a597b",
+        "definition": "fcbf84d1b48592d430dc682d8afdd556473d9391bfb2c814d39d2662eda67382"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "fbe4b8c52ea2ee3f3f96440e8a46558246f04be5e2c86bc7497aa701af261e6d"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "data": "67243825bfb6335aa75dc91556c8ac5aac9d8969427f2a54d384fdef09c4bf38",
+        "definition": "c6522063bae25e489b2f631ab166cffd40ea27cdb0f0ad21487845352a5e8d1c"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "6f99313694f2872324dc218f3f89d0b5a99c838c25e8d12d4c9efb7cc4f20fb0"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "f50c4533b7e7bf2d4bd3eb63f282365302c807bf71be578dcbd9896e02a39f39"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "4101a8f38a58e7eb41a7e7d5dda383a0c65415c0dad48de065094a93243d01db"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "data": "a54b7f2cf4c855f53c62ab2fc31d3303e436f0fa755b6275cb9f64c95ab4096f",
+        "definition": "ba4dfeeac138efef1c0b10d5148705b490c93e8e8f96e38c1441b4c10733508e"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "data": "b42cfae86f08f7657c2104e8eaaa2f3ee1e1c91050896260d4272023afc52dc3",
+        "definition": "a585a90a8dc951bae4ad799901c05fa4a81b3f11c5a29a26790d92c8e97cee86"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "data": "2463197d3716ac2c6d6a94831d82d80a343bf7b00fae3594607260493afffb8d",
+        "definition": "ef6d04757c411e8e348a8f4fa34c90f310f2a695aaf35c14e6c0ce72ddf430ea"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "data": "b00fdc1de8747eb15af7e85110604eb1792afb969ee1f09d7f27007c67f2ca10",
+        "definition": "23f698f7dbd6ef02babc81a4f05e2e3750df7aca82c30320ef46e3eb08831f56"
+      }
+    ],
+    "fixtures": []
+  },
+  "unchanged": true
+}

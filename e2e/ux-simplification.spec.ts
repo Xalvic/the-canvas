@@ -20,6 +20,8 @@ test("compact guest workspace, account dialog isolation, sign-in without uploads
   cloud.signedIn = true;
   await page.reload();
   await expect(page.getByRole("button", { name: "Account", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Board title")).toHaveValue("Fixture board");
+  await backToDevice(page);
   expect((await canvasState(page)).objects).toEqual(before.objects);
   expect(cloud.mutations).toHaveLength(0);
   await page.getByRole("button", { name: "Account", exact: true }).click();
@@ -34,6 +36,7 @@ test("board categories, search, contextual rename/delete and explicit account co
   shared.role = "editor"; shared.document!.role = "editor";
   const cloud = await mockAccount(page, [owner, shared]);
   await page.goto("/scribble/");
+  await backToDevice(page);
   await createNote(page, "Guest source");
   const original = (await canvasState(page)).objects;
   await browse(page);

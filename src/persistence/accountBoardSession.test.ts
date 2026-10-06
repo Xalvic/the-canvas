@@ -334,6 +334,22 @@ describe("account draft save queue", () => {
 });
 
 describe("account board transitions", () => {
+  it("cancels a queued switch and the active save when the account changes", async () => {
+    const record = accountRecord();
+    record.account!.pendingSave = { document: document("Pending submission"), expectedRevision: 2 };
+    startAccount(record);
+    const gate = deferred<ServerBoardDocument>();
+    vi.mocked(getServerBoardDocument).mockReturnValueOnce(gate.promise);
+    const saving = session.save(); await drain();
+    const opening = session.open({ ...metadata, id: "next-board" });
+    session.setUser(null);
+    gate.resolve(remote(document("Saved"), 2));
+    await saving; await opening; await drain();
+    expect(getServerBoardDocument).toHaveBeenCalledTimes(1);
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    expect(vi.mocked(getServerBoardDocument).mock.calls[0][1]?.aborted).toBe(true);
+    expect(useBoardStore.getState().account).toBeNull();
+  });
   it("keeps the guest canvas intact when saving a new scoped record fails", async () => {
     const guest = useDocumentStore.getState().objects;
     vi.mocked(saveLocalBoard).mockRejectedValue(new Error("Device storage full"));

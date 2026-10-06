@@ -16,6 +16,7 @@ import { createPostgresBoardStore } from "../server/postgresBoards.js";
 import { createPostgresCollaborationStore } from "../server/postgresCollaboration.js";
 import { createPostgresDocumentStore } from "../server/postgresDocuments.js";
 import { createPostgresSharingStore } from "../server/postgresSharing.js";
+import { createPostgresWorkspaceStore } from "../server/postgresWorkspace.js";
 import { createPrismaClient } from "../server/prisma.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -175,7 +176,7 @@ try {
   };
   fixture.use(createApp(createPostgresBoardStore(prisma), createPostgresDocumentStore(prisma), {
     store: authStore, provider: null, frontendUrl, secureCookies: false,
-  }, createPostgresSharingStore(prisma), assets, createPostgresCollaborationStore(prisma)));
+  }, createPostgresSharingStore(prisma), assets, createPostgresCollaborationStore(prisma), undefined, createPostgresWorkspaceStore(prisma)));
   fixture.use(errorHandler);
   server = fixture.listen(port, "127.0.0.1", () => console.log(`Isolated browser API ready on ${port}; schema ${schema}`));
   server.on("error", (error) => { console.error(error); void stop().then(() => process.exit(1)); });

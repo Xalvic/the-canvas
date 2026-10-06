@@ -3,6 +3,10 @@
 Updated: 2026-10-05. Backend integration and frontend upload/rendering are
 implemented and tested locally. Deployment remains pending.
 
+Workspace UX M5 (2026-10-06) adds optional stable upload identities and bounded
+status/reconciliation APIs. See [the M5 contract](workspace-ux-m5.md). The manual
+UI and no-header upload contract described here remain compatible until M8.
+
 ## How the pieces connect
 
 Express accepts an authenticated upload for one board. It checks the current

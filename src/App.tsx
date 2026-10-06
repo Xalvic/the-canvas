@@ -8,8 +8,10 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <CanvasViewport />
-      <CollaborationPresence />
+      <div id="canvas-editor">
+        <CanvasViewport />
+        <CollaborationPresence />
+      </div>
       <ServerBoards />
     </main>
   );

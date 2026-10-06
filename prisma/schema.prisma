@@ -26,6 +26,7 @@ model Board {
   assets    BoardAsset[]
   operationReceipts BoardOperationReceipt[]
   creationReceipts BoardCreationReceipt[]
+  lastOpenedWorkspaces WorkspaceState[]
 
   @@index([ownerId, createdAt, id], map: "boards_owner_created_idx", where: raw("(owner_id IS NOT NULL)"))
   @@map("boards")
@@ -54,6 +55,8 @@ model User {
   uploadedAssets BoardAsset[]
   operationReceipts BoardOperationReceipt[]
   creationReceipts BoardCreationReceipt[]
+  workspace WorkspaceState?
+  workspaceInitializations WorkspaceInitializationReceipt[]
 
   @@map("users")
 }
@@ -124,10 +127,16 @@ model BoardAsset {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   lastReferencedAt DateTime? @map("last_referenced_at") @db.Timestamptz(6)
+  uploadRequestId  String?   @map("upload_request_id") @db.Uuid
+  uploadContentHash String?  @map("upload_content_hash")
+  uploadLeaseToken String?   @map("upload_lease_token") @db.Uuid
+  uploadLeaseUntil DateTime? @map("upload_lease_until") @db.Timestamptz(6)
+  uploadAttempts  Int       @default(0) @map("upload_attempts")
   board            Board?    @relation(fields: [boardId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   uploader         User      @relation(fields: [uploaderId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([scopeBoardId, createdAt], map: "board_assets_board_created_idx")
+  @@unique([uploaderId, scopeBoardId, uploadRequestId], map: "board_assets_upload_request_key")
   @@index([uploaderId, createdAt], map: "board_assets_uploader_created_idx")
   @@index([status, createdAt, updatedAt], map: "board_assets_cleanup_idx", where: raw("(last_referenced_at IS NULL)"))
   @@map("board_assets")
@@ -162,6 +171,28 @@ model BoardCreationReceipt {
   @@id([actorId, requestId])
   @@index([boardId], map: "board_creation_receipts_board_idx", where: raw("(board_id IS NOT NULL)"))
   @@map("board_creation_receipts")
+}
+
+model WorkspaceState {
+  userId            String    @id @map("user_id") @db.Uuid
+  initializedAt     DateTime? @map("initialized_at") @db.Timestamptz(6)
+  lastOpenedBoardId String?   @map("last_opened_board_id") @db.Uuid
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lastOpenedBoard   Board?    @relation(fields: [lastOpenedBoardId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([lastOpenedBoardId], map: "workspace_states_last_board_idx", where: raw("(last_opened_board_id IS NOT NULL)"))
+  @@map("workspace_states")
+}
+
+model WorkspaceInitializationReceipt {
+  actorId           String   @map("actor_id") @db.Uuid
+  requestId         String   @map("request_id") @db.Uuid
+  createInitialPage Boolean  @map("create_initial_page")
+  createdAt         DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(6)
+  actor             User     @relation(fields: [actorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([actorId, requestId])
+  @@map("workspace_initialization_receipts")
 }
 
 model AssetRequestBudget {

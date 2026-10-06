@@ -15,6 +15,7 @@ import { createImageAssetService } from "./imageAssets.js";
 import { createPostgresCollaborationStore } from "./postgresCollaboration.js";
 import { loadProductionConfig } from "./productionConfig.js";
 import { createPostgresRequestBudgets } from "./productionBudgets.js";
+import { createPostgresWorkspaceStore } from "./postgresWorkspace.js";
 
 const config = loadServerConfig();
 const production = loadProductionConfig();
@@ -34,6 +35,7 @@ try {
   await prisma.$queryRaw`SELECT board_id FROM board_members LIMIT 0`;
   await prisma.$queryRaw`SELECT id FROM board_invitations LIMIT 0`;
   await prisma.$queryRaw`SELECT id FROM board_assets LIMIT 0`;
+  await prisma.$queryRaw`SELECT upload_request_id, upload_content_hash, upload_lease_token, upload_lease_until, upload_attempts FROM board_assets LIMIT 0`;
   await prisma.$queryRaw`SELECT bucket FROM asset_request_budgets LIMIT 0`;
   await prisma.$queryRaw`SELECT operation_id FROM board_operation_receipts LIMIT 0`;
   if (production) await prisma.$queryRaw`SELECT bucket FROM api_request_budgets LIMIT 0`;
@@ -52,7 +54,7 @@ const server = createApp(createPostgresBoardStore(prisma), createPostgresDocumen
     const probe = { text: "SELECT 1", query_timeout: 1800 };
     await pool.query(probe);
   },
-} : undefined).listen(config.port, config.host, () => {
+} : undefined, createPostgresWorkspaceStore(prisma)).listen(config.port, config.host, () => {
   console.log(`Scribble API listening on ${config.host}:${config.port} (${production ? "production origin guard enabled" : "development"})`);
   if (!authConfig.google) console.log("Google sign-in is disabled until its environment settings are configured");
   if (!imageConfig) console.log("Cloud images are disabled until backend ImageKit settings are configured");

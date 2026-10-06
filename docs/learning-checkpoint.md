@@ -1,30 +1,32 @@
 # Scribble: resume here
 
-Updated: 2026-10-06. Read once per new project session.
+Updated: 2026-10-07. Read once per new project session.
 
 ## Current handoff
 
-Workspace UX **M0-M3 are verified locally** on 2026-10-06. Status authority and next
-session instructions: `WORKSPACE_UX_IMPLEMENTATION_PLAN.md`, sections 6 and 9.
-Next: **M4 only**, workspace state/initialization APIs. M3 contracts and commands:
-`docs/workspace-ux-m3.md`. POST /api/boards adds actor/request receipts and an atomic
-blank document at revision 1; legacy {title} creation remains unchanged. Replay
-confirms original creation without resetting current title/content. Fresh document
-reads precede recovered editing; 90-day expiry/deletion return terminal 410 and
-retained identities prevent recreation. Typed createServerPage leaves stable intent
-persistence to M6/M7. Current UI still uses the legacy path.
-Migration 9 was applied only to disposable schemas; next unused number is 10.
-Verified 120 focused HTTP/client cases, 83 real PostgreSQL checks including actual
-API process restarts, SQL/Prisma no-drift, both builds and targeted typechecks.
-All 12 normal public tables/14 rows have unchanged fingerprints; zero disposable
-schemas remain. Docker 5434 is left running. M0-M3 changes are included in the
-user-authorized local commit; M2's IndexedDB v4 journals/guest handoff contract is in
-`docs/workspace-ux-m2.md`. Retain its v4-capable opener on rollback; physical
-sleep/native IME remain M11. M4 initialization must reuse the actor-row lock in one
-transaction. User authorized committing all current updates on 2026-10-06;
-future commits need fresh approval. No normal/production migration, push,
-provider change or deployment. Stop after the selected milestone and save its
-handoff.
+Workspace UX **M0-M6 are verified locally**; M6 completed 2026-10-07. Authority:
+`WORKSPACE_UX_IMPLEMENTATION_PLAN.md`, sections 6 and 9. Next: **M7 only**, Google
+sign-in and resumable guest transfer. Contract/commands: `docs/workspace-ux-m6.md`.
+One mounted controller owns account lifecycle and page URLs/Back/Forward. Service
+errors/timeouts retain identity; confirmed expiry/sign-out preserve journals and
+return to the retained guest. Initial hydration completes before opening account
+pages; transient navigation gating prevents guest recovery races. Hidden/inert
+canvas keeps its measured size and viewport. Read current document/roles, preserve
+selection/history boundaries, then serialize preference PATCH; another device's
+preference never navigates the current editor. Initialization UUID/mode persists
+before dispatch; final deletion stays empty. M7 must supply durable deliberate,
+account-bound transfer intent to the controller's entry hook; explicit page and
+invitation take priority. Preserve M2 IndexedDB v4 journals/guest handoff, M3/M4
+retained creation/initialization identities and M5 immutable uploads/mappings.
+Legacy manual creation/upload controls remain until M8/M9. Verified 136 focused
+cases, 40 standard browser regressions and 15 actual browser/API/Prisma/PostgreSQL
+cases; both builds and strict touched-test/fixture typechecks pass. All 12 normal
+tables/14 rows are unchanged; zero browser schemas remain. Evidence:
+`workspace-ux-evidence/m6-database-isolation.json`. M4-M6 are included in the combined
+commit authorized 2026-10-07; M0-M3 were committed earlier. Docker 5434 runs.
+Next SQL: 12; physical sleep/native IME: M11. No normal/production migration,
+provider change, push or deployment. Future commits need fresh authorization.
+Stop after M7 and save its handoff.
 
 ## Previous pen handoff
 

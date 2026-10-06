@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { createBoardStore } from "./boards.js";
 import { hashToken, SESSION_COOKIE, type AuthStore } from "./auth.js";
-import type { AssetMetadata, AssetStore } from "./assets.js";
+import type { AssetMetadata, AssetStore, UploadClaim } from "./assets.js";
 import { HttpError } from "./errors.js";
 import { createImageAssetService } from "./imageAssets.js";
 import type { ImageStorage } from "./imageKit.js";
@@ -13,6 +13,7 @@ import { MAX_IMAGE_BYTES } from "./imageValidation.js";
 import { cloudDocumentSchema } from "./contracts/cloudDocument.js";
 import { canvasDocumentSchema } from "./contracts/canvasDocument.js";
 import { documentInput } from "./testFixtures/document.js";
+import type { ProductionDependencies } from "./production.js";
 
 afterEach(() => vi.restoreAllMocks());
 const userId = randomUUID(), boardId = randomUUID(), assetId = randomUUID();
@@ -22,12 +23,13 @@ function imageObject(id = assetId) {
   return { id: "image-object", type: "image", assetId: id, zIndex: 1, createdAt: 1, updatedAt: 1,
     x: -40, y: 20, width: 100, height: 80, originalWidth: 2, originalHeight: 2, name: "Sketch.png", mimeType: "image/png" };
 }
-function setup(enabled = true) {
+function setup(enabled = true, production?: ProductionDependencies) {
   const asset: AssetMetadata = { id: assetId, boardId, scopeBoardId: boardId, uploaderId: userId, status: "ready",
     byteSize: 100, mimeType: "image/png", width: 2, height: 2, fileId: "test-file", filePath: `/scribble/dev/${boardId}/${assetId}.png`, createdAt: Date.now(), lastReferencedAt: null };
   const store: AssetStore = {
     assertCanUpload: vi.fn(async () => {}),
     reserve: vi.fn(async (_board, _user, input) => ({ ...asset, ...input, status: "pending" })),
+    reserveUpload: vi.fn(), claimUpload: vi.fn(), beginUpload: vi.fn(), releaseUpload: vi.fn(),
     finalize: vi.fn(async (id, _user, file) => ({ ...asset, id, byteSize: file.size, filePath: file.filePath })),
     getForRead: vi.fn(async () => asset), claimAbandoned: vi.fn(async () => []), finishDelete: vi.fn(async () => {}),
   };
@@ -42,7 +44,7 @@ function setup(enabled = true) {
     createFlow: vi.fn(), consumeFlow: vi.fn(), signIn: vi.fn(), revokeSession: vi.fn(),
   };
   const service = createImageAssetService(store, enabled ? storage : null);
-  const app = createApp(createBoardStore(), undefined, { store: authStore, provider: null, secureCookies: false, frontendUrl: "http://127.0.0.1:5173/scribble/" }, undefined, service);
+  const app = createApp(createBoardStore(), undefined, { store: authStore, provider: null, secureCookies: false, frontendUrl: "http://127.0.0.1:5173/scribble/" }, undefined, service, undefined, production);
   const upload = (body: Buffer, type = "image/png") => request(app).post(url).set("Cookie", cookie).set("X-Scribble-Request", "1").set("Content-Type", type).send(body);
   return { app, store, storage, service, asset, upload };
 }
@@ -166,6 +168,72 @@ describe("asset reconciliation", () => {
     vi.mocked(storage[operation]).mockRejectedValue(new Error("secret"));
     expect(await service.cleanup()).toEqual({ claimed: 1, deleted: 0, deferred: 1 });
     expect(store.finishDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("upload request HTTP boundaries", () => {
+  const requestId = randomUUID();
+  function claimed(asset: AssetMetadata): UploadClaim {
+    return { asset: { ...asset, status: "pending" }, requestId, leaseToken: randomUUID(), attempts: 0, retryAfterMs: 5000 };
+  }
+  it("returns ready request metadata without provider credentials or a second write", async () => {
+    const { app, upload, asset, store, storage } = setup();
+    vi.mocked(store.reserveUpload).mockResolvedValue({ ...claimed(asset), asset, leaseToken: null });
+    const ready = await upload(await png()).set("X-Scribble-Upload-Request", requestId.toUpperCase()).expect(200);
+    expect(ready.body.upload).toMatchObject({ requestId, boardId, assetId, state: "ready", asset: { id: assetId }, canRetry: false, retryAfterMs: null });
+    expect(storage.upload).not.toHaveBeenCalled(); expect(store.reserve).not.toHaveBeenCalled();
+    vi.mocked(store.claimUpload).mockResolvedValue({ ...claimed(asset), asset, leaseToken: null });
+    expect((await request(app).get(`/api/boards/${boardId}/asset-uploads/${requestId}`).set("Cookie", cookie).expect(200)).body).toEqual(ready.body);
+    expect(store.getForRead).not.toHaveBeenCalled(); expect(storage.sign).not.toHaveBeenCalled();
+  });
+  it("protects status with a session and validates request identity before provider access", async () => {
+    const { app, upload, store, storage } = setup();
+    await request(app).get(`/api/boards/${boardId}/asset-uploads/${requestId}`).expect(401);
+    await request(app).get(`/api/boards/${boardId}/asset-uploads/not-a-uuid`).set("Cookie", cookie).expect(400);
+    await upload(await png()).set("X-Scribble-Upload-Request", "bad").expect(400);
+    expect(store.reserveUpload).not.toHaveBeenCalled(); expect(storage.find).not.toHaveBeenCalled();
+  });
+  it("returns bounded pending state for active leases and never lets GET send bytes", async () => {
+    const { app, upload, asset, store, storage } = setup();
+    const claim = { ...claimed(asset), leaseToken: null, retryAfterMs: 80_000 };
+    vi.mocked(store.reserveUpload).mockResolvedValue(claim);
+    const result = await upload(await png()).set("X-Scribble-Upload-Request", requestId).expect(202);
+    expect(result.headers["retry-after"]).toBe("80"); expect(result.body.upload.asset).toBeNull();
+    expect(storage.find).not.toHaveBeenCalled(); expect(storage.upload).not.toHaveBeenCalled();
+    vi.mocked(store.claimUpload).mockResolvedValue(claimed(asset));
+    const read = await request(app).get(`/api/boards/${boardId}/asset-uploads/${requestId}`).set("Cookie", cookie).expect(200);
+    expect(read.body.upload.state).toBe("pending"); expect(storage.find).toHaveBeenCalledOnce();
+    expect(store.beginUpload).not.toHaveBeenCalled(); expect(storage.upload).not.toHaveBeenCalled();
+    expect(store.releaseUpload).toHaveBeenCalledOnce();
+  });
+  it("preserves durable quota refusal before provider dispatch for keyed uploads", async () => {
+    const { upload, store, storage } = setup();
+    vi.mocked(store.reserveUpload).mockRejectedValue(new HttpError(429, "ASSET_UPLOAD_RATE_LIMIT", "Allowance reached"));
+    await upload(await png()).set("X-Scribble-Upload-Request", requestId).expect(429);
+    expect(storage.find).not.toHaveBeenCalled(); expect(storage.upload).not.toHaveBeenCalled();
+  });
+  it("enforces production proxy and read/write admission before keyed body parsing or status/provider work", async () => {
+    const production: ProductionDependencies = { proxySecret: "s".repeat(48), ready: vi.fn(), log: vi.fn(),
+      budgets: { consume: vi.fn(async (scope) => ({ allowed: scope === "api-ip", retryAfter: 17 })) } };
+    const { app, upload, store, storage } = setup(true, production);
+    const proxy = (test: request.Test) => test.set("X-Scribble-Proxy-Secret", production.proxySecret).set("X-Scribble-Client-IP", "203.0.113.10");
+    await upload(Buffer.from("unparsed")).set("X-Scribble-Upload-Request", requestId).expect(403);
+    await proxy(upload(Buffer.from("unparsed")).set("X-Scribble-Upload-Request", requestId)).expect(429).expect("Retry-After", "17");
+    await proxy(request(app).get(`/api/boards/${boardId}/asset-uploads/${requestId}`).set("Cookie", cookie)).expect(429).expect("Retry-After", "17");
+    expect(production.budgets.consume).toHaveBeenCalledWith("user-write", userId, 900, 60);
+    expect(production.budgets.consume).toHaveBeenCalledWith("user-read", userId, 1200, 60);
+    expect(store.assertCanUpload).not.toHaveBeenCalled(); expect(store.reserveUpload).not.toHaveBeenCalled(); expect(store.claimUpload).not.toHaveBeenCalled();
+    expect(storage.find).not.toHaveBeenCalled(); expect(storage.upload).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(production.log!).mock.calls)).not.toContain(requestId);
+  });
+  it("exposes terminal failed status and never re-reserves a cleaned request", async () => {
+    const { app, upload, store, storage, asset } = setup();
+    const claim = { ...claimed(asset), asset: { ...asset, status: "failed" as const }, leaseToken: null };
+    vi.mocked(store.reserveUpload).mockResolvedValue(claim); vi.mocked(store.claimUpload).mockResolvedValue(claim);
+    await upload(await png()).set("X-Scribble-Upload-Request", requestId).expect(410);
+    const response = await request(app).get(`/api/boards/${boardId}/asset-uploads/${requestId}`).set("Cookie", cookie).expect(200);
+    expect(response.body.upload).toMatchObject({ state: "failed", canRetry: false, asset: null });
+    expect(storage.find).not.toHaveBeenCalled(); expect(storage.upload).not.toHaveBeenCalled();
   });
 });
 

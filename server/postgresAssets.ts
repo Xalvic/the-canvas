@@ -1,5 +1,6 @@
 import { Prisma, type BoardAsset, type PrismaClient } from "./generated/prisma/client.js";
-import type { AssetMetadata, AssetStore } from "./assets.js";
+import { randomUUID } from "node:crypto";
+import { MAX_UPLOAD_ATTEMPTS, UPLOAD_LEASE_MS, UPLOAD_RETRY_MS, type AssetMetadata, type AssetStore, type AssetReservationInput, type UploadClaim } from "./assets.js";
 import { lockBoardAccess } from "./boardPermissions.js";
 import { HttpError } from "./errors.js";
 
@@ -33,6 +34,62 @@ async function uploadAccess(tx: Prisma.TransactionClient, boardId: string, userI
   if (!await lockBoardAccess(tx, boardId, userId, "edit")) throw new HttpError(404, "BOARD_NOT_FOUND", "Board not found");
 }
 
+async function reserveAsset(tx: Prisma.TransactionClient, boardId: string, userId: string, input: AssetReservationInput, requestId?: string, contentHash?: string) {
+  const [totals] = await tx.$queryRaw<{ global_bytes: bigint; board_bytes: bigint; board_count: bigint; hourly_uploads: bigint; daily_bytes: bigint }[]>`
+    SELECT
+      COALESCE(SUM(byte_size) FILTER (WHERE status <> 'failed'), 0)::bigint AS global_bytes,
+      COALESCE(SUM(byte_size) FILTER (WHERE scope_board_id = ${boardId}::uuid AND status <> 'failed'), 0)::bigint AS board_bytes,
+      COUNT(*) FILTER (WHERE scope_board_id = ${boardId}::uuid AND status <> 'failed') AS board_count,
+      COUNT(*) FILTER (WHERE uploader_id = ${userId}::uuid AND created_at > clock_timestamp() - interval '1 hour') AS hourly_uploads,
+      COALESCE(SUM(byte_size) FILTER (WHERE uploader_id = ${userId}::uuid AND created_at > clock_timestamp() - interval '1 day'), 0)::bigint AS daily_bytes
+    FROM board_assets
+  `;
+  if (totals!.hourly_uploads >= BigInt(MAX_HOURLY_UPLOADS) || totals!.daily_bytes + BigInt(input.byteSize) > BigInt(DAILY_UPLOAD_BYTES)) {
+    throw new HttpError(429, "ASSET_UPLOAD_RATE_LIMIT", "Image uploads exceed the hourly or daily allowance");
+  }
+  if (totals!.global_bytes + BigInt(input.byteSize) > BigInt(GLOBAL_STORAGE_BYTES)
+    || totals!.board_bytes + BigInt(input.byteSize) > BigInt(BOARD_STORAGE_BYTES)
+    || totals!.board_count >= BigInt(MAX_BOARD_ASSETS)) {
+    throw new HttpError(507, "ASSET_STORAGE_LIMIT", "Image storage allowance has been reached");
+  }
+  return tx.boardAsset.create({ data: {
+    id: input.id, boardId, scopeBoardId: boardId, uploaderId: userId,
+    byteSize: input.byteSize, mimeType: input.mimeType, width: input.width, height: input.height,
+    providerFilePath: input.filePath, uploadRequestId: requestId, uploadContentHash: contentHash,
+  } });
+}
+
+async function claim(tx: Prisma.TransactionClient, row: BoardAsset): Promise<UploadClaim> {
+  let leaseToken: string | null = null;
+  if (row.status === "pending") {
+    const token = randomUUID();
+    const claimed = await tx.$executeRaw`
+      UPDATE board_assets SET upload_lease_token = ${token}::uuid,
+        upload_lease_until = clock_timestamp() + ${UPLOAD_LEASE_MS} * interval '1 millisecond', updated_at = clock_timestamp()
+      WHERE id = ${row.id}::uuid AND status = 'pending'
+        AND (upload_lease_until IS NULL OR upload_lease_until <= clock_timestamp())
+    `;
+    if (claimed) leaseToken = token;
+  }
+  const [retry] = leaseToken ? [] : await tx.$queryRaw<{ delay: number }[]>`
+    SELECT LEAST(${UPLOAD_LEASE_MS}, GREATEST(1, CEIL(EXTRACT(EPOCH FROM (upload_lease_until - clock_timestamp())) * 1000)))::integer AS delay
+    FROM board_assets WHERE id = ${row.id}::uuid
+  `;
+  return { asset: metadata(row), requestId: row.uploadRequestId!, leaseToken, attempts: row.uploadAttempts, retryAfterMs: leaseToken ? UPLOAD_RETRY_MS : (retry?.delay ?? UPLOAD_RETRY_MS) };
+}
+
+async function leasedAsset(tx: Prisma.TransactionClient, id: string, userId: string, leaseToken: string) {
+  const row = await tx.boardAsset.findUnique({ where: { id } });
+  if (!row || row.uploaderId !== userId || !row.boardId) throw new HttpError(404, "ASSET_NOT_FOUND", "Image asset not found");
+  await uploadAccess(tx, row.boardId, userId);
+  const [active] = await tx.$queryRaw<{ active: boolean }[]>`
+    SELECT upload_lease_token = ${leaseToken}::uuid AND upload_lease_until > clock_timestamp() AND status = 'pending' AS active
+    FROM board_assets WHERE id = ${id}::uuid
+  `;
+  if (!active?.active) throw new HttpError(409, "ASSET_UPLOAD_LEASE_LOST", "Image upload is being reconciled by another request");
+  return row;
+}
+
 /** Called inside the document-save transaction, after its parent-board lock.
  * A successful reference protects the asset permanently for this milestone,
  * including after later document removal. Failed saves roll this update back. */
@@ -61,41 +118,69 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
       return prisma.$transaction(async (tx) => {
         await storageLock(tx);
         await uploadAccess(tx, boardId, userId);
-        const [totals] = await tx.$queryRaw<{ global_bytes: bigint; board_bytes: bigint; board_count: bigint; hourly_uploads: bigint; daily_bytes: bigint }[]>`
-          SELECT
-            COALESCE(SUM(byte_size) FILTER (WHERE status <> 'failed'), 0)::bigint AS global_bytes,
-            COALESCE(SUM(byte_size) FILTER (WHERE scope_board_id = ${boardId}::uuid AND status <> 'failed'), 0)::bigint AS board_bytes,
-            COUNT(*) FILTER (WHERE scope_board_id = ${boardId}::uuid AND status <> 'failed') AS board_count,
-            COUNT(*) FILTER (WHERE uploader_id = ${userId}::uuid AND created_at > clock_timestamp() - interval '1 hour') AS hourly_uploads,
-            COALESCE(SUM(byte_size) FILTER (WHERE uploader_id = ${userId}::uuid AND created_at > clock_timestamp() - interval '1 day'), 0)::bigint AS daily_bytes
-          FROM board_assets
-        `;
-        if (totals!.hourly_uploads >= BigInt(MAX_HOURLY_UPLOADS) || totals!.daily_bytes + BigInt(input.byteSize) > BigInt(DAILY_UPLOAD_BYTES)) {
-          throw new HttpError(429, "ASSET_UPLOAD_RATE_LIMIT", "Image uploads exceed the hourly or daily allowance");
-        }
-        if (totals!.global_bytes + BigInt(input.byteSize) > BigInt(GLOBAL_STORAGE_BYTES)
-          || totals!.board_bytes + BigInt(input.byteSize) > BigInt(BOARD_STORAGE_BYTES)
-          || totals!.board_count >= BigInt(MAX_BOARD_ASSETS)) {
-          throw new HttpError(507, "ASSET_STORAGE_LIMIT", "Image storage allowance has been reached");
-        }
-        const row = await tx.boardAsset.create({ data: {
-          id: input.id, boardId, scopeBoardId: boardId, uploaderId: userId,
-          byteSize: input.byteSize, mimeType: input.mimeType, width: input.width, height: input.height,
-          providerFilePath: input.filePath,
-        } });
-        return metadata(row);
+        return metadata(await reserveAsset(tx, boardId, userId, input));
       });
     },
 
-    async finalize(id, userId, file) {
+    async reserveUpload(boardId, userId, input, requestId, contentHash) {
+      return prisma.$transaction(async (tx) => {
+        await storageLock(tx); await uploadAccess(tx, boardId, userId);
+        const existing = await tx.boardAsset.findUnique({ where: {
+          uploaderId_scopeBoardId_uploadRequestId: { uploaderId: userId, scopeBoardId: boardId, uploadRequestId: requestId },
+        } });
+        // Resolve identity before quota admission. Replays consume no second slot.
+        if (existing && existing.uploadContentHash !== contentHash) {
+          throw new HttpError(409, "ASSET_UPLOAD_REQUEST_CONFLICT", "This upload request was already used for different image content");
+        }
+        const row = existing ?? await reserveAsset(tx, boardId, userId, input, requestId, contentHash);
+        return claim(tx, row);
+      });
+    },
+
+    async claimUpload(boardId, userId, requestId) {
+      return prisma.$transaction(async (tx) => {
+        await storageLock(tx); await uploadAccess(tx, boardId, userId);
+        const row = await tx.boardAsset.findUnique({ where: {
+          uploaderId_scopeBoardId_uploadRequestId: { uploaderId: userId, scopeBoardId: boardId, uploadRequestId: requestId },
+        } });
+        if (!row) throw new HttpError(404, "ASSET_UPLOAD_NOT_FOUND", "Image upload request not found");
+        return claim(tx, row);
+      });
+    },
+
+    async beginUpload(id, userId, leaseToken) {
       return prisma.$transaction(async (tx) => {
         await storageLock(tx);
+        const row = await leasedAsset(tx, id, userId, leaseToken);
+        if (row.uploadAttempts >= MAX_UPLOAD_ATTEMPTS) return false;
+        await tx.boardAsset.update({ where: { id }, data: { uploadAttempts: { increment: 1 }, updatedAt: new Date() } });
+        return true;
+      });
+    },
+
+    async releaseUpload(id, leaseToken) {
+      await prisma.$transaction(async (tx) => {
+        await storageLock(tx);
+        // Fenced: a late response cannot release another process's lease.
+        await tx.$executeRaw`
+          UPDATE board_assets SET upload_lease_token = NULL,
+            upload_lease_until = clock_timestamp() + ${UPLOAD_RETRY_MS} * interval '1 millisecond', updated_at = clock_timestamp()
+          WHERE id = ${id}::uuid AND upload_lease_token = ${leaseToken}::uuid AND status = 'pending'
+        `;
+      });
+    },
+
+    async finalize(id, userId, file, leaseToken) {
+      return prisma.$transaction(async (tx) => {
+        await storageLock(tx);
+        if (leaseToken) await leasedAsset(tx, id, userId, leaseToken);
         const pending = await tx.boardAsset.findUnique({ where: { id } });
         if (!pending || pending.uploaderId !== userId || !pending.boardId) throw new HttpError(404, "ASSET_NOT_FOUND", "Image asset not found");
         await uploadAccess(tx, pending.boardId, userId);
         // Sharing changes and board deletion cannot occur after this recheck
         // until finalization commits; provider I/O happened outside the lock.
         const current = await tx.boardAsset.findUnique({ where: { id } });
+        if (current?.uploadRequestId && !leaseToken) throw new HttpError(409, "ASSET_UPLOAD_LEASE_LOST", "Image upload requires its current lease");
         if (!current || (current.status !== "pending" && current.status !== "ready")) throw new HttpError(409, "ASSET_NOT_READY", "Image upload cannot be completed");
         if (file.size !== current.byteSize || file.filePath !== current.providerFilePath || !file.fileId) {
           throw new HttpError(502, "ASSET_PROVIDER_MISMATCH", "Image storage returned unexpected file metadata");
@@ -105,7 +190,7 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
           return metadata(current);
         }
         return metadata(await tx.boardAsset.update({ where: { id }, data: {
-          status: "ready", providerFileId: file.fileId, updatedAt: new Date(),
+          status: "ready", providerFileId: file.fileId, updatedAt: new Date(), uploadLeaseToken: null, uploadLeaseUntil: null,
         } }));
       });
     },
@@ -148,7 +233,9 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
         await storageLock(tx);
         const candidates = await tx.$queryRaw<{ id: string; board_id: string | null }[]>`
           SELECT id, board_id FROM board_assets WHERE last_referenced_at IS NULL
-            AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours')
+            AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours'
+                AND (upload_request_id IS NULL OR updated_at < clock_timestamp() - interval '24 hours')
+                AND (upload_lease_until IS NULL OR upload_lease_until <= clock_timestamp()))
               OR (status = 'deleting' AND updated_at < clock_timestamp() - interval '15 minutes'))
           ORDER BY created_at, id LIMIT ${Math.max(1, Math.min(100, limit))}
         `;
@@ -160,7 +247,9 @@ export function createPostgresAssetStore(prisma: PrismaClient): AssetStore {
           const rows = await tx.$queryRaw<BoardAsset[]>`
             UPDATE board_assets SET status = 'deleting', updated_at = clock_timestamp()
             WHERE id = ${candidate.id}::uuid AND last_referenced_at IS NULL
-              AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours')
+              AND ((status = 'pending' AND created_at < clock_timestamp() - interval '24 hours'
+                  AND (upload_request_id IS NULL OR updated_at < clock_timestamp() - interval '24 hours')
+                  AND (upload_lease_until IS NULL OR upload_lease_until <= clock_timestamp()))
                 OR (status = 'deleting' AND updated_at < clock_timestamp() - interval '15 minutes'))
             RETURNING id, board_id AS "boardId", scope_board_id AS "scopeBoardId", uploader_id AS "uploaderId", status,
               byte_size AS "byteSize", mime_type AS "mimeType", width, height, provider_file_id AS "providerFileId",

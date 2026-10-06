@@ -11,8 +11,9 @@ import { MAX_IMAGE_BYTES } from "./imageValidation.js";
 import type { CollaborationStore } from "./collaboration.js";
 import { createCollaborationRouter } from "./collaborationRoutes.js";
 import { checkReady, productionRequestGuard, productionUserBudget, verifyProductionOrigin, type ProductionDependencies } from "./production.js";
+import { initializeWorkspaceSchema, updateWorkspaceSchema, type WorkspaceStore } from "./workspace.js";
 
-export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService, collaboration?: CollaborationStore, production?: ProductionDependencies) {
+export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService, collaboration?: CollaborationStore, production?: ProductionDependencies, workspace?: WorkspaceStore) {
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -33,9 +34,11 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
   }
   app.use("/api/auth", createAuthRouter(auth, production));
   app.use("/api/boards", requireBoardSession(auth));
+  app.use("/api/workspace", requireBoardSession(auth));
   if (sharing) app.use("/api/invitations", requireBoardSession(auth));
   if (production) {
     app.use("/api/boards", productionUserBudget(production));
+    app.use("/api/workspace", productionUserBudget(production));
     if (sharing) app.use("/api/invitations", productionUserBudget(production));
   }
 
@@ -43,8 +46,10 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
     const acquire = createUploadGate();
     const parseImage = express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: MAX_IMAGE_BYTES, inflate: false });
     app.post("/api/boards/:id/assets", async (req, res) => {
-      const id = boardIdSchema.parse(req.params.id);
+      const id = boardIdSchema.parse(req.params.id).toLowerCase();
       await assets.authorizeUpload(id, res.locals.ownerId);
+      const requestId = req.get("X-Scribble-Upload-Request");
+      const uploadRequestId = requestId === undefined ? undefined : boardIdSchema.parse(requestId).toLowerCase();
       const type = req.get("Content-Type")?.toLowerCase();
       if (!type || !["image/jpeg", "image/png", "image/webp"].includes(type)) {
         throw new HttpError(415, "UNSUPPORTED_IMAGE_TYPE", "Send raw JPEG, PNG or WebP bytes with the matching Content-Type");
@@ -56,9 +61,23 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
         try {
           await new Promise<void>((resolve, reject) => parseImage(req, res, (error?: unknown) => error ? reject(error) : resolve()));
         } finally { clearTimeout(bodyTimer); }
-        const asset = await assets.upload(id, res.locals.ownerId, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), type);
-        res.status(201).location(`/api/boards/${id}/assets/${asset.id}`).json({ asset });
+        const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+        if (uploadRequestId) {
+          const upload = await assets.uploadRequest(id, res.locals.ownerId, uploadRequestId, buffer, type);
+          if (upload.state === "pending") res.set("Retry-After", String(Math.ceil(upload.retryAfterMs! / 1000)));
+          res.status(upload.state === "ready" ? 200 : 202).location(`/api/boards/${id}/asset-uploads/${uploadRequestId}`).json({ upload });
+        } else {
+          const asset = await assets.upload(id, res.locals.ownerId, buffer, type);
+          res.status(201).location(`/api/boards/${id}/assets/${asset.id}`).json({ asset });
+        }
       } finally { release(); }
+    });
+    app.get("/api/boards/:id/asset-uploads/:requestId", async (req, res) => {
+      const id = boardIdSchema.parse(req.params.id).toLowerCase();
+      const requestId = boardIdSchema.parse(req.params.requestId).toLowerCase();
+      const upload = await assets.uploadStatus(id, res.locals.ownerId, requestId);
+      if (upload.state === "pending") res.set("Retry-After", String(Math.ceil(upload.retryAfterMs! / 1000)));
+      res.json({ upload });
     });
     app.get("/api/boards/:id/assets/:assetId", async (req, res) => {
       const id = boardIdSchema.parse(req.params.id);
@@ -95,6 +114,22 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
 
   if (collaboration) app.use("/api/boards/:id", createCollaborationRouter(collaboration, auth));
   app.use(express.json({ limit: "16kb" }));
+
+  function requireWorkspace() {
+    if (!workspace) throw new HttpError(503, "WORKSPACE_UNAVAILABLE", "Workspace state is unavailable");
+    return workspace;
+  }
+  app.get("/api/workspace", async (_req, res) => {
+    res.json({ workspace: await requireWorkspace().get(res.locals.ownerId) });
+  });
+  app.patch("/api/workspace", async (req, res) => {
+    if (!req.is("application/json")) throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
+    res.json({ workspace: await requireWorkspace().update(updateWorkspaceSchema.parse(req.body), res.locals.ownerId) });
+  });
+  app.post("/api/workspace/initialize", async (req, res) => {
+    if (!req.is("application/json")) throw new HttpError(415, "UNSUPPORTED_MEDIA_TYPE", "Use Content-Type: application/json");
+    res.json(await requireWorkspace().initialize(initializeWorkspaceSchema.parse(req.body), res.locals.ownerId));
+  });
 
   if (sharing) {
     app.get("/api/invitations", async (_req, res) => {

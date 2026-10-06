@@ -4,11 +4,14 @@ import type { AccountBoardSession } from "../../persistence/accountBoardSession"
 import { Dialog } from "../Dialog";
 import { InvitationInbox } from "./Sharing";
 
-export function BoardBrowser({ open, close, userId, session, boards, activeId, busy, hydrated, loading, refreshing, error, refresh, share, signIn, initialCategory = "mine" }: {
+export function BoardBrowser({ open, close, userId, session, boards, activeId, busy, hydrated, loading, refreshing, error, refresh, share, signIn, navigate, openDevice, navigationError, deviceActive = !activeId, initialCategory = "mine" }: {
   open: boolean; close: () => void; userId: string | null; session: AccountBoardSession;
   boards: ServerBoard[] | undefined; activeId?: string; busy: boolean; hydrated: boolean;
   loading: boolean; refreshing: boolean; error: boolean; refresh: () => void;
   share: (board: ServerBoard) => void; signIn: () => void; initialCategory?: "mine" | "shared" | "invitations";
+  navigate?: (id: string) => Promise<boolean>; navigationError?: string | null;
+  deviceActive?: boolean;
+  openDevice?: () => Promise<boolean>;
 }) {
   const [category, setCategory] = useState(initialCategory);
   const [search, setSearch] = useState("");
@@ -17,13 +20,13 @@ export function BoardBrowser({ open, close, userId, session, boards, activeId, b
   const [title, setTitle] = useState("");
   const filtered = boards?.filter((board) => (category === "mine" ? (board.role ?? "owner") === "owner" : board.role === "editor" || board.role === "viewer") && board.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const openBoard = async (board: ServerBoard) => {
-    await session.open(board);
-    if (!session.getState().error) close();
+    const opened = navigate ? await navigate(board.id) : await session.open(board);
+    if (opened && !session.getState().error) close();
   };
   return <>
     <Dialog open={open} title="Your boards" close={close} className="board-browser">
       <div className="device-board-row"><span><strong>This device</strong><small>Your current local board</small></span>
-        <button type="button" disabled={!activeId || busy || !hydrated} onClick={async () => { await session.back(); if (!session.getState().error) close(); }}>{activeId ? "Open device board" : "Current board"}</button></div>
+        <button type="button" disabled={deviceActive || busy || !hydrated} onClick={async () => { const opened = await (openDevice ? openDevice() : session.back()); if (opened && !session.getState().error) close(); }}>{deviceActive ? "Current board" : "Open device board"}</button></div>
       {!userId ? <><p>{initialCategory === "invitations" ? "Sign in with the invited Google email, then choose Accept invitation." : "Sign in to see your account boards. Signing in never uploads your device board."}</p><button type="button" onClick={signIn}>Sign in</button></> : <>
         <div className="browser-categories" role="group" aria-label="Board category">
           {([ ["mine", "My boards"], ["shared", "Shared with me"], ["invitations", "Invitations"] ] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} onClick={() => { setCategory(id); setActions(null); }}>{label}</button>)}
@@ -55,6 +58,7 @@ export function BoardBrowser({ open, close, userId, session, boards, activeId, b
             <button type="button" disabled={refreshing} onClick={refresh}>{error ? "Retry" : "Refresh"}</button></div>
         </>}
         {session.getState().error && <p role="alert">{session.getState().error}</p>}
+        {navigationError && <p role="alert">{navigationError}</p>}
       </>}
     </Dialog>
     <Dialog open={!!edit} title={edit?.kind === "delete" ? "Delete account board" : "Rename account board"} close={() => setEdit(null)}>

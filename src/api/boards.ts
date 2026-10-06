@@ -7,7 +7,7 @@ const timestamp = z.number().finite().nonnegative();
 const titleSchema = z.string().trim().min(1).max(120);
 export const boardRoleSchema = z.enum(["owner", "editor", "viewer"]);
 export type BoardRole = z.infer<typeof boardRoleSchema>;
-const boardSchema = z.object({
+export const boardSchema = z.object({
   id: identifier,
   title: titleSchema,
   role: boardRoleSchema.optional(),

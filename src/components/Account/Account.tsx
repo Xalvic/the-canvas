@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { getAccount, signOut, type AccountState } from "../../api/auth";
 import { Dialog } from "../Dialog";
 import { rememberInvitationIntent } from "../ServerBoards/invitationIntent";
 import { HelpDialog } from "../HelpDialog";
 import { useThemeStore } from "../../store/themeStore";
 import { waitForLocalBoardSave } from "../../persistence/waitForLocalBoardSave";
+import { rememberPageIntent } from "../../persistence/workspaceNavigation";
+import type { WorkspaceController, WorkspaceState } from "../../persistence/workspaceController";
 
 const callbackMessages: Record<string, string> = {
   denied: "Google sign-in was cancelled. You can keep using your canvas.",
@@ -21,42 +22,27 @@ function callbackError() {
   return callbackMessages[error] ?? callbackMessages.failed;
 }
 
-export function Account({ onAccountChange, refreshVersion = 0, openRequest = 0 }: {
-  onAccountChange?: (userId: string | null) => void;
-  refreshVersion?: number;
+export function Account({ workspace, lifecycle, openRequest = 0 }: {
+  workspace: WorkspaceController;
+  lifecycle: WorkspaceState;
   openRequest?: number;
 }) {
-  const [state, setState] = useState<AccountState | { status: "loading" } | { status: "error" }>({ status: "loading" });
+  const state = lifecycle.account ?? (lifecycle.status === "auth-loading" ? { status: "loading" as const } :
+    lifecycle.status === "expired" ? { status: "guest" as const, googleSignInEnabled: true } : { status: "error" as const });
   const [error, setError] = useState<string | null>(null);
-  const [version, setVersion] = useState(0);
   const [open, setOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const theme = useThemeStore((store) => store.preference);
   const setTheme = useThemeStore((store) => store.setPreference);
   const [busy, setBusy] = useState(false);
-  const logoutRequest = useRef<AbortController | null>(null);
   const loginRequest = useRef<AbortController | null>(null);
   useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
 
   useEffect(() => {
     const message = callbackError();
     if (message) { setError(message); setOpen(true); }
-    return () => { logoutRequest.current?.abort(); loginRequest.current?.abort(); };
+    return () => { loginRequest.current?.abort(); };
   }, []);
-  useEffect(() => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => { controller.abort(); setState({ status: "error" }); onAccountChange?.(null); }, 20000);
-    getAccount(controller.signal).then((account) => {
-      if (!controller.signal.aborted) {
-        clearTimeout(timeout);
-        setState(account);
-        onAccountChange?.(account.status === "signed-in" ? account.user.id : null);
-      }
-    }).catch(() => {
-      if (!controller.signal.aborted) { clearTimeout(timeout); setState({ status: "error" }); onAccountChange?.(null); }
-    });
-    return () => { clearTimeout(timeout); controller.abort(); };
-  }, [version, onAccountChange, refreshVersion]);
 
   async function login() {
     if (busy) return;
@@ -65,7 +51,7 @@ export function Account({ onAccountChange, refreshVersion = 0, openRequest = 0 }
     setBusy(true); setError(null);
     try {
       await waitForLocalBoardSave(controller.signal);
-      if (!controller.signal.aborted) { rememberInvitationIntent(); window.location.assign("/api/auth/google"); }
+      if (!controller.signal.aborted) { rememberInvitationIntent(); rememberPageIntent(); window.location.assign("/api/auth/google"); }
     } catch {
       if (!controller.signal.aborted) { setError("Couldn’t save your canvas before sign-in. Please try again."); setBusy(false); }
     }
@@ -73,18 +59,10 @@ export function Account({ onAccountChange, refreshVersion = 0, openRequest = 0 }
 
   async function logout() {
     if (busy) return;
-    const controller = new AbortController();
-    logoutRequest.current = controller;
     setBusy(true); setError(null);
     try {
-      await signOut(AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]));
-      if (!controller.signal.aborted) {
-        onAccountChange?.(null);
-        setState({ status: "loading" }); setVersion((value) => value + 1);
-      }
-    } catch {
-      if (!controller.signal.aborted) setError("Couldn’t sign out. Please try again.");
-    } finally { if (!controller.signal.aborted) setBusy(false); }
+      await workspace.logout();
+    } finally { setBusy(false); }
   }
 
   return (
@@ -94,8 +72,8 @@ export function Account({ onAccountChange, refreshVersion = 0, openRequest = 0 }
     <section className="account" aria-label="Your account">
       {state.status === "loading" && <p role="status">Connecting to your account…</p>}
       {state.status === "error" && <>
-        <p role="alert">Couldn’t check sign-in. Your canvas is still available.</p>
-        <button className="server-boards-refresh" type="button" onClick={() => { setState({ status: "loading" }); setVersion((value) => value + 1); }}>Retry sign-in check</button>
+        {!lifecycle.error && <p role="alert">Couldn’t check sign-in. Your canvas is still available.</p>}
+        <button className="server-boards-refresh" type="button" onClick={() => void workspace.checkAccount()}>Retry sign-in check</button>
       </>}
       {state.status === "guest" && <>
         <p>Keep drawing as a guest, or sign in with Google.</p>
@@ -107,6 +85,7 @@ export function Account({ onAccountChange, refreshVersion = 0, openRequest = 0 }
         <button className="server-boards-refresh" type="button" disabled={busy} onClick={() => void logout()}>{busy ? "Signing out…" : "Sign out"}</button>
       </>}
       {error && <p className="server-boards-error" role="alert">{error}</p>}
+      {lifecycle.error && <p className="server-boards-error" role="alert">{lifecycle.error}</p>}
       <div className="dialog-actions" role="group" aria-label="Account color theme"><button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>Light</button><button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>Dark</button></div>
       <button type="button" onClick={() => setHelpOpen(true)}>Help and shortcuts</button>
       <HelpDialog open={helpOpen} close={() => setHelpOpen(false)} />

@@ -27,14 +27,14 @@ export async function flushLocalBoardSave() { await flushActiveSave?.(); }
 /** Explicit takeover always loads disk again before admitting edits. */
 export async function reopenLocalBoard(): Promise<void> {
   const session = useBoardStore.getState();
-  if (session.account) return;
+  if (session.account || session.navigationPending) return;
   const lease = await boardTabCoordinator.acquire(CURRENT_BOARD_ID);
   if (!lease) { useBoardStore.getState().setTabOwnership(boardTabCoordinator.status(CURRENT_BOARD_ID)); return; }
   try {
     const [record, recovery] = await Promise.all([loadLocalBoard(), latestDetachedRecovery(CURRENT_BOARD_ID)]);
     if (!record) throw new Error("The local board is not available yet. Retry after the other tab saves.");
     const current = useBoardStore.getState();
-    if (current.id !== session.id || current.sessionVersion !== session.sessionVersion || current.account) {
+    if (current.id !== session.id || current.sessionVersion !== session.sessionVersion || current.account || current.navigationPending) {
       await boardTabCoordinator.releaseOthers(activeBoardLeaseId(current.id));
       return;
     }
@@ -151,12 +151,12 @@ export function useLocalBoardPersistence(): void {
     });
     const syncGuest = async () => {
       const before = useBoardStore.getState();
-      if (syncing || cancelled || !before.isHydrated || before.account || before.id !== CURRENT_BOARD_ID || before.tabOwnership !== "passive") return;
+      if (syncing || cancelled || !before.isHydrated || before.account || before.navigationPending || before.id !== CURRENT_BOARD_ID || before.tabOwnership !== "passive") return;
       syncing = true;
       try {
         const record = await loadLocalBoard();
         const current = useBoardStore.getState();
-        if (!record || cancelled || current.sessionVersion !== before.sessionVersion || current.account || current.tabOwnership !== "passive") return;
+        if (!record || cancelled || current.sessionVersion !== before.sessionVersion || current.account || current.navigationPending || current.tabOwnership !== "passive") return;
         if (JSON.stringify(record.objects) !== JSON.stringify(useDocumentStore.getState().objects)) {
           useDocumentStore.getState().loadDocument(record.objects);
           useSelectionStore.getState().clearSelection();
@@ -168,7 +168,7 @@ export function useLocalBoardPersistence(): void {
     const requestOwnership = (explicit: boolean): Promise<boolean> => {
       if (requesting) return requesting;
       const board = useBoardStore.getState();
-      if (!board.isHydrated || board.account || board.id !== CURRENT_BOARD_ID) return Promise.resolve(false);
+      if (!board.isHydrated || board.account || board.navigationPending || board.id !== CURRENT_BOARD_ID) return Promise.resolve(false);
       if (boardTabCoordinator.owns(board.id) && !board.tabReadOnly) return Promise.resolve(true);
       if (handingOff || board.tabOwnership === "acquiring") return Promise.resolve(false);
       // An outage retains this editor's token and pending document. Renew it
@@ -184,7 +184,7 @@ export function useLocalBoardPersistence(): void {
           boardTabCoordinator.signal("handoff", CURRENT_BOARD_ID);
           do {
             const current = useBoardStore.getState();
-            if (cancelled || current.account || current.sessionVersion !== version) return false;
+            if (cancelled || current.account || current.navigationPending || current.sessionVersion !== version) return false;
             if (!document.hasFocus()) { current.setTabOwnership("passive"); return false; }
             if (await boardTabCoordinator.acquire(CURRENT_BOARD_ID)) {
               await reopenLocalBoard();

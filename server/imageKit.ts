@@ -7,6 +7,8 @@ export type ImageUploadTarget = { assetId: string; boardId: string; mimeType: Im
 export type StoredImage = { fileId: string; filePath: string; size: number };
 export interface ImageStorage {
   pathFor(target: ImageUploadTarget): string;
+  // Create at this exact immutable path. Reject an existing file; never rename,
+  // overwrite or create another version. M5 retry safety depends on this guarantee.
   upload(buffer: Buffer, target: ImageUploadTarget): Promise<StoredImage>;
   sign(filePath: string, expiresAtUnixSeconds: number): string;
   delete(fileId: string): Promise<void>;

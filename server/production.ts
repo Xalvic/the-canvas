@@ -16,6 +16,7 @@ function routeClass(path: string) {
   if (/^\/api\/auth\/google\/?$/.test(path)) return "auth-start";
   if (/^\/api\/auth(?:\/|$)/.test(path)) return "auth-session";
   if (/^\/api\/boards(?:\/|$)/.test(path)) return "boards";
+  if (/^\/api\/workspace(?:\/|$)/.test(path)) return "workspace";
   if (/^\/api\/invitations(?:\/|$)/.test(path)) return "invitations";
   return "unknown";
 }

@@ -1,6 +1,6 @@
 # Scribble: single guest whiteboard and signed-in workspace
 
-Created: 2026-10-06. Status: M0-M3 verified locally; M4 is next.
+Created: 2026-10-06. Status: M0-M6 verified locally; M7 is next.
 
 ## Session entry: read this first
 
@@ -277,8 +277,8 @@ boards. A personal workspace needs per-user state, not a new team/membership mod
 | `POST /api/boards` (extend) | New client sends `requestId` and `initializeDocument: true` with `title`. Atomically create board metadata, a blank document, and a durable creation receipt. Return the board and confirmed document revision; repeat requests return the same destination. Preserve legacy `{title}` behavior during rollout. |
 | Existing board GET/PATCH/DELETE | Retain ownership and role checks. Rename autosaves; delete clears or safely invalidates last-opened references. An inaccessible/deleted last page falls back to another accessible page or the empty workspace. |
 | Existing document and `/operations` APIs | Reuse compare-and-swap, durable operation receipts, and selective collaboration semantics. New clients start from the revision returned by atomic creation; do not assume revision zero. |
-| `POST /api/boards/:id/assets` (extend) | Accept a stable upload idempotency key, scoped to actor and destination board. Retry resolves the original reservation/ready asset rather than allocating another one. Retain existing raw-image validation and limits. |
-| Upload-status lookup (new if needed) | Recommended `GET /api/boards/:id/asset-uploads/:requestId`: return a bounded pending/ready/failed state with asset identity when known. Require current access; never expose provider secrets. An equivalent replayable POST response is acceptable if it fully resolves uncertainty. |
+| `POST /api/boards/:id/assets` (extended in M5) | Optional stable UUID header `X-Scribble-Upload-Request`, scoped to actor/destination and hashed original MIME/bytes. Keyed POST returns `200 {upload}` ready or `202 {upload}` pending; replay reuses the original reservation before quota admission. Changed bytes conflict (409); cleaned identities are terminal (410). Legacy no-header `201 {asset}` remains. |
+| `GET /api/boards/:id/asset-uploads/:requestId` (M5) | Returns `200 {upload}` pending/ready/failed with original asset ID, bounded delay and retry permission. Current edit access/original actor required. May reconcile/finalize the original provider file but never uploads bytes; no provider secrets or signing-budget charge. |
 | Auth, sharing, presence, events | Reuse current Google OAuth, permission, invitation, and SSE contracts. Add only fields needed by the above flows. |
 
 ### Retry and transaction requirements
@@ -351,9 +351,9 @@ to execute several milestones in one session.
 | M1 | Fix false other-tab warning and safe wake recovery | M0 | Verified |
 | M2 | Safe guest handoff and simultaneous account editors | M1 | Verified |
 | M3 | Retry-safe page creation API and SQL receipts | M0 | Verified |
-| M4 | Workspace initialization and last-opened-page APIs | M3 | Pending |
-| M5 | Retry-safe image uploads and reconciliation | M3 | Pending |
-| M6 | Account lifecycle and workspace navigation controller | M2, M4 | Pending |
+| M4 | Workspace initialization and last-opened-page APIs | M3 | Verified |
+| M5 | Retry-safe image uploads and reconciliation | M3 | Verified |
+| M6 | Account lifecycle and workspace navigation controller | M2, M4 | Verified |
 | M7 | Google sign-in and resumable guest transfer | M5, M6 | Pending |
 | M8 | Automatic document, title, and image saving | M5, M6, M7 | Pending |
 | M9 | Minimal guest UI and signed-in page sidebar | M6, M7, M8 | Pending |
@@ -447,46 +447,74 @@ and public-data/schema cleanup checks pass. Contracts/commands/release boundarie
 M3's recorded contracts, auth/access middleware, board-list implementation, and
 workspace-state SQL/client modules introduced here.
 
-- [ ] Add read/update workspace state and last-opened accessible page.
-- [ ] Serialize first initialization, including the no-blank-page import mode.
-- [ ] Preserve existing users/pages and define deleted/inaccessible last-page and
+- [x] Add read/update workspace state and last-opened accessible page.
+- [x] Serialize first initialization, including the no-blank-page import mode.
+- [x] Preserve existing users/pages and define deleted/inaccessible last-page and
   intentionally empty workspace behavior.
-- [ ] Apply existing session, origin, proxy, and rate protections to new routes.
+- [x] Apply existing session, origin, proxy, and rate protections to new routes.
 
 **Gate:** first initialization in concurrent tabs/devices creates at most one default
 page; access checks and last-page deletion behave as specified. Record API contracts.
+
+Verified locally 2026-10-06: 171 focused HTTP/client cases and 119 distinct real
+PostgreSQL checks pass, including simultaneous API processes, restart, import mode,
+permissions, final deletion, transaction/SQL rollback and existing-data preservation.
+Both builds, strict touched-test typechecks and SQL/Prisma no-drift pass. Migration
+10 touched disposable schemas only. Final contracts: `docs/workspace-ux-m4.md`.
+Initialization returns HTTP 200 with workspace/current opening candidate and echoed
+request acknowledgement; it never rewrites documents or resets initialization.
+Last-opened preferences change only on PATCH. The current UI is still unchanged.
 
 ### M5 - Make image upload retries safe
 
 **Read:** section 5's upload/reconciliation requirements; `imageAssets.ts`,
 `assets.ts`, `postgresAssets.ts`, `imageKit.ts`, upload adapters, and focused tests.
 
-- [ ] Add stable upload request identity and durable pending/ready/failed state.
-- [ ] Reconcile uncertain provider writes before allocating/uploading again.
-- [ ] Add status lookup or equivalent replay contract, bounded retries, and
+- [x] Add stable upload request identity and durable pending/ready/failed state.
+- [x] Reconcile uncertain provider writes before allocating/uploading again.
+- [x] Add status lookup or equivalent replay contract, bounded retries, and
   current permission checks on both initial and repeated requests.
-- [ ] Preserve quotas, validation, referenced assets, and completed mappings.
+- [x] Preserve quotas, validation, referenced assets, and completed mappings.
 
 **Gate:** real API/DB tests with controlled provider responses cover lost responses,
 concurrent retries, restart, content mismatch, revocation, and rate limits without
 duplicate assets/quota charges. Automatic UI upload orchestration belongs to M8.
+
+Verified locally 2026-10-06: 170 focused client/HTTP cases and 141 distinct real
+PostgreSQL cases, including 22 new upload cases, independent API processes,
+discarded responses/restart and API crash after provider storage. Migration 11
+adds retained actor/board/request identity, original-byte hash and fenced leases/
+three-write counter to existing assets. Both builds, strict typechecks, SQL/Prisma
+no-drift and normal-database fingerprints pass; zero disposable schemas remain.
+Contract/commands: `docs/workspace-ux-m5.md`. No normal/production migration or
+real provider changes. Existing manual UI stays legacy until M8; new adapters
+require caller-owned persisted intents. M4/M5 are uncommitted. Next: M6 only.
 
 ### M6 - Implement workspace lifecycle and navigation
 
 **Read:** section 3's workspace/lifecycle rules; completed API and journal contracts;
 `App.tsx`, account/session controller, board store, and relevant request adapters.
 
-- [ ] Keep one mounted controller and distinguish guest/auth-loading/workspace,
+- [x] Keep one mounted controller and distinguish guest/auth-loading/workspace,
   service failure, confirmed expiry, and sign-out.
-- [ ] Implement page URL, Back/Forward, last-page restore, safe switching, and
+- [x] Implement page URL, Back/Forward, last-page restore, safe switching, and
   first initialization; reserve pending transfer intent priority for M7.
-- [ ] Prevent stale async responses, wrong-page history, account-cache leakage,
+- [x] Prevent stale async responses, wrong-page history, account-cache leakage,
   duplicate first-page creation, and loss of pending work on logout/expiry.
-- [ ] Preserve existing invitation/deep-link intent through authentication.
+- [x] Preserve existing invitation/deep-link intent through authentication.
 
 **Gate:** focused controller/browser tests cover account entry, switching, reload,
 navigation, slow/error responses, logout, and current roles. Keep the existing UI
 usable until M9; this milestone does not require the visual redesign.
+
+**Verified 2026-10-07:** 136 focused controller/client/persistence cases, 40 standard
+browser regressions and 15 real browser/API/Prisma/PostgreSQL cases pass. Both
+builds, strict touched-test/fixture typechecks and diff checks pass. Account
+timeouts preserve known identity; URLs, safe journaled switching, serialized return
+preferences, permanent first initialization, intentional final deletion and M7's
+transfer-priority hook are wired. All 12 normal tables/14 rows are unchanged;
+zero disposable schemas remain. Contract/commands: `docs/workspace-ux-m6.md`.
+M4-M6 are included in the combined commit authorized 2026-10-07. Next: M7 only.
 
 ### M7 - Implement Google sign-in and guest transfer
 
@@ -639,35 +667,36 @@ by mocks alone. Record unavailable checks honestly without abandoning other work
 
 ## 9. Progress and next-session handoff
 
-M0-M3 are verified locally. M4-M11 remain pending. The next session should
-execute **M4 only**, workspace state and initialization.
+M0-M6 are verified locally. M7-M11 remain pending. The next session should
+execute **M7 only**, Google sign-in and resumable guest transfer.
 
 ### Current handoff - replace after each session
 
-- Last completed milestone: M3 - verified locally 2026-10-06.
-- Next milestone: M4 - Add workspace state and initialization.
+- Last completed milestone: M6 - verified locally 2026-10-07.
+- Next milestone: M7 - Implement Google sign-in and guest transfer.
 - In-progress substep: none.
-- Changed: atomic revision-one page creation, actor/request receipts, split rename
-  validation, typed createServerPage, migration 9/Prisma mappings and fixtures.
-  M0-M3 work is included in the user-authorized local commit; no M3 dependency or
-  local storage change.
-- Verified: 120 focused HTTP/client cases; 83 real PostgreSQL checks, including
-  concurrency, actual API restarts, rollback, permissions, expiry/deletion and
-  legacy behavior. Both builds, focused typechecks, SQL/Prisma no-drift and diff
-  check pass. Contracts/commands: `docs/workspace-ux-m3.md`.
-- Contract: replay returns current accessible metadata and original creation
-  revision 1 without resetting content. Read the current document before recovered
-  editing. Replay lasts 90 days; compact identities remain after expiry/deletion.
-  Never automatically replace terminal 410 requests with new IDs.
-- Boundaries: current UI uses legacy creation; intent persistence awaits M6/M7.
-  M4 must reuse the actor-row lock in one transaction. Next SQL number: 10.
-  Preserve M2's IndexedDB v4 journals/ownership (`docs/workspace-ux-m2.md`).
-- Blockers: none. Migration 9 touched disposable schemas only. All normal public
-  table/row fingerprints are unchanged; zero test schemas before/after. Docker
-  5434 left running. User authorized committing all current updates on 2026-10-06;
-  no push, deployment or production mutation. Future commits need fresh approval.
-- Next read: M4 block, sections 3/5 workspace entry/endpoints, M3 guide and relevant
-  auth/access, board-list/store, migration and client API modules.
+- Changed: mounted workspace controller, passive account UI, page URL/history,
+  stable initialization, safe switching and intentional final deletion. Guest
+  recovery waits during navigation; hidden/inert canvas keeps its size/viewport.
+  M4-M6 are included in the combined commit authorized 2026-10-07;
+  M0-M3 were previously committed.
+- Verified: 136 focused cases, 40 standard browser regressions and 15 real browser/
+  API/Prisma/PostgreSQL cases. Both builds, strict touched-test/fixture typechecks
+  and diff checks pass. Exact commands/contract: `docs/workspace-ux-m6.md`.
+- Contract: URL -> last accessible -> owned/shared fallback; current document/role
+  reads before open, serialized preference PATCH afterward. Service errors retain
+  identity; confirmed expiry preserves journals and clears private access. Persist
+  initialization UUID/mode before dispatch; final deletion never recreates defaults.
+- Boundaries: M7 supplies durable consent/account-bound transfer to the entry-intent
+  hook. Transfer mode suppresses defaults; explicit page/invitation has priority.
+  Keep M2 v4 journals, M3/M4 receipts, M5 immutable uploads and the pen renderer.
+  Legacy manual creation/upload controls remain until M8/M9.
+- Blockers: none. No new SQL migration. All 12 normal tables/14 rows retain identical
+  fingerprints; zero browser schemas remain. Evidence:
+  `workspace-ux-evidence/m6-database-isolation.json`. Docker 5434 is running.
+  No normal/production migration, provider change, push or deployment.
+- Next read: M7 block, section 3 sign-in/transfer rules, account UI, workspace
+  entry-intent hook and M3/M5 adapters. Next SQL: 12. Physical IME/sleep: M11.
 
 Keep this current handoff around 150-250 words or less. Capture exact test commands
 and results, relevant migrations/API/journal decisions, current file locations, any
@@ -704,7 +733,41 @@ Replay returns live accessible metadata and original creation revision, never
 rewrites content. Expired (90-day) or deleted destinations return terminal 410;
 compact identities remain indefinitely. Typed `createServerPage` requires a
 caller-owned stable intent; orchestration awaits M6/M7. Exact contracts/commands/
-rollback: `docs/workspace-ux-m3.md`. Next unused SQL migration number: 10.
+rollback: `docs/workspace-ux-m3.md`.
+
+M4: migration 10 adds workspace state and permanent actor/request initialization
+identities. GET has no creation/write side effect; PATCH validates current access.
+POST initialize returns HTTP 200/current candidate and initializes only once,
+with no default for false/import mode or existing accessible pages. Later requests
+cannot recreate a deleted final page; same UUID/changed mode conflicts. Read the
+current document before editing, then PATCH after opening. Shared actor NO KEY
+UPDATE and workspace parent SHARE locks preserve serialization/access without
+sharing/FK lock cycles. Exact contracts: `docs/workspace-ux-m4.md`.
+UI wiring remains M6/M7.
+
+M5: migration 11 adds retained uploader/scope-board/request UUIDs, original MIME/
+byte hashes and database-clock leases/0-3 write attempts to existing assets.
+Header `X-Scribble-Upload-Request` selects `200/202 {upload}` ready/pending POST;
+legacy no-header `201 {asset}` remains. Status GET returns bounded state and
+reconciles/finalizes only; no byte upload or signed URL. Current edit permission
+and original actor required on every replay/status/write admission/finalization.
+Same bytes reuse one reservation before quota checks; changed bytes conflict.
+Exact immutable provider path, SDK retries off, token fencing and persisted
+cooldown protect concurrency/restart. Unknown writes keep quota; only confirmed
+cleanup releases it. Cleaned request identities remain terminal 410 indefinitely.
+Ready draft/history assets and completed local mappings are retained. Adapters
+require a caller-persisted intent; automatic UI adoption is M8. Exact contract:
+`docs/workspace-ux-m5.md`. Next unused SQL number: 12.
+
+M6: one mounted lifecycle/navigation controller distinguishes service errors from
+confirmed expiry. Base-compatible page URLs/Back/Forward, fresh current documents,
+account-scoped journals and serialized post-open preferences restore pages safely.
+Persist initialization UUID/mode before dispatch; never treat a list failure as
+empty or recreate defaults after deletion. Wait for guest hydration and suppress
+guest recovery during navigation; preserve measured canvas size while hidden/inert.
+M7 supplies explicit transfer intent through the reserved entry hook. Legacy manual
+creation/upload UI stays available until M8/M9. No schema/API changes. Commands,
+compatibility and regression evidence: `docs/workspace-ux-m6.md`.
 
 ### Reusable one-milestone execution prompt
 

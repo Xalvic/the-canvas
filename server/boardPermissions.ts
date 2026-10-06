@@ -6,10 +6,13 @@ export const boardRoleSql = (userId: string) => Prisma.sql`
   CASE WHEN b.owner_id = ${userId}::uuid THEN 'owner' ELSE m.role END
 `;
 
-export async function lockBoardAccess(tx: Prisma.TransactionClient, boardId: string, userId: string, required: "read" | "edit" | "owner") {
+export async function lockBoardAccess(tx: Prisma.TransactionClient, boardId: string, userId: string, required: "read" | "edit" | "owner", readLock: "share" | "update" = "update") {
   // Lock the parent first; sharing mutations use the same lock as document saves.
+  // Workspace reads can visit a revoked preference and then a fallback. Shared
+  // read locks protect authorization without making those readers lock cycles.
+  const lock = required === "read" && readLock === "share" ? Prisma.sql`FOR SHARE` : Prisma.sql`FOR UPDATE`;
   const boards = await tx.$queryRaw<{ id: string; owner_id: string | null }[]>`
-    SELECT id, owner_id FROM boards WHERE id = ${boardId}::uuid FOR UPDATE
+    SELECT id, owner_id FROM boards WHERE id = ${boardId}::uuid ${lock}
   `;
   const board = boards[0];
   if (!board || !board.owner_id) return undefined;
