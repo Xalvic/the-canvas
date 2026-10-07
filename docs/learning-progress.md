@@ -6,25 +6,32 @@ only. No individual questions, answers, or understanding assessments.
 Start with [the compact checkpoint](learning-checkpoint.md). Use relevant
 sections of [the learning plan](learning-plan.md) when needed.
 
-Workspace UX M0-M6 are implemented/verified locally; M6 completed 2026-10-07.
-Implemented one mounted account/workspace controller, base-compatible page URLs,
-Back/Forward/last-page restore, stable initialization intent, safe journaled
-switching and intentional final deletion. Service errors/timeouts retain the
-known account; confirmed expiry/sign-out preserve work and clear private access.
-Navigation waits for guest hydration and prevents guest recovery races; hidden
-canvas keeps its measured size, viewport and atomic history boundaries. Serialized
-return preferences stay independent of same-account auth checks and other devices.
-Verified 136 focused cases, 40 standard browser regressions and 15 actual browser/
-API/Prisma/PostgreSQL cases; both builds and strict touched-test/fixture typechecks
-pass. All 12 normal tables/14 rows are unchanged; zero browser schemas remain.
-Contract/commands: `workspace-ux-m6.md`. This records implementation/validation,
-not a new assessment. M2 v4 journals, M3/M4 receipt semantics, M5 immutable upload
-identities/mappings and the pen renderer remain intact. No new schema/API/package
-change. M7 supplies deliberate consent and account-bound transfer intent; automatic
-images/saving adoption remains M8 and the visual redesign M9. Next: M7 only.
-M4-M6 are included in the combined commit authorized 2026-10-07; M0-M3 were
-committed earlier. No normal/production migration, real provider change, push or
-deployment; future commits need fresh permission.
+Workspace UX M0-M10 are implemented/verified locally; M10 completed 2026-10-07.
+Implemented bottom drawing/history controls, left zoom, contextual desktop/mobile
+styles, compact header spacing, keyboard-bounded drawer/dialogs, safe areas, dark
+active-tool contrast, menu traversal, focus restoration and shortcut/clipboard
+isolation. Layout remains separate from world coordinates; drag, resize, ink and
+atomic history retain their established boundaries. Current layout/theme fixtures
+are retargeted to Pages/app menus. Earlier guest/workspace navigation, roles,
+sharing, persisted New page requests, consent, journals/assets and automatic saving
+remain intact. M10 passes seven viewport-math tests, 38 standard browser cases,
+four distinct actual browser/API/Prisma/PostgreSQL journeys, frontend build,
+strict focused typecheck, inspected screenshots and diff checks. All 12 normal
+tables/14 rows are unchanged; zero disposable schemas remain. Guide/commands:
+`workspace-ux-m10.md`. No API/SQL/Prisma/package/IndexedDB-format change; next SQL
+stays 12. All pending updates, including M7-M10 and the earlier local commits, are
+included in the commit/push and normal Cloudflare deployment authorized 2026-10-07.
+The combined checkout passes 811 fast tests and the backend build.
+Rollback keeps the M8-aware v4 parser and
+exceptional copy handling. Next: **M11 only**, historical manual-provider fixture
+consolidation, integrated validation and release handoff. Physical/provider,
+screen-reader, actual browser zoom and real keyboard/IME acceptance remain pending.
+No normal/production migration was performed during milestone implementation.
+The backend release was also authorized: production Neon database `scribble` now
+has SQL 1-11, with an encrypted backup and unchanged existing application data.
+The user chose a manual Render dashboard deployment; its live workspace API is
+pending that deploy. Release record: `workspace-ux-release.md`.
+This records implementation/validation, not individual assessments.
 
 ## Covered
 

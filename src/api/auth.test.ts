@@ -8,7 +8,7 @@ describe("account API boundary", () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ user }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     const signal = new AbortController().signal;
-    expect(await getAccount(signal)).toEqual({ status: "signed-in", user });
+    expect(await getAccount(signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false });
     expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/auth/me", { credentials: "same-origin", signal });
   });
   it.each([true, false])("handles guest state without treating sign-in availability %s as a login", async (enabled) => {
@@ -31,4 +31,16 @@ describe("account API boundary", () => {
     expect(fetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST", credentials: "same-origin", headers: { "X-Scribble-Request": "1" }, signal });
     await expect(signOut(signal)).rejects.toThrow("Could not sign out");
   });
+});
+it("advertises transfer support only for the compatible signed-in server contract", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ user, capabilities: { guestTransfer: 1 } }))));
+  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: true });
+});
+it("older servers retain identity while leaving transfer support disabled", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ user }))));
+  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false });
+});
+it("preserves Google-only guest availability and optional transfer support", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "UNAUTHENTICATED", details: { googleSignInEnabled: true, guestTransferEnabled: true } } }), { status: 401 })));
+  expect(await getAccount(new AbortController().signal)).toEqual({ status: "guest", googleSignInEnabled: true, guestTransferEnabled: true });
 });

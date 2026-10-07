@@ -175,7 +175,12 @@ try {
     return { ...signed, expiresAt: Number(new URL(signed.url).searchParams.get("expires")) * 1000 };
   };
   fixture.use(createApp(createPostgresBoardStore(prisma), createPostgresDocumentStore(prisma), {
-    store: authStore, provider: null, frontendUrl, secureCookies: false,
+    store: authStore, provider: {
+      // Controlled OAuth identity only. Exercise the real auth router/store/cookies
+      // without contacting Google or reading production credentials.
+      authorizationUrl: ({ state }) => `${frontendUrl.replace("/scribble/", "/api/auth/google/callback")}?state=${state}&code=${randomUUID()}`,
+      verifyCode: async (code) => ({ subject: `fixture-oauth-${code}`, email: `oauth-${code}@example.com`, displayName: "OAuth fixture" }),
+    }, frontendUrl, secureCookies: false,
   }, createPostgresSharingStore(prisma), assets, createPostgresCollaborationStore(prisma), undefined, createPostgresWorkspaceStore(prisma)));
   fixture.use(errorHandler);
   server = fixture.listen(port, "127.0.0.1", () => console.log(`Isolated browser API ready on ${port}; schema ${schema}`));

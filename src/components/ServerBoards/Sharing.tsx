@@ -36,7 +36,7 @@ function useSharingAction(userId: string, session: AccountBoardSession) {
   } };
 }
 
-export function InvitationInbox({ userId, session, opened }: { userId: string; session: AccountBoardSession; opened?: () => void }) {
+export function InvitationInbox({ userId, session, opened, navigate }: { userId: string; session: AccountBoardSession; opened?: () => void; navigate?: (id: string) => Promise<boolean> }) {
   const invitations = useQuery({ queryKey: [...accountBoardKeys.owner(userId), "invitations"], queryFn: ({ signal }) => getInvitations(signal), retry: retryBoardRead, networkMode: "always", refetchInterval: 30000 });
   const action = useSharingAction(userId, session);
   const [accepted, setAccepted] = useState<{ boardId: string; title: string } | null>(null);
@@ -58,10 +58,9 @@ export function InvitationInbox({ userId, session, opened }: { userId: string; s
       </div>
     </div>)}
     {accepted && <div className="invitation-ready"><p role="status">Invitation accepted for {accepted.title}.</p><button type="button" disabled={action.isPending || session.getState().busy} onClick={() => action.mutate(async (signal) => {
-      const board = await getServerBoard(accepted.boardId, signal);
-      await session.open(board);
-      if (!session.getState().error) opened?.();
-    })}>Open board</button></div>}
+      const result = navigate ? await navigate(accepted.boardId) : await session.open(await getServerBoard(accepted.boardId, signal));
+      if (result && !session.getState().error) opened?.();
+    })}>Open page</button></div>}
     {action.isSuccess && !accepted && <p role="status">Invitation updated.</p>}
     {action.isError && <p role="alert">{action.error.message}</p>}
     <button type="button" disabled={invitations.isFetching} onClick={() => void invitations.refetch()}>Refresh invitations</button>

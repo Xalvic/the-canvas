@@ -9,9 +9,9 @@ const responseSchema = z.object({ document: canvasDocumentSchema.safeExtend({
   boardId: z.uuid(), revision: z.number().int().positive(), updatedAt: z.number().finite().nonnegative(), role: boardRoleSchema.optional(),
 }), replayed: z.boolean() });
 
-export async function applyBoardOperation(boardId: string, input: CollaborationOperationInput, signal: AbortSignal): Promise<ServerBoardDocument> {
+export async function applyBoardOperation(boardId: string, input: CollaborationOperationInput, signal: AbortSignal, accountId?: string): Promise<ServerBoardDocument> {
   const body = collaborationOperationSchema.parse(input);
-  const response = await boardRequest(`/api/boards/${encodeURIComponent(z.uuid().parse(boardId))}/operations`, mutation("POST", signal, body), "Could not share these edits");
+  const response = await boardRequest(`/api/boards/${encodeURIComponent(z.uuid().parse(boardId))}/operations`, mutation("POST", signal, body, accountId), "Could not share these edits");
   const { document } = await parseResponse(response, responseSchema);
   if (document.boardId !== boardId || document.revision <= body.baseRevision) throw new Error("The server returned an invalid collaboration revision");
   return document;

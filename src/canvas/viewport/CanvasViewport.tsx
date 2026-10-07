@@ -48,7 +48,6 @@ import { useToolPreferencesStore } from "../../store/toolPreferencesStore";
 import type { StrokePoint } from "../objects/types";
 import { Toolbar } from "../../components/Toolbar/Toolbar";
 import { ZoomControls } from "../../components/ZoomControls/ZoomControls";
-import { HistoryControls } from "../../components/HistoryControls/HistoryControls";
 import {
   createImportedImageObject,
   getClipboardImageFiles,
@@ -151,6 +150,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
       target.tagName === "TEXTAREA" ||
       target.tagName === "SELECT")
   );
+}
+
+function isChromeTarget(target: EventTarget | null): boolean {
+  return !!document.querySelector("dialog[open]") || target instanceof Element &&
+    !!target.closest(".board-header, .page-sidebar, .toolbar-area, .tool-options, .mobile-selection-actions, .zoom-dock");
 }
 
 function normalizedWheelDelta(event: WheelEvent): Point {
@@ -260,6 +264,7 @@ export function CanvasViewport() {
     clientPoint?: Point,
   ) => {
     if (useBoardStore.getState().readOnly || files.length === 0) return;
+    const insertionSession = useBoardStore.getState().sessionVersion;
     const insertionPoint = getImageInsertionPoint(clientPoint);
     if (!insertionPoint) return;
 
@@ -271,7 +276,7 @@ export function CanvasViewport() {
       result.status === "rejected" ? [result.reason] : [],
     );
 
-    if (imported.length > 0 && !useBoardStore.getState().readOnly) {
+    if (imported.length > 0 && !useBoardStore.getState().readOnly && useBoardStore.getState().sessionVersion === insertionSession) {
       const documentStore = useDocumentStore.getState();
       const firstZIndex = documentStore.getNextZIndex();
       const imageObjects = imported.map((asset, index) =>
@@ -1233,9 +1238,9 @@ export function CanvasViewport() {
     const focused = document.activeElement;
     if (
       target instanceof Element &&
-      !target.closest(".toolbar-area, .tool-options") &&
+      !target.closest(".toolbar-area, .tool-options, .mobile-selection-actions, .zoom-dock") &&
       focused instanceof HTMLElement &&
-      focused.closest(".toolbar-area, .tool-options")
+      focused.closest(".toolbar-area, .tool-options, .mobile-selection-actions, .zoom-dock")
     ) {
       focused.blur();
     }
@@ -1707,6 +1712,7 @@ export function CanvasViewport() {
   useEffect(() => {
     const handleCopy = (event: ClipboardEvent) => {
       if (
+        isChromeTarget(event.target) ||
         isTypingTarget(event.target) ||
         useSelectionStore.getState().selectedIds.size === 0
       ) {
@@ -1718,6 +1724,7 @@ export function CanvasViewport() {
     };
 
     const handlePaste = (event: ClipboardEvent) => {
+      if (isChromeTarget(event.target)) return;
       if (useBoardStore.getState().readOnly && !isTypingTarget(event.target)) { event.preventDefault(); return; }
       const isEditingText = isTypingTarget(event.target);
       const imageFiles = getClipboardImageFiles(event.clipboardData);
@@ -1852,7 +1859,7 @@ export function CanvasViewport() {
           <div className="empty-prompt-content">
             <strong>Start creating</strong>
             <span className="empty-prompt-copy">
-              Double-click for a note, or choose a tool above
+              Double-click for a note, or choose a drawing tool
             </span>
             <div className="empty-prompt-tools">
               <span><kbd>N</kbd> Note</span>
@@ -1881,13 +1888,6 @@ export function CanvasViewport() {
 
       <div onPointerDown={(event) => event.stopPropagation()}>
         <Toolbar />
-      </div>
-
-      <div
-        className="history-dock"
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <HistoryControls />
       </div>
 
       <aside className="canvas-hint" aria-label="Canvas navigation help">
@@ -1996,6 +1996,8 @@ export function CanvasViewport() {
       <div
         className="zoom-dock"
         onPointerDown={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+        onKeyUp={(event) => event.stopPropagation()}
       >
         <ZoomControls
           zoom={displayZoom}

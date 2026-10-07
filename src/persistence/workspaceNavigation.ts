@@ -44,3 +44,19 @@ export function workspaceInitializationIntent(userId: string, createInitialPage:
   return intent;
 }
 export function clearWorkspaceInitializationIntent(userId: string) { localStorage.removeItem(initializationKey(userId)); }
+
+const newPageKey = (userId: string) => `scribble:new-page:${userId}`;
+const newPageSchema = z.strictObject({ requestId: uuid, title: z.literal("Untitled"), initializeDocument: z.literal(true), destinationId: uuid.nullable() });
+// Each tab owns its deliberate New page action. A reload/retry retains the exact
+// M3 payload; even an acknowledged destination is kept until it opens successfully.
+export function newPageIntent(userId: string) {
+  const raw = sessionStorage.getItem(newPageKey(userId));
+  if (raw) return newPageSchema.parse(JSON.parse(raw));
+  const intent = { requestId: crypto.randomUUID(), title: "Untitled" as const, initializeDocument: true as const, destinationId: null };
+  sessionStorage.setItem(newPageKey(userId), JSON.stringify(intent));
+  return intent;
+}
+export function rememberNewPage(userId: string, intent: ReturnType<typeof newPageIntent>, destinationId: string) {
+  sessionStorage.setItem(newPageKey(userId), JSON.stringify({ ...intent, destinationId }));
+}
+export function clearNewPageIntent(userId: string) { sessionStorage.removeItem(newPageKey(userId)); }

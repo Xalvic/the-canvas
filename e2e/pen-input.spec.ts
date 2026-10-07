@@ -12,7 +12,7 @@ async function snapshot(page: Page) {
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: { code: "UNAUTHENTICATED", message: "Sign in required" } }) }));
   await page.goto("/");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await page.getByRole("button", { name: "Pen tool", exact: true }).click();
 });
 
@@ -181,7 +181,7 @@ test("low zoom changes only presentation; draft/saved dark ink agree and detail 
   await page.waitForTimeout(900);
   const path = await saved.getAttribute("d");
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await expect(saved).toHaveAttribute("d", path!);
   expect((await snapshot(page)).objects).toEqual(before.objects);
 });
@@ -213,6 +213,9 @@ test("high-zoom selection contains the ink; drag and thickness edits keep geomet
   expect(small.height).toBe(4);
   expect(small.points).toEqual(afterMove.objects[0].points);
   await page.getByRole("button", { name: "Close appearance" }).click();
+  await expect(page.getByRole("button", { name: "Edit appearance" })).toBeFocused();
+  // Canvas shortcuts resume after leaving the focused toolbar control.
+  await page.mouse.click(1100, 500);
   await page.keyboard.press("Control+z");
   expect((await snapshot(page)).objects).toEqual(afterMove.objects);
   await page.keyboard.press("Control+z");

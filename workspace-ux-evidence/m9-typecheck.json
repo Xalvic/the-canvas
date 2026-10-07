@@ -1,0 +1,9 @@
+{
+  "extends": "../e2e-integration/tsconfig.json",
+  "include": [
+    "../src/persistence/workspaceController.test.ts",
+    "../e2e/account-boards.spec.ts",
+    "../e2e/ux-simplification.spec.ts",
+    "../e2e-integration/workspace-ui.spec.ts"
+  ]
+}

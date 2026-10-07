@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { getAccount, signOut } from "../api/auth";
-import { BoardApiError, deleteServerBoard, getServerBoard, getServerBoardDocument, listServerBoards } from "../api/boards";
+import { BoardApiError, createServerPage, deleteServerBoard, getServerBoard, getServerBoardDocument, listServerBoards } from "../api/boards";
 import { getServerWorkspace, initializeServerWorkspace, updateServerWorkspace } from "../api/workspace";
 import { AccountBoardSession } from "./accountBoardSession";
 import { WorkspaceController } from "./workspaceController";
@@ -19,7 +19,7 @@ import { pageFromUrl, rememberPageIntent } from "./workspaceNavigation";
 vi.mock("../api/auth", () => ({ getAccount: vi.fn(), signOut: vi.fn() }));
 vi.mock("../api/workspace", () => ({ getServerWorkspace: vi.fn(), initializeServerWorkspace: vi.fn(), updateServerWorkspace: vi.fn() }));
 vi.mock("../api/boards", async (original) => ({ ...await original<typeof import("../api/boards")>(),
-  getServerBoard: vi.fn(), getServerBoardDocument: vi.fn(), listServerBoards: vi.fn(), deleteServerBoard: vi.fn() }));
+  createServerPage: vi.fn(), getServerBoard: vi.fn(), getServerBoardDocument: vi.fn(), listServerBoards: vi.fn(), deleteServerBoard: vi.fn() }));
 vi.mock("./localBoardStorage", async (original) => ({ ...await original<typeof import("./localBoardStorage")>(), loadLocalBoard: vi.fn(), saveLocalBoard: vi.fn() }));
 vi.mock("./waitForLocalBoardSave", () => ({ waitForLocalBoardSave: vi.fn() }));
 vi.mock("./useLocalBoardPersistence", () => ({ flushLocalBoardSave: vi.fn(), captureLocalBoard: vi.fn() }));
@@ -72,6 +72,47 @@ beforeEach(() => {
 afterEach(() => { stop(); client.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); useBoardStore.setState(initialBoard); useDocumentStore.getState().loadDocument({}); useInteractionStore.getState().endInteraction(); });
 
 describe("workspace lifecycle and navigation", () => {
+  it("retains a new page request through lost responses/reload and opens its confirmed destination", async () => {
+    await start();
+    vi.mocked(createServerPage).mockRejectedValueOnce(new TypeError("Lost create response"));
+    expect(await controller.newPage()).toBe(false);
+    expect(useBoardStore.getState().account?.boardId).toBe(first.id);
+    const [payload] = vi.mocked(createServerPage).mock.calls[0];
+    expect(payload).toEqual({ requestId: expect.any(String), title: "Untitled", initializeDocument: true });
+    stop(); controller = new WorkspaceController(session, client); await start();
+    vi.mocked(createServerPage).mockResolvedValue({ board: second, creation: { requestId: payload.requestId, documentRevision: 1, replayed: true, expiresAt: Date.now() + 100000 } });
+    expect(await controller.newPage()).toBe(true);
+    expect(vi.mocked(createServerPage).mock.calls[1]).toEqual([payload, expect.any(AbortSignal), user.id]);
+    expect(getServerBoard).toHaveBeenCalledWith(second.id, expect.any(AbortSignal), user.id);
+    expect(getServerBoardDocument).toHaveBeenCalledWith(second.id, expect.any(AbortSignal), user.id);
+    expect(pageFromUrl()).toBe(second.id); expect(tabStorage.size).toBe(0);
+    expect(useDocumentStore.getState().past).toHaveLength(0);
+  });
+  it("requires new page intent persistence before dispatch and leaves the current canvas intact", async () => {
+    await start();
+    vi.stubGlobal("sessionStorage", { getItem: () => null, setItem: () => { throw new Error("Storage unavailable"); } });
+    expect(await controller.newPage()).toBe(false); expect(createServerPage).not.toHaveBeenCalled();
+    expect(useBoardStore.getState().account?.boardId).toBe(first.id);
+    expect(controller.getState().creationError).toContain("Storage unavailable");
+  });
+  it("reopens a known new page after a failed document read without another creation request", async () => {
+    await start();
+    vi.mocked(createServerPage).mockImplementation(async (payload) => ({ board: second, creation: { requestId: payload.requestId, documentRevision: 1, replayed: false, expiresAt: Date.now() + 100000 } }));
+    vi.mocked(getServerBoardDocument).mockRejectedValueOnce(new TypeError("Document unavailable"));
+    expect(await controller.newPage()).toBe(false);
+    expect(useBoardStore.getState().account?.boardId).toBe(first.id);
+    expect(await controller.newPage()).toBe(true); expect(createServerPage).toHaveBeenCalledTimes(1);
+  });
+  it("does not dispatch two new page requests or replace native composition", async () => {
+    await start(); document.dispatchEvent(new Event("compositionstart"));
+    expect(await controller.newPage()).toBe(false); expect(createServerPage).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event("compositionend"));
+    const gate = deferred<Awaited<ReturnType<typeof createServerPage>>>(); vi.mocked(createServerPage).mockReturnValue(gate.promise);
+    const work = controller.newPage(); await vi.waitFor(() => expect(createServerPage).toHaveBeenCalledTimes(1));
+    expect(await controller.newPage()).toBe(false);
+    gate.resolve({ board: second, creation: { requestId: vi.mocked(createServerPage).mock.calls[0][0].requestId, documentRevision: 1, replayed: false, expiresAt: Date.now() + 100000 } });
+    expect(await work).toBe(true);
+  });
   it("waits for initial guest hydration even when the guest lease is passive", async () => {
     useBoardStore.setState({ isHydrated: false, tabReadOnly: true });
     stop = controller.start();
@@ -85,7 +126,7 @@ describe("workspace lifecycle and navigation", () => {
     vi.mocked(listServerBoards).mockResolvedValue([]);
     await start();
     expect(initializeServerWorkspace).toHaveBeenCalledWith({ requestId: expect.any(String), createInitialPage: true }, expect.any(AbortSignal));
-    expect(getServerBoardDocument).toHaveBeenCalledWith(first.id, expect.any(AbortSignal));
+    expect(getServerBoardDocument).toHaveBeenCalledWith(first.id, expect.any(AbortSignal), user.id);
     expect(useDocumentStore.getState().objects).toEqual({});
     expect(records.get(CURRENT_BOARD_ID)?.objects["guest-note"]).toBeDefined();
     await vi.waitFor(() => expect(updateServerWorkspace).toHaveBeenCalledWith({ lastOpenedBoardId: first.id }, expect.any(AbortSignal)));

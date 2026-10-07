@@ -4,29 +4,40 @@ Updated: 2026-10-07. Read once per new project session.
 
 ## Current handoff
 
-Workspace UX **M0-M6 are verified locally**; M6 completed 2026-10-07. Authority:
-`WORKSPACE_UX_IMPLEMENTATION_PLAN.md`, sections 6 and 9. Next: **M7 only**, Google
-sign-in and resumable guest transfer. Contract/commands: `docs/workspace-ux-m6.md`.
-One mounted controller owns account lifecycle and page URLs/Back/Forward. Service
-errors/timeouts retain identity; confirmed expiry/sign-out preserve journals and
-return to the retained guest. Initial hydration completes before opening account
-pages; transient navigation gating prevents guest recovery races. Hidden/inert
-canvas keeps its measured size and viewport. Read current document/roles, preserve
-selection/history boundaries, then serialize preference PATCH; another device's
-preference never navigates the current editor. Initialization UUID/mode persists
-before dispatch; final deletion stays empty. M7 must supply durable deliberate,
-account-bound transfer intent to the controller's entry hook; explicit page and
-invitation take priority. Preserve M2 IndexedDB v4 journals/guest handoff, M3/M4
-retained creation/initialization identities and M5 immutable uploads/mappings.
-Legacy manual creation/upload controls remain until M8/M9. Verified 136 focused
-cases, 40 standard browser regressions and 15 actual browser/API/Prisma/PostgreSQL
-cases; both builds and strict touched-test/fixture typechecks pass. All 12 normal
-tables/14 rows are unchanged; zero browser schemas remain. Evidence:
-`workspace-ux-evidence/m6-database-isolation.json`. M4-M6 are included in the combined
-commit authorized 2026-10-07; M0-M3 were committed earlier. Docker 5434 runs.
-Next SQL: 12; physical sleep/native IME: M11. No normal/production migration,
-provider change, push or deployment. Future commits need fresh authorization.
-Stop after M7 and save its handoff.
+Workspace UX **M0-M10 are verified locally**; M10 completed 2026-10-07. Authority:
+`WORKSPACE_UX_IMPLEMENTATION_PLAN.md`, sections 6 and 9. Next: **M11 only**,
+integrated validation and release handoff. Guide/commands: `docs/workspace-ux-m10.md`.
+Tools/history sit at bottom center, zoom at bottom left, desktop styles on the
+right and mobile styles in compact popovers. Measured header/notice offsets,
+safe areas and visual-viewport-bounded native dialogs preserve canvas coordinates.
+More tools uses an accessible menu; Escape restores focus and keyboard/clipboard
+events in chrome stay isolated. Mobile appearance replaces the selection action
+row while open. Layout/theme fixtures now use current Pages/app-menu semantics.
+Guests retain one local drawing and quiet saving. Workspace Pages, inline rename,
+roles/sharing, avatar/inbox and desktop visibility preferences stay intact.
+New page commits/journals first and persists its exact request/destination before
+opening. Preserve M2 journals, M3/M4 receipts, M5 assets, M6 lifecycle, M7 transfer
+consent/binding, M8 autosave/retry and pen behavior. M10 passes seven viewport-math
+tests, 38 standard browser cases and four distinct actual browser/API/Prisma/
+PostgreSQL journeys, build, strict focused typecheck and diff checks. Screenshots
+are inspected. All 12 normal tables/14 rows are unchanged; zero disposable schemas:
+`workspace-ux-evidence/m10-database-isolation.json`. No API/SQL/Prisma/package/
+IndexedDB-format change; next SQL remains 12. The user authorized committing and
+pushing all pending updates, including earlier milestones, with normal Cloudflare
+Pages deployment on 2026-10-07. M7-M10 are included in that combined delivery;
+the two earlier local commits are included in the push. The combined checkout
+passes 811 fast tests and the backend build. Docker/5434 remain running.
+M11 consolidates historical manual-provider
+fixtures and runs the integrated gate; physical keyboard/IME/sleep, screen-reader,
+actual browser zoom and live-provider acceptance remain separate pending checks.
+Rollback needs the M8-aware v4 parser; unknown exceptional copy responses still
+need My pages inspection. The user also authorized the backend release on
+2026-10-07. Neon database `scribble` now has migrations 1-11; an encrypted local
+backup and before/after fingerprints confirm all existing application data stayed
+unchanged. The live API still lacks `/api/workspace` and M7 transfer capabilities
+until the backend deploy. Render auto-deploy remains OFF; the user chose to deploy
+the pushed backend through its dashboard. Release record: `workspace-ux-release.md`.
+Stop after M11 and save its handoff.
 
 ## Previous pen handoff
 

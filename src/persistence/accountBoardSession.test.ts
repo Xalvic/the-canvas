@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import {
   createServerBoard, getServerBoard, getServerBoardDocument, listServerBoards, renameServerBoard, saveServerBoardDocument,
-  type ServerBoardDocument,
+  BoardApiError, type ServerBoardDocument,
 } from "../api/boards";
 import { createCardObject, createImageObject } from "../canvas/objects/objectFactories";
 import { getAsset } from "../assets/assetStore";
-import { uploadBoardAsset, downloadBoardAsset } from "../api/assets";
+import { uploadBoardAssetRequest, getBoardAssetUpload, downloadBoardAsset } from "../api/assets";
 import { useBoardStore } from "../store/boardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -38,7 +38,7 @@ vi.mock("./localBoardStorage", async (importOriginal) => ({
 }));
 vi.mock("./waitForLocalBoardSave", () => ({ waitForLocalBoardSave: vi.fn() }));
 vi.mock("../assets/assetStore", () => ({ getAsset: vi.fn() }));
-vi.mock("../api/assets", () => ({ uploadBoardAsset: vi.fn(), downloadBoardAsset: vi.fn() }));
+vi.mock("../api/assets", () => ({ uploadBoardAssetRequest: vi.fn(), getBoardAssetUpload: vi.fn(), downloadBoardAsset: vi.fn(), MAX_CLOUD_IMAGE_BYTES: 5 * 1024 * 1024 }));
 
 const ownerId = "owner-1";
 const metadata = { id: "board-1", title: "Account board", createdAt: 10, updatedAt: 20 };
@@ -122,9 +122,11 @@ beforeEach(() => {
   vi.mocked(renameServerBoard).mockImplementation(async (id, title) => ({ ...metadata, id, title }));
   vi.mocked(getAsset).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
   vi.mocked(downloadBoardAsset).mockResolvedValue(new Blob(["png"], { type: "image/png" }));
-  vi.mocked(uploadBoardAsset).mockImplementation(async (boardId) => ({
-    id: "550e8400-e29b-41d4-a716-446655440010", boardId, mimeType: "image/png",
-    byteSize: 3, width: 20, height: 10, createdAt: 10,
+  vi.mocked(getBoardAssetUpload).mockRejectedValue(new BoardApiError(404, "ASSET_UPLOAD_NOT_FOUND", "Missing"));
+  vi.mocked(uploadBoardAssetRequest).mockImplementation(async (boardId, _blob, requestId) => ({
+    requestId, boardId, assetId: "550e8400-e29b-41d4-a716-446655440010", state: "ready", canRetry: false, retryAfterMs: null,
+    asset: { id: "550e8400-e29b-41d4-a716-446655440010", boardId, mimeType: "image/png",
+    byteSize: 3, width: 20, height: 10, createdAt: 10 },
   }));
   queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
   session = new AccountBoardSession(queryClient);
@@ -136,6 +138,7 @@ afterEach(() => {
   stop();
   queryClient.clear();
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   useBoardStore.setState(initialBoard);
   useDocumentStore.getState().loadDocument({});
   useSelectionStore.getState().clearSelection();
@@ -146,43 +149,41 @@ function localImage(assetId = "local-image") {
     originalWidth: 20, originalHeight: 10, mimeType: "image/png", name: "Draft image", zIndex: 2 }), id: assetId };
 }
 
-describe("explicit account image uploads", () => {
-  it("keeps local images out of autosave until explicit upload, without changing undo history", async () => {
+describe("automatic account image uploads", () => {
+  it("uploads new insertions automatically without changing undo history", async () => {
     startAccount(accountRecord(document("Saved")));
     const image = localImage();
     useDocumentStore.getState().addObject(image);
     const history = useDocumentStore.getState().past;
     await session.save();
-    expect(uploadBoardAsset).not.toHaveBeenCalled();
-    expect(saveServerBoardDocument).not.toHaveBeenCalled();
-    await session.uploadImages();
-    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
     expect(useDocumentStore.getState().past).toBe(history);
     expect(useDocumentStore.getState().objects[image.id]).toEqual(image);
     expect(useBoardStore.getState().account?.imageAssets).toEqual({ "local-image": "550e8400-e29b-41d4-a716-446655440010" });
     expect(saveServerBoardDocument).toHaveBeenCalledWith(metadata.id,
-      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 2, expect.any(AbortSignal));
+      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 2, expect.any(AbortSignal), ownerId);
     useDocumentStore.getState().undo();
     await session.save();
     useDocumentStore.getState().redo();
     await session.save();
-    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
     expect(session.getState().status).toBe("saved");
   });
 
   it("persists each completed upload and retries only missing images after a failure", async () => {
     startAccount(accountRecord(document("Saved")));
     useDocumentStore.getState().addObjects([localImage("first"), localImage("second")]);
-    vi.mocked(uploadBoardAsset).mockResolvedValueOnce({ id: "550e8400-e29b-41d4-a716-446655440010", boardId: metadata.id,
-      mimeType: "image/png", width: 20, height: 10, byteSize: 3, createdAt: 10 }).mockRejectedValueOnce(new Error("Provider offline"));
+    const ready = await vi.mocked(uploadBoardAssetRequest).getMockImplementation()!(metadata.id, new Blob(), crypto.randomUUID());
+    vi.mocked(uploadBoardAssetRequest).mockResolvedValueOnce(ready).mockRejectedValueOnce(new Error("Provider offline"));
     await session.uploadImages();
     expect(session.getState()).toMatchObject({ status: "error", error: "Provider offline" });
     expect(useBoardStore.getState().account?.imageAssets).toHaveProperty("first");
     expect(saveServerBoardDocument).not.toHaveBeenCalled();
     const record = captureLocalBoard();
     startAccount(structuredClone(record));
+    await vi.advanceTimersByTimeAsync(5_000);
     await session.uploadImages();
-    expect(uploadBoardAsset).toHaveBeenCalledTimes(3);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(3);
     expect(session.getState().status).toBe("saved");
   });
 
@@ -192,10 +193,10 @@ describe("explicit account image uploads", () => {
     const record = accountRecord(document("Saved")); record.objects[image.id] = image;
     startAccount(record);
     await session.saveCopy();
-    expect(downloadBoardAsset).toHaveBeenCalledExactlyOnceWith("source-board", image.assetId, expect.any(AbortSignal));
-    expect(uploadBoardAsset).toHaveBeenCalledTimes(1);
+    expect(downloadBoardAsset).toHaveBeenCalledExactlyOnceWith("source-board", image.assetId, expect.any(AbortSignal), ownerId);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
     expect(saveServerBoardDocument).toHaveBeenCalledWith(metadata.id,
-      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 0, expect.any(AbortSignal));
+      expect.objectContaining({ content: { objects: expect.arrayContaining([expect.objectContaining({ type: "image", assetId: "550e8400-e29b-41d4-a716-446655440010" })]) } }), 0, expect.any(AbortSignal), ownerId);
   });
 
   it("does not upload while signed out or with viewer access", async () => {
@@ -203,8 +204,210 @@ describe("explicit account image uploads", () => {
     useDocumentStore.getState().addObject(localImage());
     useBoardStore.getState().setAccessRole("viewer");
     await session.uploadImages();
-    expect(uploadBoardAsset).not.toHaveBeenCalled();
-    expect(session.getState().error).toMatch(/Editing access/);
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    expect(useBoardStore.getState().readOnly).toBe(true);
+  });
+});
+
+describe("workspace saving recovery", () => {
+  it("stops automatic bytes when upload attempts are exhausted, but can confirm a delayed ready asset", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    const requestId = useBoardStore.getState().account!.imageUploads!["local-image"].requestId;
+    const ready = await vi.mocked(uploadBoardAssetRequest).getMockImplementation()!(metadata.id, new Blob(), requestId);
+    vi.mocked(uploadBoardAssetRequest).mockResolvedValueOnce({ requestId, boardId: metadata.id, assetId: ready.assetId,
+      state: "pending", canRetry: false, retryAfterMs: 5_000, asset: null });
+    await session.save(); await vi.advanceTimersByTimeAsync(60_000);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("error");
+    vi.mocked(getBoardAssetUpload).mockResolvedValueOnce(ready);
+    await session.retrySave();
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("reconciles a lost title response and never overwrites a newer collaborator title", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useBoardStore.getState().setTitle("My submitted title");
+    vi.mocked(renameServerBoard).mockRejectedValueOnce(new TypeError("Lost title response"));
+    await session.save();
+    expect(useBoardStore.getState().account!.pendingTitle).toEqual({ title: "My submitted title", previousTitle: metadata.title });
+    vi.mocked(getServerBoard).mockResolvedValueOnce({ ...metadata, title: "My submitted title" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(renameServerBoard).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+    useBoardStore.getState().setTitle("Another submitted title");
+    vi.mocked(renameServerBoard).mockRejectedValueOnce(new TypeError("Lost second response"));
+    await session.save();
+    vi.mocked(getServerBoard).mockResolvedValueOnce({ ...metadata, title: "Newer collaborator title" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(renameServerBoard).toHaveBeenCalledTimes(2);
+    expect(session.getState().status).toBe("conflict");
+    expect(useBoardStore.getState().title).toBe("Another submitted title");
+  });
+
+  it("retains read-only status when an access check cancels an active upload", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    vi.mocked(uploadBoardAssetRequest).mockImplementationOnce(async (_board, _blob, _request, signal) => {
+      await new Promise((_, reject) => signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true }));
+      throw new Error("Unreachable");
+    });
+    const saving = session.save(); await drain();
+    vi.mocked(getServerBoard).mockResolvedValueOnce({ ...metadata, role: "viewer" });
+    await session.refreshAccess(); await saving;
+    expect(session.getState().status).toBe("read-only");
+    expect(useDocumentStore.getState().objects).toHaveProperty("local-image");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps legacy image bytes unconsented through save and history replay until review", async () => {
+    const record = accountRecord(document("Saved"));
+    const image = localImage(); record.objects[image.id] = image;
+    startAccount(record);
+    await session.save();
+    expect(session.getState().status).toBe("consent");
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    useDocumentStore.getState().deleteObjects([image.id]);
+    useDocumentStore.getState().undo();
+    useDocumentStore.getState().redo();
+    useDocumentStore.getState().undo();
+    await session.save();
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    expect(useBoardStore.getState().account?.imageUploads).toBeUndefined();
+    await session.uploadImages();
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("journals the exact request and immutable bytes before dispatch", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    vi.mocked(uploadBoardAssetRequest).mockImplementationOnce(async (boardId, blob, requestId, _signal, accountId) => {
+      const intent = useBoardStore.getState().account!.imageUploads!["local-image"];
+      expect(intent).toMatchObject({ requestId, blob, dispatched: true });
+      expect(waitForLocalBoardSave).toHaveBeenCalled();
+      expect(accountId).toBe(ownerId);
+      return { requestId, boardId, assetId: "550e8400-e29b-41d4-a716-446655440010", state: "ready", canRetry: false, retryAfterMs: null,
+        asset: { id: "550e8400-e29b-41d4-a716-446655440010", boardId, mimeType: "image/png", byteSize: 3, width: 20, height: 10, createdAt: 10 } };
+    });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("blocks remote writes when intent persistence fails", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    vi.mocked(waitForLocalBoardSave).mockRejectedValue(new Error("Storage full"));
+    await vi.advanceTimersByTimeAsync(700);
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+    expect(session.getState()).toMatchObject({ status: "error", error: "Storage full" });
+  });
+
+  it("reconciles a lost upload response after reload with the same request and no second upload", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    const ready = await vi.mocked(uploadBoardAssetRequest).getMockImplementation()!(metadata.id, new Blob(), crypto.randomUUID());
+    vi.mocked(uploadBoardAssetRequest).mockRejectedValueOnce(new TypeError("Lost confirmation"));
+    await session.save();
+    const original = captureLocalBoard();
+    const requestId = original.account!.imageUploads!["local-image"].requestId;
+    vi.mocked(getBoardAssetUpload).mockResolvedValue({ ...ready, requestId });
+    startAccount(structuredClone(original));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await session.save();
+    expect(getBoardAssetUpload).toHaveBeenCalledWith(metadata.id, requestId, expect.any(AbortSignal), ownerId);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("honors a pending upload delay and reuses its bytes and identity", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    const requestId = useBoardStore.getState().account!.imageUploads!["local-image"].requestId;
+    const pending = { requestId, boardId: metadata.id, assetId: "550e8400-e29b-41d4-a716-446655440010", state: "pending" as const, canRetry: true, retryAfterMs: 5_000, asset: null };
+    vi.mocked(uploadBoardAssetRequest).mockResolvedValueOnce(pending);
+    vi.mocked(getBoardAssetUpload).mockResolvedValue(pending);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(session.getState().status).toBe("pending");
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(getBoardAssetUpload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(uploadBoardAssetRequest).mock.calls[1].slice(0, 3)).toEqual(vi.mocked(uploadBoardAssetRequest).mock.calls[0].slice(0, 3));
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("keeps a late upload's mapping outside undo and reuses it on redo", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    const ready = await vi.mocked(uploadBoardAssetRequest).getMockImplementation()!(metadata.id, new Blob(), crypto.randomUUID());
+    const gate = deferred<typeof ready>(); vi.mocked(uploadBoardAssetRequest).mockReturnValueOnce(gate.promise);
+    const saving = session.save(); await drain();
+    useDocumentStore.getState().undo(); gate.resolve(ready); await saving;
+    expect(useBoardStore.getState().account!.imageAssets).toHaveProperty("local-image");
+    useDocumentStore.getState().redo(); await vi.advanceTimersByTimeAsync(700);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("does not start an upload for an insertion undone before its save boundary", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage()); useDocumentStore.getState().undo();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    useDocumentStore.getState().redo(); await vi.advanceTimersByTimeAsync(700);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves another insertion's authorization while a document response is pending", async () => {
+    startAccount(accountRecord(document("Saved")));
+    const gate = deferred<ServerBoardDocument>(); vi.mocked(saveServerBoardDocument).mockReturnValueOnce(gate.promise);
+    useDocumentStore.getState().updateObject("card-1", { body: "First edit" });
+    const submitted = serializeDocumentSnapshot(useDocumentStore.getState().objects);
+    const saving = session.save(); await drain();
+    useDocumentStore.getState().addObject(localImage());
+    const requestId = useBoardStore.getState().account!.imageUploads!["local-image"].requestId;
+    gate.resolve(remote(submitted, 3)); await saving; await drain();
+    expect(useBoardStore.getState().account!.imageUploads!["local-image"].requestId).toBe(requestId);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("saved");
+  });
+
+  it("bounds network retries and leaves one explicit retry after exhaustion", async () => {
+    startAccount(accountRecord());
+    vi.mocked(saveServerBoardDocument).mockRejectedValue(new TypeError("Offline API"));
+    await session.save(); await vi.advanceTimersByTimeAsync(60_000);
+    expect(saveServerBoardDocument).toHaveBeenCalledTimes(4);
+    expect(session.getState()).toMatchObject({ status: "error", error: "Offline API" });
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(saveServerBoardDocument).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not send bytes again after terminal upload failure or revoked access", async () => {
+    startAccount(accountRecord(document("Saved")));
+    useDocumentStore.getState().addObject(localImage());
+    vi.mocked(uploadBoardAssetRequest).mockRejectedValueOnce(new BoardApiError(403, "BOARD_FORBIDDEN", "Access changed"));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    expect(session.getState().status).toBe("read-only");
+    expect(saveServerBoardDocument).not.toHaveBeenCalled();
+  });
+
+  it("keeps offline edits pending and saves automatically on reconnection", async () => {
+    stop(); vi.stubGlobal("window", new EventTarget()); vi.stubGlobal("navigator", { onLine: false });
+    hydrate(accountRecord(document("Saved"))); stop = session.start();
+    useBoardStore.getState().setTitle("Offline title"); useDocumentStore.getState().addObject(localImage());
+    await vi.advanceTimersByTimeAsync(700);
+    expect(session.getState().status).toBe("pending");
+    expect(uploadBoardAssetRequest).not.toHaveBeenCalled();
+    vi.stubGlobal("navigator", { onLine: true }); window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(session.getState().status).toBe("saved");
+    expect(renameServerBoard).toHaveBeenCalled();
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -271,7 +474,7 @@ describe("account draft save queue", () => {
 
     await session.save();
 
-    expect(saveServerBoardDocument).toHaveBeenCalledExactlyOnceWith(metadata.id, submitted, 2, expect.any(AbortSignal));
+    expect(saveServerBoardDocument).toHaveBeenCalledExactlyOnceWith(metadata.id, submitted, 2, expect.any(AbortSignal), ownerId);
     expect(useBoardStore.getState().account?.revision).toBe(3);
     expect(useBoardStore.getState().account?.pendingSave).toBeUndefined();
     expect(session.getState().status).toBe("saved");
@@ -326,7 +529,7 @@ describe("account draft save queue", () => {
     await drain();
 
     expect(saveServerBoardDocument).toHaveBeenCalledTimes(2);
-    expect(saveServerBoardDocument).toHaveBeenNthCalledWith(2, metadata.id, newest, 3, expect.any(AbortSignal));
+    expect(saveServerBoardDocument).toHaveBeenNthCalledWith(2, metadata.id, newest, 3, expect.any(AbortSignal), ownerId);
     expect(useBoardStore.getState().account?.savedDocument).toEqual(newest);
     expect(useBoardStore.getState().account?.revision).toBe(4);
     expect(session.getState().status).toBe("saved");

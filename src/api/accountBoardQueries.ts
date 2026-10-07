@@ -55,7 +55,7 @@ export class AccountBoardQueries {
   document(ownerId: string, boardId: string, signal: AbortSignal) {
     const options = queryOptions({
       queryKey: accountBoardKeys.document(ownerId, boardId),
-      queryFn: ({ signal: querySignal }) => getServerBoardDocument(boardId, querySignal),
+      queryFn: ({ signal: querySignal }) => getServerBoardDocument(boardId, querySignal, ownerId),
       // Always check the revision before opening, reloading, or reconciling an uncertain save.
       staleTime: 0,
       retry: false,
@@ -96,12 +96,12 @@ export class AccountBoardQueries {
   }
 
   rename(ownerId: string, boardId: string, title: string, signal: AbortSignal) {
-    return this.mutate(ownerId, "rename", signal, () => renameServerBoard(boardId, title, signal),
+    return this.mutate(ownerId, "rename", signal, () => renameServerBoard(boardId, title, signal, ownerId),
       (board) => this.updateList(ownerId, signal, (boards) => boards.map((item) => item.id === board.id ? board : item)));
   }
 
   save(ownerId: string, boardId: string, document: CanvasDocument, revision: number, signal: AbortSignal) {
-    return this.mutate(ownerId, "save", signal, () => saveServerBoardDocument(boardId, document, revision, signal), async (saved) => {
+    return this.mutate(ownerId, "save", signal, () => saveServerBoardDocument(boardId, document, revision, signal, ownerId), async (saved) => {
       const queryKey = accountBoardKeys.document(ownerId, boardId);
       await this.client.cancelQueries({ queryKey, exact: true });
       if (signal.aborted) return;
@@ -111,7 +111,7 @@ export class AccountBoardQueries {
   }
 
   operation(ownerId: string, boardId: string, input: CollaborationOperationInput, signal: AbortSignal) {
-    return this.mutate(ownerId, "operation", signal, () => applyBoardOperation(boardId, input, signal), async (saved) => {
+    return this.mutate(ownerId, "operation", signal, () => applyBoardOperation(boardId, input, signal, ownerId), async (saved) => {
       const queryKey = accountBoardKeys.document(ownerId, boardId);
       await this.client.cancelQueries({ queryKey, exact: true });
       if (signal.aborted) return;

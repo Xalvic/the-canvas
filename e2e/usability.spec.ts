@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { mockAccount } from "./fixtures/account";
 
 // Read the actual stores through Vite without adding a test API to the app.
 async function snapshot(page: Page) {
@@ -36,8 +37,9 @@ async function mouseStroke(
 }
 
 test.beforeEach(async ({ page }) => {
+  const cloud = await mockAccount(page); cloud.signedIn = false;
   await page.goto("/");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
 });
 
 test("one-shot Note, Text and Frame; continuous Pen; silent autosave; accessible icon toolbar", async ({
@@ -103,7 +105,7 @@ test("one-shot Note, Text and Frame; continuous Pen; silent autosave; accessible
   await page.waitForTimeout(900);
   const saved = (await snapshot(page)).objects;
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   expect((await snapshot(page)).objects).toEqual(saved);
   await expect(page.locator(".tool-options")).toHaveCount(0);
 });
@@ -150,7 +152,7 @@ test("Draw responds to real mouse velocity on lines and curves; Solid uses const
   await page.screenshot({ path: "test-results/pen-modes.png" });
   await page.waitForTimeout(900);
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await page.keyboard.press("p");
   for (const name of ["Solid", "Blue", "XL"])
     await expect(
@@ -201,7 +203,7 @@ test("text inherits preferences, resizes for XL, preserves styles through reload
   expect((await snapshot(page)).objects[0]).toEqual(original);
   await page.waitForTimeout(900);
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   expect((await snapshot(page)).objects[0]).toEqual(original);
   await page.getByRole("button", { name: "Text tool", exact: true }).click();
   for (const name of ["Green", "XL", "Bold", "Center"])

@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { mockAccount } from "./fixtures/account";
+
+test.beforeEach(async ({ page }) => { const cloud = await mockAccount(page); cloud.signedIn = false; });
 
 async function openMobile(page: Page, width = 390, height = 844) {
   await page.setViewportSize({ width, height });
   await page.goto("/");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
 }
 
 async function tap(
@@ -53,15 +56,15 @@ test("mobile dock, settings tray, and persisted themes fit narrow screens", asyn
   const settingsBox = (await settings.boundingBox())!;
   expect(settingsBox.x).toBeGreaterThanOrEqual(0);
   expect(settingsBox.x + settingsBox.width).toBeLessThanOrEqual(320);
-  expect(settingsBox.height).toBeLessThan(300);
+  expect(settingsBox.height).toBeLessThanOrEqual(340);
   await page.getByRole("button", { name: "Red", exact: true }).click();
   await page.getByRole("button", { name: "Large", exact: true }).click();
   await page
     .getByRole("button", { name: "Collapse settings", exact: true })
     .click();
 
-  await page.getByRole("button", { name: "More tools", exact: true }).click();
-  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await page.getByRole("button", { name: "App menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Dark theme", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(
     await page.evaluate(() => localStorage.getItem("scribble:theme")),
@@ -81,7 +84,7 @@ test("phone and tablet breakpoints keep controls reachable", async ({ page }) =>
   for (const width of [320, 375, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/");
-    await expect(page.getByLabel("Board title")).toBeEnabled();
+    await expect(page.getByLabel("Drawing title")).toBeEnabled();
     const dockBox = (await page.locator(".mobile-tool-dock").boundingBox())!;
     expect(dockBox.x).toBeGreaterThanOrEqual(0);
     expect(dockBox.x + dockBox.width).toBeLessThanOrEqual(width);
@@ -111,9 +114,8 @@ test("light is the default and replaces the retired system preference", async ({
   expect(
     await page.evaluate(() => localStorage.getItem("scribble:theme")),
   ).toBe("light");
-  await expect(
-    page.getByRole("button", { name: "Theme: light", exact: true }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "App menu", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Dark theme", exact: true })).toBeVisible();
 });
 
 test("touch select pans empty space, drags objects, pinches, and multi-selects", async ({

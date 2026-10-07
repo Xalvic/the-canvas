@@ -20,6 +20,16 @@ const callbackSchema = z.object({
   code: z.string().min(1).max(4096).optional(),
   error: z.string().min(1).max(256).optional(),
 }).refine((value) => Boolean(value.code) !== Boolean(value.error));
+const CLIENT_FLOW_COOKIE = "scribble_google_client_flow";
+const clientFlowSchema = z.uuid();
+
+function clientFlowCookie(cookie: string | undefined, browser: string | undefined) {
+  const values = cookie?.split(";").map((part) => part.trim()).filter((part) => part.startsWith(`${CLIENT_FLOW_COOKIE}=`)) ?? [];
+  if (!browser || values.length !== 1) return null;
+  const parts = values[0].slice(CLIENT_FLOW_COOKIE.length + 1).split(".");
+  const [pairedBrowser, flowId] = parts;
+  return parts.length === 2 && pairedBrowser === browser && clientFlowSchema.safeParse(flowId).success ? flowId : null;
+}
 
 export function createAuthRouter(auth?: AuthDependencies, production?: ProductionDependencies) {
   const router = Router();
@@ -40,8 +50,11 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
     attempts.count++;
     starts.set(ip, attempts);
     const state = randomToken(), browser = randomToken(), nonce = randomToken(), codeVerifier = randomToken();
+    const clientFlow = req.query.clientFlow === undefined ? null : clientFlowSchema.parse(req.query.clientFlow);
     await auth.store.createFlow({ stateHash: hashToken(state), browserHash: hashToken(browser), nonce, codeVerifier });
     res.cookie(FLOW_COOKIE, browser, { ...flowCookie, maxAge: FLOW_MAX_AGE });
+    if (clientFlow) res.cookie(CLIENT_FLOW_COOKIE, `${browser}.${clientFlow}`, { ...flowCookie, maxAge: FLOW_MAX_AGE });
+    else res.clearCookie(CLIENT_FLOW_COOKIE, flowCookie);
     res.redirect(auth.provider.authorizationUrl({ state, nonce, codeChallenge: codeChallenge(codeVerifier) }));
   });
 
@@ -52,10 +65,12 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
       const target = new URL(auth!.frontendUrl);
       target.searchParams.set("authError", reason);
       res.clearCookie(FLOW_COOKIE, flowCookie);
+      res.clearCookie(CLIENT_FLOW_COOKIE, flowCookie);
       res.redirect(303, target.href);
     }
     const query = callbackSchema.safeParse(req.query);
     const browser = readTokenCookie(req.headers.cookie, FLOW_COOKIE);
+    const clientFlow = clientFlowCookie(req.headers.cookie, browser);
     if (!query.success || !browser) { failure("invalid_state"); return; }
     const flow = await auth.store.consumeFlow(hashToken(query.data.state), hashToken(browser));
     if (!flow) { failure("invalid_state"); return; }
@@ -71,8 +86,11 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
     const previous = readTokenCookie(req.headers.cookie, SESSION_COOKIE);
     const session = await auth.store.signIn(identity, hashToken(token), previous ? hashToken(previous) : undefined);
     res.clearCookie(FLOW_COOKIE, flowCookie);
+    res.clearCookie(CLIENT_FLOW_COOKIE, flowCookie);
     res.cookie(SESSION_COOKIE, token, { ...sessionCookie, maxAge: Math.min(SESSION_MAX_AGE, session.expiresAt - Date.now()) });
-    res.redirect(303, auth.frontendUrl);
+    const target = new URL(auth.frontendUrl);
+    if (clientFlow) target.searchParams.set("authFlow", clientFlow);
+    res.redirect(303, target.href);
   });
 
   router.get("/me", async (req, res) => {
@@ -80,10 +98,10 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
     const session = token && auth ? await auth.store.getSession(hashToken(token)) : undefined;
     if (!session) {
       res.clearCookie(SESSION_COOKIE, sessionCookie);
-      throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue", { googleSignInEnabled: Boolean(auth?.provider) });
+      throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue", { googleSignInEnabled: Boolean(auth?.provider), guestTransferEnabled: true });
     }
     if (production) await enforceUserBudget(production, res, session.user.id, true);
-    res.json({ user: session.user });
+    res.json({ user: session.user, capabilities: { guestTransfer: 1 } });
   });
 
   router.post("/logout", async (req, res) => {
@@ -99,6 +117,7 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
     }
     res.clearCookie(SESSION_COOKIE, sessionCookie);
     res.clearCookie(FLOW_COOKIE, flowCookie);
+    res.clearCookie(CLIENT_FLOW_COOKIE, flowCookie);
     res.status(204).end();
   });
   return router;

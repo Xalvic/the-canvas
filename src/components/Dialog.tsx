@@ -19,7 +19,7 @@ export function Dialog({ open, title, close, children, className = "" }: {
     return () => {
       dialog.close();
       if (trigger?.isConnected && !trigger.closest("dialog:not([open])")) trigger.focus();
-      else document.querySelector<HTMLElement>(".board-header .boards-trigger")?.focus();
+      else document.querySelector<HTMLElement>(".board-header .app-menu-trigger")?.focus();
     };
   }, [open]);
   return open ? <dialog ref={ref} className={`app-dialog ${className}`} aria-labelledby={heading}

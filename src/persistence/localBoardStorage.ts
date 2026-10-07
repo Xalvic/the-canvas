@@ -7,6 +7,7 @@ import { isOpacity } from "../tools/toolSettings";
 import { z } from "zod";
 import { canvasDocumentSchema, type CanvasDocument } from "./canvasDocument";
 import { collaborationOperationSchema, type CollaborationOperationInput } from "../../server/contracts/collaboration";
+import { imageUploadIntentsSchema, type ImageUploadIntent } from "./accountImageUploads";
 import {
   BOARD_STORE_NAME,
   openCanvasDatabase,
@@ -25,6 +26,8 @@ export type AccountBoardLink = {
   savedDocument: CanvasDocument;
   savedTitle: string;
   imageAssets?: Record<string, string>;
+  imageUploads?: Record<string, ImageUploadIntent>;
+  pendingTitle?: { title: string; previousTitle: string };
   pendingOperation?: { input: CollaborationOperationInput; document: CanvasDocument; conflicted?: boolean };
   pendingSave?: { document: CanvasDocument; expectedRevision: number };
 };
@@ -49,6 +52,8 @@ const accountBoardLinkSchema = z.strictObject({
   savedDocument: canvasDocumentSchema,
   savedTitle: z.string(),
   imageAssets: imageAssetsSchema.optional(),
+  imageUploads: imageUploadIntentsSchema.optional(),
+  pendingTitle: z.strictObject({ title: z.string(), previousTitle: z.string() }).optional(),
   pendingOperation: z.strictObject({ input: collaborationOperationSchema, document: canvasDocumentSchema, conflicted: z.boolean().optional() }).optional(),
   pendingSave: z.strictObject({
     document: canvasDocumentSchema,

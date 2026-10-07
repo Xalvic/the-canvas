@@ -25,7 +25,7 @@ export function parseEditorJournal(value: unknown): EditorJournal | null {
 export function journalIsDirty(board: LocalBoardRecord) {
   const link = board.account;
   if (!link) return false;
-  if (link.pendingOperation || link.pendingSave || board.title !== link.savedTitle) return true;
+  if (link.pendingOperation || link.pendingSave || link.pendingTitle || board.title !== link.savedTitle) return true;
   try {
     return JSON.stringify(serializeDocumentSnapshot(board.objects, { boardId: link.boardId, imageAssets: link.imageAssets })) !== JSON.stringify(link.savedDocument);
   } catch { return true; }

@@ -300,6 +300,7 @@ export function ToolOptions({
           else performUndo();
         }
         if (event.key === "Escape") {
+          event.preventDefault();
           preview.cancel();
           onClose?.();
         }
@@ -307,6 +308,7 @@ export function ToolOptions({
         // while interacting with the panel.
         event.stopPropagation();
       }}
+      onKeyUp={(event) => event.stopPropagation()}
     >
       <div className="appearance-heading">
         <strong>
@@ -325,16 +327,14 @@ export function ToolOptions({
           >
             {collapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
-          {object && (
           <button
             type="button"
             className="icon-button"
-            aria-label="Close appearance"
+            aria-label={object ? "Close appearance" : "Close settings"}
             onClick={onClose}
           >
             <X size={16} />
           </button>
-          )}
         </div>
       </div>
       <div id={contentId} className="tool-options-content" hidden={collapsed}>

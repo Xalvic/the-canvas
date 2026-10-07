@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { accountMenu, closeDialogs, rowActions } from "../e2e/fixtures/ui";
-import { BASE_URL, canvasState, createNote, flushLocalDraft, membership, mutationHeaders, network, openBoard, signIn } from "./fixture";
+import { BASE_URL, canvasState, createNote, flushLocalDraft, membership, mutationHeaders, network, openBoard, signIn, state } from "./fixture";
 
 async function pageRecord(request: APIRequestContext, title: string) {
   const response = await request.post(`${BASE_URL}/api/boards`, { headers: mutationHeaders, data: { title } });
@@ -60,7 +60,7 @@ test("explicit page, last-opened restore, Back/Forward and per-page history/view
 });
 
 test("sign-in preserves the guest original and sign-out journals active text before restoring it", async ({ page, context }) => {
-  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveText("Sign in");
+  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
   await createNote(page, "Retained guest original", 330, 500); await flushLocalDraft(page);
   await signIn(context.request); await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(async () => (await pages(context.request)).length).toBe(1);
@@ -70,7 +70,7 @@ test("sign-in preserves the guest original and sign-out journals active text bef
   await page.locator(".card-object-value").filter({ has: page.getByText("Account pending text", { exact: true }) }).dblclick();
   await page.getByLabel("Card title", { exact: true }).fill("Committed at sign-out");
   const userId = (await canvasState(page)).account!.ownerId;
-  await accountMenu(page); await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await accountMenu(page); await page.getByRole("menuitem", { name: "Sign out", exact: true }).click();
   await expect.poll(async () => (await canvasState(page)).account).toBeNull();
   await closeDialogs(page); await expect(page.getByText("Retained guest original", { exact: true })).toBeVisible();
   const preserved = await page.evaluate(async ({ id, userId }) => {
@@ -89,7 +89,7 @@ test("account service failure and slow checks retain the loaded page; confirmed 
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: 503, json: { error: { code: "UNAVAILABLE" } } }));
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("alert").filter({ hasText: "Could not check your account" })).toBeVisible();
-  await active(page, board.id); await expect(page.locator(".account-trigger")).toHaveText("Account");
+  await active(page, board.id); await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
   await page.unroute("**/api/auth/me");
   let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
   await page.route("**/api/auth/me", async (route) => { await gate; await route.continue(); });
@@ -99,7 +99,7 @@ test("account service failure and slow checks retain the loaded page; confirmed 
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(async () => (await canvasState(page)).account).toBeNull();
   await expect(page.getByRole("alert").filter({ hasText: "Your session ended" })).toBeVisible();
-  await expect(page.locator(".account-trigger")).toHaveText("Sign in");
+  await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
 });
 
 test("lost initialization response is recovered without creating a second page", async ({ page, context }) => {
@@ -125,8 +125,8 @@ test("list failure never initializes and an initialized empty workspace never re
   await page.getByRole("button", { name: "Retry workspace", exact: true }).click();
   await expect.poll(async () => (await pages(context.request)).length).toBe(1);
   const [board] = await pages(context.request); await active(page, board.id);
-  await rowActions(page, board.title); await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await page.getByRole("dialog", { name: "Delete account board", exact: true }).getByRole("button", { name: "Delete board", exact: true }).click();
+  await rowActions(page, board.title); await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await page.getByRole("dialog", { name: "Delete page", exact: true }).getByRole("button", { name: "Delete page", exact: true }).click();
   await closeDialogs(page); await expect(page.getByText("Your workspace is empty.", { exact: true })).toBeVisible();
   await expect(page.locator("#canvas-editor")).toBeHidden(); expect(await pages(context.request)).toHaveLength(0);
   await page.reload(); await expect(page.getByText("Your workspace is empty.", { exact: true })).toBeVisible();
@@ -142,7 +142,7 @@ test("current viewer roles are respected and a revoked explicit page falls back"
     const viewerAccount = await signIn(viewer.request); await membership(owner.request, board.id, viewerAccount.user.id, "viewer");
     const own = await pageRecord(viewer.request, "Viewer own page");
     const page = await viewer.newPage(); await page.goto(`${BASE_URL}/scribble/?page=${board.id}`); await active(page, board.id);
-    await expect(page.getByText("Shared with you · Can view", { exact: true })).toBeVisible();
+    await expect(page.locator(".board-location")).toHaveText("Can view");
     await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
     await membership(owner.request, board.id, viewerAccount.user.id, null);
     await page.reload(); await active(page, own.id);
@@ -155,7 +155,7 @@ test("page and invitation intent survive a simulated authentication redirect wit
   const { subject } = await signIn(context.request); const board = await pageRecord(context.request, "Linked page");
   await context.request.post(`${BASE_URL}/api/auth/logout`, { headers: mutationHeaders });
   await page.goto(`/scribble/?page=${board.id}&invite=${invite}`);
-  await expect(page.locator(".account-trigger")).toHaveText("Sign in");
+  await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
   await page.evaluate(async () => {
     (await import(/* @vite-ignore */ "/scribble/src/persistence/workspaceNavigation.ts")).rememberPageIntent();
     (await import(/* @vite-ignore */ "/scribble/src/components/ServerBoards/invitationIntent.ts")).rememberInvitationIntent();
@@ -163,7 +163,7 @@ test("page and invitation intent survive a simulated authentication redirect wit
   // Fixture restores the same Google subject; no real OAuth/provider is contacted.
   await signIn(context.request, subject);
   await page.goto("/scribble/");
-  await expect(page.getByRole("dialog", { name: "Your boards", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Invitations", exact: true })).toBeVisible();
   await expect(page.getByText("Use the invited Google account. Acceptance is your choice; signing in does not accept or open a board.", { exact: true })).toBeVisible();
   await active(page, board.id);
   expect((await pages(context.request)).length).toBe(1);
@@ -175,13 +175,18 @@ test("a lost account save remains journaled while switching pages and navigating
   await page.goto(`/scribble/?page=${first.id}`); await active(page, first.id);
   await network(context.request, 1);
   await createNote(page, "Pending response retained", 330, 500);
-  await expect(page.locator(".save-status")).toContainText("Account save failed"); await flushLocalDraft(page);
+  await expect(page.locator(".save-status")).toContainText("Changes pending");
   const pending = (await canvasState(page)).account!.pendingOperation!.input;
+  await flushLocalDraft(page);
   await openBoard(page, second.title); await active(page, second.id);
   await page.goBack(); await active(page, first.id);
   await expect(page.getByText("Pending response retained", { exact: true })).toBeVisible();
-  expect((await canvasState(page)).account!.pendingOperation!.input).toEqual(pending);
-  await expect(page.locator(".save-status")).toContainText("Account save failed");
+  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  expect((await canvasState(page)).account!.pendingOperation).toBeUndefined();
+  const persisted = await state(context.request, first.id);
+  expect(persisted.receipts).toHaveLength(1);
+  expect(persisted.receipts[0].operation_id).toBe(pending.operationId);
+  expect(persisted.document!.revision).toBe(2);
 });
 
 test("account switching clears the old visible page and cache while preserving its journal", async ({ page, context }) => {
@@ -192,8 +197,7 @@ test("account switching clears the old visible page and cache while preserving i
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await active(page, second.id);
   expect((await canvasState(page)).account?.ownerId).toBe(other.user.id);
-  await page.getByRole("button", { name: "Boards", exact: true }).click();
-  await expect(page.getByRole("list", { name: "Account boards", exact: true }).getByText(first.title, { exact: true })).toHaveCount(0);
+  await expect(page.locator(".page-list").getByText(first.title, { exact: true })).toHaveCount(0);
   await closeDialogs(page);
   const preserved = await page.evaluate(async ({ userId, boardId }) => {
     const { accountEditorJournals } = await import(/* @vite-ignore */ "/scribble/src/persistence/accountEditorJournals.ts");

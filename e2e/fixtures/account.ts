@@ -5,7 +5,7 @@ import type { BoardDocument } from "../../server/documents";
 import { isDeepStrictEqual } from "node:util";
 
 export const user = { id: "11111111-1111-4111-8111-111111111111", email: "owner@example.com", displayName: "Owner" };
-const guest = { error: { code: "UNAUTHENTICATED", message: "Sign in to use account boards", details: { googleSignInEnabled: true } } };
+const guest = { error: { code: "UNAUTHENTICATED", message: "Sign in to use account boards", details: { googleSignInEnabled: true, guestTransferEnabled: true } } };
 export const firstId = "22222222-2222-4222-8222-222222222222";
 export const secondId = "33333333-3333-4333-8333-333333333333";
 
@@ -51,7 +51,7 @@ export async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     await route.fulfill({ json: { workspace: { initialized: true, lastOpenedBoardId: accessible } } });
   });
   await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: [] } }));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user } : guest }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user, capabilities: { guestTransfer: 1 } } : guest }));
   await page.route("**/api/auth/logout", (route) => {
     cloud.signedIn = false;
     return route.fulfill({ status: 204 });
@@ -78,9 +78,9 @@ export async function mockAccount(page: Page, initial: SavedBoard[] = []) {
           : { json: { boards } }).catch(() => {});
       } else if (method === "POST") {
         const id = `${String(nextId++).padStart(8, "0")}-4444-4444-8444-444444444444`;
-        const board = { id, title: body.title, createdAt: 1, updatedAt: 1, document: null };
+        const board = { id, title: body.title, createdAt: 1, updatedAt: 1, document: body.initializeDocument ? { boardId: id, schemaVersion: 1 as const, revision: 1, updatedAt: 1, content: { objects: [] } } : null };
         cloud.boards.set(id, board);
-        await route.fulfill({ status: 201, json: { board } });
+        await route.fulfill({ status: 201, json: { board, ...(body.initializeDocument ? { creation: { requestId: body.requestId, documentRevision: 1, replayed: false, expiresAt: Date.now() + 100000 } } : {}) } });
       }
       return;
     }
@@ -169,13 +169,17 @@ export async function editNote(page: Page, before: string, after: string) {
   await page.keyboard.press("Escape");
 }
 
-export async function openBoard(page: Page, title: string) {
+export async function restoreAccount(page: Page, cloud: Awaited<ReturnType<typeof mockAccount>>) {
+  cloud.signedIn = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
+}
+
+export async function openBoard(page: Page, title: string, cloud?: Awaited<ReturnType<typeof mockAccount>>) {
+  if (cloud && !await page.getByRole("button", { name: "Pages", exact: true }).isVisible()) await restoreAccount(page, cloud);
   await browse(page);
-  const list = page.getByRole("list", { name: "Account boards", exact: true });
-  const shared = page.getByRole("button", { name: "Shared with me", exact: true });
-  if (!await list.getByText(title, { exact: true }).isVisible()) await shared.click();
-  await list.getByRole("button", { name: title, exact: false }).filter({ has: page.getByText(title, { exact: true }) }).click();
-  await expect(page.getByLabel("Board title", { exact: true })).toHaveValue(title);
+  await page.locator(".page-list").getByRole("button", { name: title, exact: false }).filter({ has: page.getByText(title, { exact: true }) }).click();
+  await expect(page.getByLabel("Page title", { exact: true })).toHaveValue(title);
   await closeDialogs(page);
 }
 

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../Dialog";
 import { rememberInvitationIntent } from "../ServerBoards/invitationIntent";
-import { HelpDialog } from "../HelpDialog";
-import { useThemeStore } from "../../store/themeStore";
-import { waitForLocalBoardSave } from "../../persistence/waitForLocalBoardSave";
+import { Menu } from "../Menu";
+import { loadLocalBoard } from "../../persistence/localBoardStorage";
+import { useDocumentStore } from "../../store/documentStore";
+import { useBoardStore } from "../../store/boardStore";
 import { rememberPageIntent } from "../../persistence/workspaceNavigation";
 import type { WorkspaceController, WorkspaceState } from "../../persistence/workspaceController";
 
@@ -31,12 +32,23 @@ export function Account({ workspace, lifecycle, openRequest = 0 }: {
     lifecycle.status === "expired" ? { status: "guest" as const, googleSignInEnabled: true } : { status: "error" as const });
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const theme = useThemeStore((store) => store.preference);
-  const setTheme = useThemeStore((store) => store.setPreference);
   const [busy, setBusy] = useState(false);
+  const [bringDrawing, setBringDrawing] = useState(false);
+  const [retainedDrawing, setRetainedDrawing] = useState(false);
+  const objects = useDocumentStore((store) => store.objects);
+  const activeAccount = useBoardStore((store) => store.account);
+  const hasDrawing = !activeAccount && Object.keys(objects).length > 0 || retainedDrawing;
   const loginRequest = useRef<AbortController | null>(null);
   useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
+  useEffect(() => {
+    if (!open) { setBringDrawing(false); return; }
+    let current = true;
+    if (state.status === "signed-in") void loadLocalBoard().then((board) => {
+      if (current) setRetainedDrawing(!!board && Object.keys(board.objects).length > 0);
+    }).catch(() => { if (current) setRetainedDrawing(false); });
+    else setRetainedDrawing(false);
+    return () => { current = false; };
+  }, [open, state.status]);
 
   useEffect(() => {
     const message = callbackError();
@@ -50,11 +62,16 @@ export function Account({ workspace, lifecycle, openRequest = 0 }: {
     loginRequest.current = controller;
     setBusy(true); setError(null);
     try {
-      await waitForLocalBoardSave(controller.signal);
-      if (!controller.signal.aborted) { rememberInvitationIntent(); rememberPageIntent(); window.location.assign("/api/auth/google"); }
-    } catch {
-      if (!controller.signal.aborted) { setError("Couldn’t save your canvas before sign-in. Please try again."); setBusy(false); }
-    }
+      const target = await workspace.prepareGoogleSignIn(hasDrawing && bringDrawing, controller.signal);
+      if (!controller.signal.aborted) { rememberInvitationIntent(); rememberPageIntent(); window.location.assign(target); }
+    } catch (error) {
+      if (!controller.signal.aborted) { setError(error instanceof Error ? error.message : "Couldn’t save your canvas before sign-in. Please try again."); setBusy(false); setOpen(true); }
+    } finally { if (loginRequest.current === controller) loginRequest.current = null; }
+  }
+
+  function closeAccount() {
+    if (loginRequest.current) { loginRequest.current.abort(); loginRequest.current = null; setBusy(false); }
+    setOpen(false);
   }
 
   async function logout() {
@@ -67,8 +84,13 @@ export function Account({ workspace, lifecycle, openRequest = 0 }: {
 
   return (
     <>
-    <button type="button" className="account-trigger" aria-label={state.status === "error" ? "Account unavailable — retry" : undefined} aria-haspopup="dialog" onClick={() => setOpen(true)}>{state.status === "signed-in" ? "Account" : state.status === "loading" ? "Connecting…" : state.status === "error" ? "Account ⚠" : "Sign in"}</button>
-    <Dialog open={open} title="Your account" close={() => setOpen(false)}>
+    {state.status === "signed-in" ? <Menu label="Account menu" className="account-menu" triggerClass="account-trigger avatar-trigger" trigger={(state.user.displayName ?? state.user.email).slice(0, 1).toUpperCase()}>
+      <strong>{state.user.displayName ?? state.user.email}</strong><span className="menu-email">{state.user.email}</span>
+      <button type="button" role="menuitem" onClick={() => setOpen(true)}>{lifecycle.transfer ? "Resume drawing transfer" : "Your account and retained drawing"}</button>
+      <button type="button" role="menuitem" disabled={busy} onClick={() => void logout()}>{busy ? "Signing out…" : "Sign out"}</button>
+    </Menu> : <button type="button" className="account-trigger" aria-label={state.status === "error" ? "Account unavailable — retry" : undefined} aria-haspopup={hasDrawing || state.status !== "guest" ? "dialog" : undefined} disabled={busy}
+      onClick={() => { if (state.status === "guest" && state.googleSignInEnabled && !hasDrawing) void login(); else setOpen(true); }}>{state.status === "loading" ? "Connecting…" : state.status === "error" ? "Account ⚠" : busy ? "Connecting…" : "Sign in with Google"}</button>}
+    <Dialog open={open} title="Your account" close={closeAccount}>
     <section className="account" aria-label="Your account">
       {state.status === "loading" && <p role="status">Connecting to your account…</p>}
       {state.status === "error" && <>
@@ -77,18 +99,24 @@ export function Account({ workspace, lifecycle, openRequest = 0 }: {
       </>}
       {state.status === "guest" && <>
         <p>Keep drawing as a guest, or sign in with Google.</p>
+        {hasDrawing && <><label className="transfer-choice"><input type="checkbox" checked={bringDrawing} disabled={busy} onChange={(event) => setBringDrawing(event.target.checked)} />Bring this drawing into my workspace</label><p className="dialog-footnote">Includes its images. Your original drawing stays on this device. Leave this unchecked to keep it here.</p></>}
         {state.googleSignInEnabled ? <a className="account-google" href="/api/auth/google" aria-disabled={busy} onClick={(event) => { event.preventDefault(); void login(); }}>{busy ? "Saving canvas…" : "Sign in with Google"}</a> :
           <p className="server-boards-description">Google sign-in isn’t available right now.</p>}
       </>}
       {state.status === "signed-in" && <>
         <p className="account-email">{state.user.displayName ?? state.user.email}<br />{state.user.displayName && state.user.email}</p>
+        {lifecycle.transfer ? <>
+          <p>Your drawing transfer is {lifecycle.transfer.status === "paused" ? "paused" : "ready to continue"}. Its original is preserved on this device.</p>
+          <button type="button" disabled={busy || !!lifecycle.transferProgress} onClick={() => { setOpen(false); void workspace.resumeTransfer(); }}>Resume drawing transfer</button>
+        </> : hasDrawing && <>
+          <label className="transfer-choice"><input type="checkbox" checked={bringDrawing} disabled={busy} onChange={(event) => setBringDrawing(event.target.checked)} />Bring this drawing into my workspace</label>
+          <p className="dialog-footnote">Bring the retained device drawing and its images into a new page. Your original stays here.</p>
+          <button type="button" disabled={!bringDrawing || busy} onClick={() => { setOpen(false); void workspace.bringGuestDrawing(); }}>Bring drawing</button>
+        </>}
         <button className="server-boards-refresh" type="button" disabled={busy} onClick={() => void logout()}>{busy ? "Signing out…" : "Sign out"}</button>
       </>}
       {error && <p className="server-boards-error" role="alert">{error}</p>}
       {lifecycle.error && <p className="server-boards-error" role="alert">{lifecycle.error}</p>}
-      <div className="dialog-actions" role="group" aria-label="Account color theme"><button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>Light</button><button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>Dark</button></div>
-      <button type="button" onClick={() => setHelpOpen(true)}>Help and shortcuts</button>
-      <HelpDialog open={helpOpen} close={() => setHelpOpen(false)} />
     </section>
     </Dialog>
     </>

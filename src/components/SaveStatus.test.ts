@@ -20,6 +20,10 @@ describe("truthful save presentation", () => {
   it("claims a device fallback only after confirmation", () => {
     expect(savePresentation({ ...base, cloud: "error" }).label).toContain("saved on this device");
     expect(savePresentation({ ...base, cloud: "error", local: "saving" }).label).not.toContain("saved on this device");
+    expect(savePresentation({ ...base, cloud: "pending", local: "saving" }).label).not.toContain("saved on this device");
+    expect(savePresentation({ ...base, cloud: "pending", pendingImages: 1 }).label).toBe("Changes pending · saved on this device");
+    expect(savePresentation({ ...base, cloud: "consent", pendingImages: 1 }).label).toBe("Older images need upload consent");
+    expect(savePresentation({ ...base, cloud: "saving", pendingImages: 1 }).label).toBe("Saving to account…");
   });
   it("never infers another writer from loading, unverified access or storage failure", () => {
     expect(savePresentation({ ...base, tabReadOnly: true, local: "loading" })).toEqual({ label: "Opening device draft…", attention: false });

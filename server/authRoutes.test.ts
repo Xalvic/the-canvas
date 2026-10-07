@@ -48,6 +48,34 @@ async function begin(agent: ReturnType<typeof request.agent>) {
 }
 
 describe("Google-only session HTTP", () => {
+  it("echoes a deliberate client flow only from a successful browser-paired OAuth attempt", async () => {
+    const { app } = setup(); const agent = request.agent(app); const clientFlow = randomUUID();
+    const start = await agent.get("/api/auth/google").query({ clientFlow }).expect(302);
+    const header = cookie(start, "scribble_google_client_flow");
+    expect(header).toContain("HttpOnly"); expect(header).toContain("Max-Age=600");
+    const state = new URL(start.headers.location).searchParams.get("state");
+    const callback = await agent.get("/api/auth/google/callback").query({ state, code: "verified" }).expect(303);
+    expect(callback.headers.location).toBe(`${frontendUrl}?authFlow=${clientFlow}`);
+    expect(cookie(callback, "scribble_google_client_flow")).toContain("Expires=Thu, 01 Jan 1970");
+  });
+  it("clears stale client flow on ordinary sign-in and never echoes it on a denied callback", async () => {
+    const { app } = setup(); const agent = request.agent(app);
+    const start = await agent.get("/api/auth/google").query({ clientFlow: randomUUID() }).expect(302);
+    const state = new URL(start.headers.location).searchParams.get("state");
+    const callback = await agent.get("/api/auth/google/callback").query({ state, error: "access_denied" }).expect(303);
+    expect(callback.headers.location).toBe(`${frontendUrl}?authError=denied`);
+    const ordinary = await begin(agent);
+    expect(cookie(ordinary.response, "scribble_google_client_flow")).toContain("Expires=Thu, 01 Jan 1970");
+  });
+  it("rejects malformed client flow IDs and ignores unpaired flow cookies", async () => {
+    const { app, auth } = setup();
+    await request(app).get("/api/auth/google").query({ clientFlow: "bad" }).expect(400);
+    expect(auth.store.createFlow).not.toHaveBeenCalled();
+    const start = await begin(request.agent(app));
+    const callback = await request(app).get("/api/auth/google/callback").query({ state: start.state, code: "verified" })
+      .set("Cookie", `${cookie(start.response, FLOW_COOKIE).split(";")[0]}; scribble_google_client_flow=${randomToken()}.${randomUUID()}`).expect(303);
+    expect(callback.headers.location).toBe(frontendUrl);
+  });
   it("keeps account availability explicit and protects server boards when Google is unconfigured", async () => {
     const app = createApp(createBoardStore());
     for (const path of ["/api/auth/google", "/api/auth/google/callback"]) {
@@ -87,7 +115,7 @@ describe("Google-only session HTTP", () => {
     expect(header).toContain("HttpOnly"); expect(header).toContain("SameSite=Lax"); expect(header).toContain("Path=/api;");
     expect(sessions.has(token)).toBe(false); expect(sessions.has(hashToken(token))).toBe(true);
     expect(auth.provider!.verifyCode).toHaveBeenCalledExactlyOnceWith("verified-code", expect.objectContaining({ nonce: expect.any(String), codeVerifier: expect.any(String) }));
-    expect((await agent.get("/api/auth/me").expect(200)).body).toEqual({ user });
+    expect((await agent.get("/api/auth/me").expect(200)).body).toEqual({ user, capabilities: { guestTransfer: 1 } });
     expect((await request(app).get("/api/auth/me").expect(401)).body.error.details.googleSignInEnabled).toBe(true);
   });
 

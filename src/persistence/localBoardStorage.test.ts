@@ -56,6 +56,15 @@ function accountBoard(): LocalBoardRecord & { account: AccountBoardLink } {
 }
 
 describe("local board format", () => {
+  it("preserves durable upload consent and immutable bytes in an existing account journal format", () => {
+    const board = accountBoard();
+    const intent = { requestId: crypto.randomUUID(), blob: new Blob(["source"], { type: "image/png" }),
+      dispatched: true, pendingConfirmed: true, canRetry: true, nextAttemptAt: 50, failed: false };
+    board.account.imageUploads = Object.fromEntries([["__proto__", intent], ["local-image", intent]]);
+    expect(parseLocalBoard(structuredClone(board))).toEqual(board);
+    expect(parseLocalBoard({ ...board, account: { ...board.account, imageUploads: { image: { ...intent, requestId: "invalid" } } } })).toBeNull();
+    expect(parseLocalBoard({ ...board, account: { ...board.account, imageUploads: { image: { ...intent, blob: {} } } } })).toBeNull();
+  });
   it("round trips mixed renderer versions and rejects malformed new profiles", () => {
     const legacy = createStrokeObject([{ x: 0, y: 0, pressure: 0.4, widthRatio: 0.3 }], 1);
     const modern = createStrokeObject([{ x: 0, y: 20, pressure: 0.1, inkPressure: 0.25 }], 2, DEFAULT_PEN_SETTINGS, "pen");

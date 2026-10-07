@@ -1,4 +1,4 @@
-import { browse, closeDialogs, details, backToDevice, newAccountBoard, explicitSave } from "../e2e/fixtures/ui";
+import { browse, closeDialogs } from "../e2e/fixtures/ui";
 import { randomUUID } from "node:crypto";
 import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import type { StoredCanvasObject } from "../server/contracts/collaboration";
@@ -44,11 +44,10 @@ export async function canvasState(page: Page) {
 }
 export async function openBoard(page: Page, title: string) {
   await browse(page);
-  if (!await page.getByRole("list", { name: "Account boards", exact: true }).getByText(title, { exact: true }).isVisible()) await page.getByRole("button", { name: "Shared with me", exact: true }).click();
-  await page.getByRole("listitem").filter({ has: page.getByText(title, { exact: true }) }).locator(".board-open").click();
-  await expect(page.getByLabel("Board title")).toHaveValue(title);
+  await page.locator(".page-list").getByRole("button", { name: title, exact: false }).filter({ has: page.getByText(title, { exact: true }) }).click();
+  await expect(page.getByLabel("Page title")).toHaveValue(title);
   await closeDialogs(page);
-  await expect(page.getByLabel("Board title")).toBeVisible();
+  await expect(page.getByLabel("Page title")).toBeVisible();
   await page.getByRole("button", { name: "Reset viewport", exact: true }).click();
 }
 export async function connected(page: Page) {

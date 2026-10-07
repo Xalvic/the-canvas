@@ -63,6 +63,7 @@ export class BoardApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly currentRevision?: number,
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "BoardApiError";
@@ -85,11 +86,14 @@ export async function boardRequest(url: string, init: RequestInit, failureMessag
     const error = parsed.success ? parsed.data.error : undefined;
     const conflict = error && ["REVISION_CONFLICT", "COLLABORATION_CONFLICT"].includes(error.code)
       ? conflictDetailsSchema.safeParse(error.details) : undefined;
+    const retryAfter = response.headers.get("Retry-After");
+    const retryDelay = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : undefined;
     throw new BoardApiError(
       response.status,
       error?.code ?? "HTTP_ERROR",
       error?.message ?? failureMessage,
       conflict?.success ? conflict.data.currentRevision : undefined,
+      retryDelay === undefined ? undefined : Math.min(90_000, Math.max(1, retryDelay)),
     );
   }
   return response;
@@ -114,11 +118,12 @@ function boardUrl(id: string) {
   return `/api/boards/${encodeURIComponent(identifier.parse(id))}`;
 }
 
-export function mutation(method: string, signal?: AbortSignal, body?: unknown): RequestInit {
+export function mutation(method: string, signal?: AbortSignal, body?: unknown, accountId?: string): RequestInit {
   return {
     method,
     headers: {
       "X-Scribble-Request": "1",
+      ...(accountId ? { "X-Scribble-Account": z.uuid().parse(accountId) } : {}),
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -126,13 +131,17 @@ export function mutation(method: string, signal?: AbortSignal, body?: unknown): 
   };
 }
 
+export function expectedAccountHeaders(accountId?: string) {
+  return accountId ? { headers: { "X-Scribble-Account": z.uuid().parse(accountId) } } : {};
+}
+
 export async function listServerBoards(signal?: AbortSignal): Promise<ServerBoard[]> {
   const response = await boardRequest("/api/boards", { signal }, "Could not load server boards");
   return (await parseResponse(response, boardListSchema)).boards;
 }
 
-export async function getServerBoard(id: string, signal?: AbortSignal): Promise<ServerBoard> {
-  const response = await boardRequest(boardUrl(id), { signal }, "Could not check board access");
+export async function getServerBoard(id: string, signal?: AbortSignal, accountId?: string): Promise<ServerBoard> {
+  const response = await boardRequest(boardUrl(id), { signal, ...expectedAccountHeaders(accountId) }, "Could not check board access");
   const board = (await parseResponse(response, boardResponseSchema)).board;
   requireIdentity(board.id, id, response.status);
   return board;
@@ -146,9 +155,9 @@ export async function createServerBoard(title: string, signal?: AbortSignal): Pr
 
 // Callers persist this intent before dispatch and keep its requestId on retry.
 // Orchestration is added in M6/M7; the legacy UI still uses createServerBoard.
-export async function createServerPage(input: CreateServerPageInput, signal?: AbortSignal): Promise<ServerPageCreation> {
+export async function createServerPage(input: CreateServerPageInput, signal?: AbortSignal, accountId?: string): Promise<ServerPageCreation> {
   const body = pageRequestSchema.parse(input);
-  const response = await boardRequest("/api/boards", mutation("POST", signal, body), "Could not create workspace page");
+  const response = await boardRequest("/api/boards", mutation("POST", signal, body, accountId), "Could not create workspace page");
   const result = await parseResponse(response, pageCreationSchema);
   if (result.creation.requestId !== body.requestId) {
     throw new BoardApiError(response.status, "INVALID_RESPONSE", "The server returned a different creation request");
@@ -159,9 +168,9 @@ export async function createServerPage(input: CreateServerPageInput, signal?: Ab
   return result;
 }
 
-export async function renameServerBoard(id: string, title: string, signal?: AbortSignal): Promise<ServerBoard> {
+export async function renameServerBoard(id: string, title: string, signal?: AbortSignal, accountId?: string): Promise<ServerBoard> {
   const body = { title: titleSchema.parse(title) };
-  const response = await boardRequest(boardUrl(id), mutation("PATCH", signal, body), "Could not rename server board");
+  const response = await boardRequest(boardUrl(id), mutation("PATCH", signal, body, accountId), "Could not rename server board");
   const board = (await parseResponse(response, boardResponseSchema)).board;
   requireIdentity(board.id, id, response.status);
   return board;
@@ -174,8 +183,8 @@ export async function deleteServerBoard(id: string, signal?: AbortSignal): Promi
   }
 }
 
-export async function getServerBoardDocument(id: string, signal?: AbortSignal): Promise<ServerBoardDocument> {
-  const response = await boardRequest(`${boardUrl(id)}/document`, { signal }, "Could not open server board");
+export async function getServerBoardDocument(id: string, signal?: AbortSignal, accountId?: string): Promise<ServerBoardDocument> {
+  const response = await boardRequest(`${boardUrl(id)}/document`, { signal, ...expectedAccountHeaders(accountId) }, "Could not open server board");
   const document = (await parseResponse(response, documentResponseSchema)).document;
   requireIdentity(document.boardId, id, response.status);
   return document;
@@ -186,9 +195,10 @@ export async function saveServerBoardDocument(
   document: CanvasDocument,
   expectedRevision: number,
   signal?: AbortSignal,
+  accountId?: string,
 ): Promise<ServerBoardDocument> {
   const body = saveDocumentSchema.parse({ ...document, expectedRevision });
-  const response = await boardRequest(`${boardUrl(id)}/document`, mutation("PUT", signal, body), "Could not save server board");
+  const response = await boardRequest(`${boardUrl(id)}/document`, mutation("PUT", signal, body, accountId), "Could not save server board");
   const saved = (await parseResponse(response, documentResponseSchema)).document;
   requireIdentity(saved.boardId, id, response.status);
   if (saved.revision !== expectedRevision + 1) {

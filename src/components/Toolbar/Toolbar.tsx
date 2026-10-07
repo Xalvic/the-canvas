@@ -1,13 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronUp,
   Copy,
   MoreHorizontal,
-  Moon,
   Pencil,
   SlidersHorizontal,
-  Sun,
   Trash2,
 } from "lucide-react";
 import {
@@ -24,12 +22,27 @@ import { useSelectionStore } from "../../store/selectionStore";
 import { useBoardStore } from "../../store/boardStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { useInteractionStore } from "../../store/interactionStore";
-import {
-  useThemeStore,
-  type ThemePreference,
-} from "../../store/themeStore";
 import { duplicateSelection } from "../../clipboard/clipboardCommands";
 import { ToolOptions } from "../ToolOptions/ToolOptions";
+import { HistoryControls } from "../HistoryControls/HistoryControls";
+import { Menu } from "../Menu";
+
+function traverseTools(event: KeyboardEvent<HTMLDivElement>) {
+  event.stopPropagation();
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  if ((event.target as Element).closest('[role="menu"]')) return;
+  event.preventDefault();
+  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+  const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const index = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 :
+    (current + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+  buttons[index]?.focus();
+}
+
+function focusTool(label: string) {
+  const dock = window.matchMedia("(max-width: 767px)").matches ? ".mobile-tool-dock" : ".desktop-tool-dock";
+  document.querySelector<HTMLButtonElement>(`${dock} button[aria-label="${label}"]`)?.focus();
+}
 
 const tools: Array<{
   id: ActiveTool;
@@ -57,65 +70,6 @@ const mobilePrimaryTools = tools.filter(({ id }) =>
 const mobileMoreTools = tools.filter(({ id }) =>
   (["hand", "connector", "frame"] as ActiveTool[]).includes(id),
 );
-
-function ThemePicker({ onSelect }: { onSelect?: () => void }) {
-  const preference = useThemeStore((state) => state.preference);
-  const setPreference = useThemeStore((state) => state.setPreference);
-  const choices: Array<{
-    id: ThemePreference;
-    label: string;
-    icon: typeof Sun;
-  }> = [
-    { id: "light", label: "Light", icon: Sun },
-    { id: "dark", label: "Dark", icon: Moon },
-  ];
-
-  return (
-    <div className="theme-picker" role="group" aria-label="Color theme">
-      {choices.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={preference === id}
-          onClick={() => {
-            setPreference(id);
-            onSelect?.();
-          }}
-        >
-          <Icon aria-hidden="true" />
-          <span>{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function DesktopThemeControl() {
-  const preference = useThemeStore((state) => state.preference);
-  const [open, setOpen] = useState(false);
-  const Icon = preference === "dark" ? Moon : Sun;
-
-  return (
-    <div className="tool-slot desktop-theme-control">
-      <span className="tool-divider" aria-hidden="true" />
-      <button
-        type="button"
-        className="tool-button"
-        aria-label={`Theme: ${preference}`}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon aria-hidden="true" />
-      </button>
-      {open && (
-        <div className="toolbar-popover toolbar-popover--theme">
-          <strong>Theme</strong>
-          <ThemePicker onSelect={() => setOpen(false)} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 function ToolButton({
   id,
@@ -199,7 +153,6 @@ export function Toolbar() {
     (state) => state.mode === "editingText",
   );
   const [appearanceId, setAppearanceId] = useState<string | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [collapsedPanels, setCollapsedPanels] = useState({
     pen: false,
@@ -215,8 +168,11 @@ export function Toolbar() {
 
   useEffect(() => {
     setAppearanceId(null);
-    setMoreOpen(false);
   }, [activeTool, selectedId, isEditing]);
+
+  useEffect(() => {
+    if (dockCollapsed) document.querySelector<HTMLButtonElement>(".show-tools-button")?.focus();
+  }, [dockCollapsed]);
 
   useEffect(() => {
     const compact = window.matchMedia("(max-width: 767px)");
@@ -237,7 +193,6 @@ export function Toolbar() {
 
   const chooseTool = (tool: ActiveTool) => {
     setAppearanceId(null);
-    setMoreOpen(false);
     setActiveTool(tool);
   };
 
@@ -250,15 +205,13 @@ export function Toolbar() {
 
   return (
     <>
-      <div className="toolbar-area">
+      <div className="toolbar-area" onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()}>
         <div
           className="tool-dock desktop-tool-dock"
           role="toolbar"
           aria-label="Canvas tools"
-          onKeyDown={(event) => {
-            if (event.key === " " || event.key === "Enter")
-              event.stopPropagation();
-          }}
+          onKeyDown={traverseTools}
+          onKeyUp={(event) => event.stopPropagation()}
         >
           {tools.map((tool, index) => (
             <div className="desktop-tool-entry" key={tool.id}>
@@ -298,7 +251,6 @@ export function Toolbar() {
               </span>
             </div>
           )}
-          <DesktopThemeControl />
         </div>
 
         <div className="mobile-toolbar-wrap">
@@ -307,7 +259,10 @@ export function Toolbar() {
               type="button"
               className="show-tools-button"
               aria-label="Show tool dock"
-              onClick={() => setDockCollapsed(false)}
+              onClick={() => {
+                setDockCollapsed(false);
+                requestAnimationFrame(() => focusTool("Select tool"));
+              }}
             >
               <ChevronUp aria-hidden="true" />
               Tools
@@ -317,6 +272,8 @@ export function Toolbar() {
               className="tool-dock mobile-tool-dock"
               role="toolbar"
               aria-label="Canvas tools"
+              onKeyDown={traverseTools}
+              onKeyUp={(event) => event.stopPropagation()}
             >
               {mobilePrimaryTools.map((tool) => (
                 <ToolButton
@@ -328,45 +285,32 @@ export function Toolbar() {
                 />
               ))}
               <div className="tool-slot mobile-tool-slot">
-                <button
-                  className={`tool-button mobile-tool-button${mobileMoreTools.some(({ id }) => id === activeTool) ? " is-active" : ""}`}
-                  type="button"
-                  aria-label="More tools"
-                  aria-expanded={moreOpen}
-                  onClick={() => setMoreOpen((value) => !value)}
-                >
+                <Menu label="More tools" className="mobile-more-menu" triggerClass={`tool-button mobile-tool-button${mobileMoreTools.some(({ id }) => id === activeTool) ? " is-active" : ""}`} trigger={<>
                   <MoreHorizontal aria-hidden="true" />
                   <span>More</span>
-                </button>
-                {moreOpen && (
-                  <div className="toolbar-popover mobile-more-menu">
-                    <div className="mobile-more-tools">
-                      {mobileMoreTools.map(({ id, label, icon: Icon }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className={activeTool === id ? "is-active" : undefined}
-                          aria-label={`${label} tool`}
-                          disabled={readOnly && id !== "select" && id !== "hand"}
-                          aria-pressed={activeTool === id}
-                          onClick={() => chooseTool(id)}
-                        >
-                          <Icon aria-hidden="true" />
-                          <span>{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <strong>Theme</strong>
-                    <ThemePicker onSelect={() => setMoreOpen(false)} />
-                  </div>
-                )}
+                </>}>
+                  {mobileMoreTools.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="menuitemradio"
+                      className={activeTool === id ? "is-active" : undefined}
+                      aria-label={`${label} tool`}
+                      disabled={readOnly && id !== "select" && id !== "hand"}
+                      aria-checked={activeTool === id}
+                      onClick={() => chooseTool(id)}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </Menu>
               </div>
               <button
                 type="button"
                 className="mobile-dock-collapse"
                 aria-label="Collapse tool dock"
                 onClick={() => {
-                  setMoreOpen(false);
                   setDockCollapsed(true);
                 }}
               >
@@ -375,10 +319,13 @@ export function Toolbar() {
             </div>
           )}
         </div>
+        <div className="history-dock" onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()}>
+          <HistoryControls />
+        </div>
       </div>
 
       {!readOnly && !isEditing && activeTool === "select" && selectedIds.size > 0 && (
-        <div className="mobile-selection-actions" aria-label="Selection actions">
+        <div className="mobile-selection-actions" role="toolbar" aria-label="Selection actions" onKeyDown={traverseTools} onKeyUp={(event) => event.stopPropagation()}>
           <SelectionAction
             label="Multi-select"
             icon={<SelectIcon aria-hidden="true" />}
@@ -433,7 +380,7 @@ export function Toolbar() {
               [activeTool]: !state[activeTool],
             }))
           }
-          onClose={() => setActiveTool("select")}
+          onClose={() => { setActiveTool("select"); focusTool("Select tool"); }}
         />
       )}
       {editable && appearanceId === editable.id && (
@@ -448,7 +395,11 @@ export function Toolbar() {
               appearance: !state.appearance,
             }))
           }
-          onClose={() => setAppearanceId(null)}
+          onClose={() => {
+            setAppearanceId(null);
+            const label = window.matchMedia("(max-width: 767px)").matches ? "Style" : "Edit appearance";
+            requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.focus());
+          }}
         />
       )}
     </>

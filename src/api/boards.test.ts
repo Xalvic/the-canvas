@@ -27,6 +27,19 @@ function respond(body: unknown, status = 200) {
 }
 
 describe("board metadata API boundary", () => {
+  it("binds automatic title and document saves to their original account", async () => {
+    const rename = respond({ board });
+    await renameServerBoard(id, board.title, undefined, otherId);
+    expect(rename.mock.calls[0][1].headers["X-Scribble-Account"]).toBe(otherId);
+    const save = respond({ document: savedDocument }, 201);
+    await saveServerBoardDocument(id, document, 0, undefined, otherId);
+    expect(save.mock.calls[0][1].headers["X-Scribble-Account"]).toBe(otherId);
+  });
+  it("retains bounded Retry-After on API errors for resumable transfer admission", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "RATE_LIMIT", message: "Wait" } }),
+      { status: 429, headers: { "Retry-After": "90" } })));
+    await expect(listServerBoards()).rejects.toMatchObject({ code: "RATE_LIMIT", retryAfterMs: 90_000 });
+  });
   it("reads metadata and supports older metadata-only fixtures", async () => {
     const boards = [board, { id: "private-board", title: "Older board" }];
     const fetch = respond({ boards });

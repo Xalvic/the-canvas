@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BoardApiError, boardRequest, parseResponse } from "./boards";
+import { BoardApiError, boardRequest, parseResponse, expectedAccountHeaders } from "./boards";
 
 export const MAX_CLOUD_IMAGE_BYTES = 5 * 1024 * 1024;
 const mimeType = z.enum(["image/jpeg", "image/png", "image/webp"]);
@@ -51,23 +51,23 @@ async function parseUpload(response: Response, boardId: string, requestId: strin
 
 // Caller must durably save this UUID BEFORE dispatch, and reuse it after reload.
 // One request only: lifecycle/polling and automatic uploads belong to M7/M8.
-export async function uploadBoardAssetRequest(boardId: string, blob: Blob, requestId: string, signal?: AbortSignal): Promise<BoardAssetUpload> {
+export async function uploadBoardAssetRequest(boardId: string, blob: Blob, requestId: string, signal?: AbortSignal, accountId?: string): Promise<BoardAssetUpload> {
   const identity = uploadIdentityInput(boardId, requestId);
   const type = mimeType.safeParse(blob.type);
   if (!type.success || blob.size < 1 || blob.size > MAX_CLOUD_IMAGE_BYTES) {
     throw new Error("Cloud images must be JPEG, PNG or WebP and at most 5 MiB");
   }
   const response = await boardRequest(assetsUrl(identity.boardId), {
-    method: "POST", headers: { "X-Scribble-Request": "1", "Content-Type": type.data, "X-Scribble-Upload-Request": identity.requestId }, body: blob,
+    method: "POST", headers: { ...expectedAccountHeaders(accountId).headers, "X-Scribble-Request": "1", "Content-Type": type.data, "X-Scribble-Upload-Request": identity.requestId }, body: blob,
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000),
   }, "Could not upload image");
   return parseUpload(response, identity.boardId, identity.requestId, true);
 }
 
-export async function getBoardAssetUpload(boardId: string, requestId: string, signal?: AbortSignal): Promise<BoardAssetUpload> {
+export async function getBoardAssetUpload(boardId: string, requestId: string, signal?: AbortSignal, accountId?: string): Promise<BoardAssetUpload> {
   const identity = uploadIdentityInput(boardId, requestId);
   const response = await boardRequest(`/api/boards/${identity.boardId}/asset-uploads/${identity.requestId}`, {
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000), cache: "no-store",
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000), cache: "no-store", ...expectedAccountHeaders(accountId),
   }, "Could not check image upload");
   return parseUpload(response, identity.boardId, identity.requestId, false);
 }
@@ -86,9 +86,9 @@ export async function uploadBoardAsset(boardId: string, blob: Blob, signal?: Abo
   return asset;
 }
 
-export async function getBoardAsset(boardId: string, assetId: string, signal?: AbortSignal): Promise<SignedBoardAsset> {
+export async function getBoardAsset(boardId: string, assetId: string, signal?: AbortSignal, accountId?: string): Promise<SignedBoardAsset> {
   const response = await boardRequest(`${assetsUrl(boardId)}/${encodeURIComponent(z.uuid().parse(assetId))}`, {
-    signal, cache: "no-store",
+    signal, cache: "no-store", ...expectedAccountHeaders(accountId),
   }, "Could not access image");
   const { asset } = await parseResponse(response, z.object({ asset: signedAssetSchema }));
   if (asset.boardId !== boardId || asset.id !== assetId || asset.expiresAt <= Date.now() || asset.expiresAt > Date.now() + 310_000) {
@@ -97,10 +97,11 @@ export async function getBoardAsset(boardId: string, assetId: string, signal?: A
   return asset;
 }
 
-// Used only during an explicit account copy/upload. Remote bytes never enter IndexedDB.
-export async function downloadBoardAsset(boardId: string, assetId: string, signal?: AbortSignal): Promise<Blob> {
+// An authorized cross-page paste/copy may preserve these bytes in its upload
+// intent before dispatch. Signed URLs remain transient.
+export async function downloadBoardAsset(boardId: string, assetId: string, signal?: AbortSignal, accountId?: string): Promise<Blob> {
   signal?.throwIfAborted();
-  const asset = await getBoardAsset(boardId, assetId, signal);
+  const asset = await getBoardAsset(boardId, assetId, signal, accountId);
   signal?.throwIfAborted();
   const response = await fetch(asset.url, { signal, credentials: "omit", cache: "no-store", redirect: "error" });
   if (!response.ok || response.headers.get("content-type")?.split(";")[0].trim() !== asset.mimeType) {

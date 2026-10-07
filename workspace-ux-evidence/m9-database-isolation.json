@@ -1,0 +1,157 @@
+{
+  "before": {
+    "fingerprints": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "fd8aa12e90250b164f676b602cb156959ac55b4dd53902e907df5096f1fa79ed"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "bad0b49e294aa51d0e7e13af713274b8ca99cab96a8e783c3e2dde5b28dd0a71"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "data": "408eb5f765a737a260074986f3e396753f18261abfcaf3435182358c011f4292",
+        "definition": "aaaeff4d12f170fad91afef1c72f18a60cfa994247912fcf0001db7fd50c89ed"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "8dfc02d8c5396d2c50074cb8b5f33cadb1ee1e36e9c31f8b774a82aa09919250"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "data": "277f2b9d742fc6cb1eabee7347baa1912779367538b4d38491abd75a2e0a9306",
+        "definition": "99d750d4a48e542669367230099c116bdae45cf981cd46747c070c4d7ba5cb93"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "565fd12ab51391d3e98c969bf43569460dcbd791fa6952afe835d63c18466c40"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "a0937896591f5432c939f316d116ca65ac08949a58778f8d01b9585369e4551c"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "71c91a3225e831995088e9ee46f389ff34820fcceccb95e5af021f0c1f702bc9"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "data": "dca39b0a5d71cb429b8ddfdf03a3816a4074f18f295bb840bc54c2378ef92b77",
+        "definition": "6153f227ea4dce2f73a3221d33188dbdd5c2938c3d8d350a03cda0d54602db3a"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "data": "913b637371caf76b9a1d5f715c87f220ef80adfed4a9bb68cc759ece35b3be5c",
+        "definition": "8e1cfeaf2b555aa5c07fb68f14906180c44054f3d0fb72c6670ee15cfd1f5b09"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "data": "0391e8720d2704a8b6d53044a17010a8bb1b07d47fe177e3e460e2ac3ce886bd",
+        "definition": "ede4e867497783b9a33a3d2bc5d3a5ee4a72315615ee16a1525282edb8f97f78"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "data": "ffab63d94ac3233ce25993a57c30e5f013f63a9d132b9ad6d2086852e838cf72",
+        "definition": "3f047b5984b21696c26341f72566d584cc0dcb14f174cae7b653856f96e4361f"
+      }
+    ],
+    "disposableSchemas": []
+  },
+  "after": {
+    "fingerprints": [
+      {
+        "table": "api_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "fd8aa12e90250b164f676b602cb156959ac55b4dd53902e907df5096f1fa79ed"
+      },
+      {
+        "table": "asset_request_budgets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "bad0b49e294aa51d0e7e13af713274b8ca99cab96a8e783c3e2dde5b28dd0a71"
+      },
+      {
+        "table": "auth_sessions",
+        "count": 1,
+        "data": "408eb5f765a737a260074986f3e396753f18261abfcaf3435182358c011f4292",
+        "definition": "aaaeff4d12f170fad91afef1c72f18a60cfa994247912fcf0001db7fd50c89ed"
+      },
+      {
+        "table": "board_assets",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "8dfc02d8c5396d2c50074cb8b5f33cadb1ee1e36e9c31f8b774a82aa09919250"
+      },
+      {
+        "table": "board_documents",
+        "count": 1,
+        "data": "277f2b9d742fc6cb1eabee7347baa1912779367538b4d38491abd75a2e0a9306",
+        "definition": "99d750d4a48e542669367230099c116bdae45cf981cd46747c070c4d7ba5cb93"
+      },
+      {
+        "table": "board_invitations",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "565fd12ab51391d3e98c969bf43569460dcbd791fa6952afe835d63c18466c40"
+      },
+      {
+        "table": "board_members",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "a0937896591f5432c939f316d116ca65ac08949a58778f8d01b9585369e4551c"
+      },
+      {
+        "table": "board_operation_receipts",
+        "count": 0,
+        "data": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "definition": "71c91a3225e831995088e9ee46f389ff34820fcceccb95e5af021f0c1f702bc9"
+      },
+      {
+        "table": "boards",
+        "count": 2,
+        "data": "dca39b0a5d71cb429b8ddfdf03a3816a4074f18f295bb840bc54c2378ef92b77",
+        "definition": "6153f227ea4dce2f73a3221d33188dbdd5c2938c3d8d350a03cda0d54602db3a"
+      },
+      {
+        "table": "google_auth_flows",
+        "count": 1,
+        "data": "913b637371caf76b9a1d5f715c87f220ef80adfed4a9bb68cc759ece35b3be5c",
+        "definition": "8e1cfeaf2b555aa5c07fb68f14906180c44054f3d0fb72c6670ee15cfd1f5b09"
+      },
+      {
+        "table": "schema_migrations",
+        "count": 8,
+        "data": "0391e8720d2704a8b6d53044a17010a8bb1b07d47fe177e3e460e2ac3ce886bd",
+        "definition": "ede4e867497783b9a33a3d2bc5d3a5ee4a72315615ee16a1525282edb8f97f78"
+      },
+      {
+        "table": "users",
+        "count": 1,
+        "data": "ffab63d94ac3233ce25993a57c30e5f013f63a9d132b9ad6d2086852e838cf72",
+        "definition": "3f047b5984b21696c26341f72566d584cc0dcb14f174cae7b653856f96e4361f"
+      }
+    ],
+    "disposableSchemas": []
+  },
+  "unchanged": true
+}

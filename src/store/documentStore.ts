@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { useBoardStore } from "./boardStore";
+import { authorizeAccountImages } from "../persistence/accountImageUploads";
 import {
   isCanvasSpatialObject,
   isConnectorObject,
@@ -112,6 +113,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     set((state) => {
       if (useBoardStore.getState().readOnly) return state;
       if (objects.length === 0) return state;
+      authorizeAccountImages(objects);
       const nextObjects = { ...state.objects };
       for (const object of objects) nextObjects[object.id] = object;
 

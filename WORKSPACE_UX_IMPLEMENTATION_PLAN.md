@@ -1,6 +1,6 @@
 # Scribble: single guest whiteboard and signed-in workspace
 
-Created: 2026-10-06. Status: M0-M6 verified locally; M7 is next.
+Created: 2026-10-06. Status: M0-M10 verified locally; M11 is next.
 
 ## Session entry: read this first
 
@@ -354,10 +354,10 @@ to execute several milestones in one session.
 | M4 | Workspace initialization and last-opened-page APIs | M3 | Verified |
 | M5 | Retry-safe image uploads and reconciliation | M3 | Verified |
 | M6 | Account lifecycle and workspace navigation controller | M2, M4 | Verified |
-| M7 | Google sign-in and resumable guest transfer | M5, M6 | Pending |
-| M8 | Automatic document, title, and image saving | M5, M6, M7 | Pending |
-| M9 | Minimal guest UI and signed-in page sidebar | M6, M7, M8 | Pending |
-| M10 | Toolbar layout, responsive behavior, and accessibility | M9 | Pending |
+| M7 | Google sign-in and resumable guest transfer | M5, M6 | Verified locally 2026-10-07 |
+| M8 | Automatic document, title, and image saving | M5, M6, M7 | Verified locally 2026-10-07 |
+| M9 | Minimal guest UI and signed-in page sidebar | M6, M7, M8 | Verified locally 2026-10-07 |
+| M10 | Toolbar layout, responsive behavior, and accessibility | M9 | Verified locally 2026-10-07 |
 | M11 | Integrated validation and release handoff | M0-M10 | Pending |
 
 Default order is M0 through M11. If a milestone proves too large for one session,
@@ -521,60 +521,100 @@ M4-M6 are included in the combined commit authorized 2026-10-07. Next: M7 only.
 **Read:** section 3's sign-in/transfer behavior and section 5's transfer transaction
 rules; account UI, invitation intent, session controller, and completed API adapters.
 
-- [ ] Provide direct empty-canvas Google sign-in and explicit existing-drawing consent.
-- [ ] Persist a scoped source snapshot/intent and resume on the same destination
+- [x] Provide direct empty-canvas Google sign-in and explicit existing-drawing consent.
+- [x] Persist a scoped source snapshot/intent and resume on the same destination
   through creation, images, document confirmation, and reload.
-- [ ] Preserve the guest original and pending edits; prevent later imports from
+- [x] Preserve the guest original and pending edits; prevent later imports from
   session restoration, declined consent, canceled OAuth, or unrelated accounts.
-- [ ] Handle invitation priority and a deliberate later import from the account menu.
+- [x] Handle invitation priority and a deliberate later import from the account menu.
 
 **Gate:** transfer/decline/cancel/failed-auth and interruption tests prove no unsolicited
 upload, duplicate destination, or overwritten newer edits. Document real-Google
 checks separately from fixture verification.
+
+M7 is verified locally 2026-10-07: unchecked consent, immutable IndexedDB source/
+blobs, callback/account binding, stable creation/upload identities, operation-receipt
+confirmation and committed-before-open recovery. Guest original/viewport, invitation
+priority and newer edits are preserved. Request-time actor guards fence account-cookie
+races, including final document reads; capability gating preserves older-server use.
+233 focused cases, 26 standard browser regressions and 26 distinct actual browser/
+API/Prisma/PostgreSQL cases across focused runs pass. Both builds, strict touched-test/
+fixture checks and database isolation pass. Real Google/provider acceptance is pending.
+Exact contract/commands: `docs/workspace-ux-m7.md`. M7 is uncommitted. Next: M8 only.
 
 ### M8 - Automate workspace saving
 
 **Read:** section 3's saving rules; completed upload/creation contracts;
 `accountBoardSession.ts`, save state, image insertion hooks, and relevant tests.
 
-- [ ] Integrate document/title autosaving and automatic uploads for new image actions.
-- [ ] Resume only authorized transfers/uploads; handle legacy unconsented images
+- [x] Integrate document/title autosaving and automatic uploads for new image actions.
+- [x] Resume only authorized transfers/uploads; handle legacy unconsented images
   through one migration consent while keeping all local content recoverable.
-- [ ] Implement truthful confirmed/pending/error status and bounded reconnection
+- [x] Implement truthful confirmed/pending/error status and bounded reconnection
   retries that reuse request IDs, asset mappings, and operation receipts.
-- [ ] Retain assets needed by undo/redo and stop retries on terminal access failures.
+- [x] Retain assets needed by undo/redo and stop retries on terminal access failures.
 
 **Gate:** drawing, renaming, supported-image insert/paste/drop, offline/reconnect,
 lost responses, and undo/redo pass focused browser/API checks without manual saving.
 Obsolete presentation controls are removed in M9 after this behavior is verified.
+
+M8 is verified locally 2026-10-07: newly inserted/pasted/dropped workspace images
+automatically use durable account-journal upload intents; older unconsented files
+require one review. Immutable bytes/UUIDs, completed mappings, operation receipts
+and pending-title reconciliation survive lost responses/reload. Bounded retries
+honor server delays; offline edits resume online, and terminal access changes stop
+requests without replacing read-only status. Undo/redo retains assets and history.
+807 fast tests, 26 standard browser cases and 41 distinct real browser/API/DB cases
+passed across focused runs. Both builds, strict typechecks and the normal-data
+audit pass. No SQL/package change or deployment. Contract/commands:
+`docs/workspace-ux-m8.md`. M7/M8 remain uncommitted. Next: M9 only.
 
 ### M9 - Replace guest and workspace navigation UI
 
 **Read:** section 3's guest/workspace/sharing rules; current header/browser/account,
 title, sharing, recovery, and help components; verified M6-M8 contracts.
 
-- [ ] Show minimal guest chrome with no page management or routine save controls.
-- [ ] Build the signed-in page sidebar, New page, direct selection, inline rename,
+- [x] Show minimal guest chrome with no page management or routine save controls.
+- [x] Build the signed-in page sidebar, New page, direct selection, inline rename,
   overflow deletion, avatar menu, shared group, and contextual invitation entry.
-- [ ] Wire the current-page Share dialog and preserve actual permission behavior.
-- [ ] Remove normal-path SaveFlow/device-account browsing and duplicated notices;
+- [x] Wire the current-page Share dialog and preserve actual permission behavior.
+- [x] Remove normal-path SaveFlow/device-account browsing and duplicated notices;
   retain useful recovery actions and update help/copy/selectors.
 
 **Gate:** real guest/owner/editor/viewer journeys use the new UI and controllers;
 no fake-data wireframe or missing backend behavior stands in for a finished flow.
+
+Verified locally 2026-10-07: 75 targeted unit tests, 28 distinct standard browser
+cases and 49 distinct real browser/API/Prisma/PostgreSQL cases across final/focused
+runs. Frontend build, integration/focused test typechecks and diff checks pass.
+Normal database definitions/data are unchanged; zero disposable schemas remain.
+Guide, commands, contracts and inspected screenshots: `docs/workspace-ux-m9.md`.
+The new page action uses M3 intents/receipts; only exceptional recovery-copy creation
+keeps legacy handling. M7-M9 remain uncommitted. Next: M10 only.
 
 ### M10 - Finish canvas layout and accessibility
 
 **Read:** section 3's layout rules; Toolbar, ZoomControls, relevant viewport placement
 code, style files found by targeted search, and responsive/accessibility fixtures.
 
-- [ ] Arrange drawing tools/history, zoom, contextual styles, and compact top controls.
-- [ ] Finish mobile drawer behavior, safe areas, soft-keyboard layouts, and dark mode.
-- [ ] Verify labels, keyboard traversal, Escape/focus restoration, and shortcut isolation.
-- [ ] Check pan/zoom coordinates and pen/drag/resize behavior when chrome changes size.
+- [x] Arrange drawing tools/history, zoom, contextual styles, and compact top controls.
+- [x] Finish mobile drawer behavior, safe areas, soft-keyboard layouts, and dark mode.
+- [x] Verify labels, keyboard traversal, Escape/focus restoration, and shortcut isolation.
+- [x] Check pan/zoom coordinates and pen/drag/resize behavior when chrome changes size.
 
 **Gate:** inspected desktop/mobile screenshots and focused layout/input tests pass;
 no overlap of essential controls or regression in world-to-screen interaction.
+
+Verified locally 2026-10-07: bottom tools/history, left zoom, contextual styles,
+measured header/notice offsets, keyboard-bounded mobile drawer/dialogs, safe areas,
+focus restoration and shortcut/clipboard isolation. Seven viewport-math tests,
+38 standard browser cases and four distinct actual browser/API/Prisma/PostgreSQL
+journeys pass. Build, strict focused typecheck, diff checks and inspected screenshots
+pass. All 12 normal tables/14 rows are unchanged; zero disposable schemas remain.
+Guide/commands: `docs/workspace-ux-m10.md`. Physical/provider/full integrated gates
+remain M11. M7-M10 are included in the combined delivery authorized 2026-10-07,
+with the earlier local commits and normal Cloudflare Pages deployment.
+No SQL/Prisma/package/IndexedDB change in M10.
 
 ### M11 - Validate the integrated delivery and prepare handoff
 
@@ -667,36 +707,41 @@ by mocks alone. Record unavailable checks honestly without abandoning other work
 
 ## 9. Progress and next-session handoff
 
-M0-M6 are verified locally. M7-M11 remain pending. The next session should
-execute **M7 only**, Google sign-in and resumable guest transfer.
+M0-M10 are verified locally. M11 remains pending. The next session should
+execute **M11 only**, integrated validation and release handoff.
 
 ### Current handoff - replace after each session
 
-- Last completed milestone: M6 - verified locally 2026-10-07.
-- Next milestone: M7 - Implement Google sign-in and guest transfer.
+- Last completed milestone: M10 - verified locally 2026-10-07.
+- Next milestone: M11 - Integrated validation and release handoff. Stop after M11.
 - In-progress substep: none.
-- Changed: mounted workspace controller, passive account UI, page URL/history,
-  stable initialization, safe switching and intentional final deletion. Guest
-  recovery waits during navigation; hidden/inert canvas keeps its size/viewport.
-  M4-M6 are included in the combined commit authorized 2026-10-07;
-  M0-M3 were previously committed.
-- Verified: 136 focused cases, 40 standard browser regressions and 15 real browser/
-  API/Prisma/PostgreSQL cases. Both builds, strict touched-test/fixture typechecks
-  and diff checks pass. Exact commands/contract: `docs/workspace-ux-m6.md`.
-- Contract: URL -> last accessible -> owned/shared fallback; current document/role
-  reads before open, serialized preference PATCH afterward. Service errors retain
-  identity; confirmed expiry preserves journals and clears private access. Persist
-  initialization UUID/mode before dispatch; final deletion never recreates defaults.
-- Boundaries: M7 supplies durable consent/account-bound transfer to the entry-intent
-  hook. Transfer mode suppresses defaults; explicit page/invitation has priority.
-  Keep M2 v4 journals, M3/M4 receipts, M5 immutable uploads and the pen renderer.
-  Legacy manual creation/upload controls remain until M8/M9.
-- Blockers: none. No new SQL migration. All 12 normal tables/14 rows retain identical
-  fingerprints; zero browser schemas remain. Evidence:
-  `workspace-ux-evidence/m6-database-isolation.json`. Docker 5434 is running.
-  No normal/production migration, provider change, push or deployment.
-- Next read: M7 block, section 3 sign-in/transfer rules, account UI, workspace
-  entry-intent hook and M3/M5 adapters. Next SQL: 12. Physical IME/sleep: M11.
+- Changed: bottom drawing tools/history, bottom-left zoom, desktop right styles,
+  compact mobile settings, measured header/notice spacing, safe areas and native
+  dialogs bounded by the visual viewport. Mobile appearance replaces the action
+  row while open. More tools uses radio menu semantics. Escape restores focus;
+  toolbar/menu/dialog keyboard and clipboard events stay isolated from the canvas.
+- Contract: layout remains an overlay; canvas size/origin and established center
+  resize behavior stay intact. Keep M2 journals, M3/M4 creation receipts, M5 assets,
+  M6 lifecycle, M7 consent, M8 saving/pen behavior and M9's persisted New page flow.
+- Verified: seven viewport-math tests, 38 standard browser cases, four distinct
+  actual browser/API/Prisma/PostgreSQL journeys, frontend build, strict focused
+  typecheck, diff checks and inspected desktop/mobile screenshots. Guide/commands:
+  `docs/workspace-ux-m10.md`. Local auth/provider fixtures are controlled.
+- Boundaries: no API/SQL/Prisma/package/IndexedDB-format change; next SQL remains
+  12. All 12 normal tables/14 rows are unchanged; zero disposable schemas remain:
+  `workspace-ux-evidence/m10-database-isolation.json`. Docker/5434 remain running.
+- Next read: M11 block, section 7 matrix, section 8 release boundaries and compact
+  milestone guides. Consolidate historical manual-provider fixtures with automatic
+  save journeys. Full integrated, physical keyboard/IME/sleep, screen-reader,
+  browser chrome zoom and live-provider acceptance remain pending. All pending
+  updates and earlier local commits are included in the commit/push and normal
+  Cloudflare Pages deployment authorized 2026-10-07. The combined checkout passes
+  811 fast tests and the backend build. The backend release was also authorized:
+  Neon database `scribble` has SQL 1-11 with unchanged existing application data
+  and an encrypted backup. The user chose to deploy through Render's dashboard;
+  the live workspace API remains pending that deploy. `docs/workspace-ux-release.md`
+  records this release separately from M11. Rollback retains the
+  M8-aware v4 parser; exceptional copies keep legacy unknown-creation handling.
 
 Keep this current handoff around 150-250 words or less. Capture exact test commands
 and results, relevant migrations/API/journal decisions, current file locations, any

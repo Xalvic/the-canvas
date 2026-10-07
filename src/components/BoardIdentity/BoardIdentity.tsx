@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import {
   DEFAULT_BOARD_TITLE,
   useBoardStore,
@@ -9,9 +9,15 @@ export function BoardIdentity({ location }: { location?: string }) {
   const readOnly = useBoardStore((state) => state.readOnly);
   const isHydrated = useBoardStore((state) => state.isHydrated);
   const setTitle = useBoardStore((state) => state.setTitle);
+  const account = useBoardStore((state) => state.account);
+  const [draft, setDraft] = useState<string | null>(null);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter" || event.key === "Escape") {
+    if (event.key === "Escape") {
+      setDraft(null);
+      event.currentTarget.value = title;
+      event.currentTarget.blur();
+    } else if (event.key === "Enter" && !event.nativeEvent.isComposing) {
       event.currentTarget.blur();
     }
   };
@@ -30,16 +36,17 @@ export function BoardIdentity({ location }: { location?: string }) {
       <div className="board-identity-copy">
         <input
           className="board-title-input"
-          aria-label="Board title"
-          value={title}
+          aria-label={account ? "Page title" : "Drawing title"}
+          value={draft ?? title}
           disabled={!isHydrated || readOnly}
-          maxLength={80}
+          maxLength={120}
           size={Math.min(18, Math.max(8, title.length))}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={(event) => {
             const nextTitle = event.currentTarget.value.trim();
             setTitle(nextTitle || DEFAULT_BOARD_TITLE);
+            setDraft(null);
           }}
           onFocus={(event) => event.currentTarget.select()}
         />

@@ -36,6 +36,20 @@ describe("private board HTTP access", () => {
     ["get", `/api/boards/${id}/document`], ["put", `/api/boards/${id}/document`],
   ] as const;
 
+  it.each([...routes, ["post", `/api/boards/${id}/assets`], ["post", `/api/boards/${id}/operations`], ["get", `/api/boards/${id}/asset-uploads/${id}`]] as const)
+    ("rejects a changed account for %s %s before parsing or writing", async (method, path) => {
+      const { app, boards, get, save } = setup(); const create = vi.spyOn(boards, "create");
+      const response = await request(app)[method](path).set("Cookie", otherCookie).set("X-Scribble-Account", owner.id)
+        .set("X-Scribble-Request", "1").set("Content-Type", "application/json").send("{").expect(409);
+      expect(response.body.error.code).toBe("ACCOUNT_CHANGED");
+      expect(create).not.toHaveBeenCalled(); expect(get).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled();
+    });
+  it("accepts matching account guards and rejects malformed account headers", async () => {
+    const { app } = setup();
+    await request(app).get("/api/boards").set("Cookie", cookie).set("X-Scribble-Account", owner.id).expect(200);
+    await request(app).get("/api/boards").set("Cookie", cookie).set("X-Scribble-Account", "bad").expect(409);
+  });
+
   it.each(routes)("requires authentication for %s %s even without Google configured", async (method, path) => {
     const { app, boards, get, save } = setup();
     const list = vi.spyOn(boards, "list");

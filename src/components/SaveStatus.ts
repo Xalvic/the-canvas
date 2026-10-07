@@ -27,10 +27,12 @@ export function savePresentation(input: StatusInput) {
   if (cloud === "signed-out") return { label: "Sign in to sync this board", attention: true };
   if (cloud === "error") return { label: local === "saved" ? "Account save failed · saved on this device" : "Account save failed", attention: true };
   if (account && role === "viewer") return { label: "Can view · account board", attention: recovery };
+  if (account && cloud === "consent") return { label: "Older images need upload consent", attention: true };
+  if (account && cloud === "pending") return { label: local === "saved" ? "Changes pending · saved on this device" : "Changes pending", attention: false };
+  if (account && cloud === "saving") return { label: "Saving to account…", attention: false };
   if (account && pendingImages > 0) return { label: `${pendingImages} ${pendingImages === 1 ? "image" : "images"} waiting to upload`, attention: true };
   if (local === "saving") return { label: "Saving on this device…", attention: false };
   if (!account) return { label: "Saved on this device", attention: recovery };
-  if (cloud === "saving") return { label: "Saving to account…", attention: false };
   if (cloud === "unsaved" || cloud === "local") return { label: "Changes waiting to save", attention: false };
   return { label: "Saved to account", attention: recovery };
 }
