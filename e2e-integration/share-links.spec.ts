@@ -150,6 +150,7 @@ test("navigation fences a delayed Share response and preserves edited work", asy
   await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { (window as unknown as { writes: number }).writes = ((window as unknown as { writes?: number }).writes ?? 0) + 1; } } }); });
   await page.route("**/share-link/copy", async (route) => { const response = await route.fetch(); dispatched = true; await wait; await route.fulfill({ response }).catch(() => {}); });
   await editNote(page, "Link baseline", "Saved before Share"); await flushLocalDraft(page);
+  await expect.poll(async () => (await state(context.request, id)).document!.content.objects[0]).toMatchObject({ title: "Saved before Share" });
   await page.getByRole("button", { name: "Share", exact: true }).click(); await expect.poll(() => dispatched).toBe(true);
   await page.getByRole("button", { name: "+ New page", exact: true }).click();
   await expect.poll(async () => (await canvasState(page)).account?.boardId).not.toBe(id); release();
