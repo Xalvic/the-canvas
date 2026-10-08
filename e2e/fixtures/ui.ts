@@ -5,10 +5,15 @@ export async function closeDialogs(page: Page) {
 }
 export async function browse(page: Page, category = "My pages") {
   await closeDialogs(page);
-  await expect(page.getByRole("button", { name: "Pages", exact: true })).toBeVisible();
-  if (!await page.locator(".page-sidebar").isVisible()) {
-    await page.getByRole("button", { name: "Pages", exact: true }).click();
+  const trigger = page.getByRole("button", { name: "Pages", exact: true });
+  await expect(trigger).toBeVisible();
+  const mobile = await page.evaluate(() => window.matchMedia("(max-width: 1100px)").matches);
+  if (mobile) await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+  else await expect(trigger).not.toHaveAttribute("aria-haspopup");
+  if (await trigger.getAttribute("aria-expanded") !== "true") {
+    await trigger.click();
   }
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".page-sidebar")).toBeVisible();
   if (category === "Invitations") await page.locator(".sidebar-footer").getByRole("button", { name: /^Invitations/ }).click();
 }
@@ -34,15 +39,13 @@ export async function backToDevice(page: Page) {
 export async function newAccountBoard(page: Page) {
   await browse(page);
   const getBoardId = () => page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().account?.boardId);
-  await expect.poll(getBoardId).toBeTruthy();
-  const previous = await getBoardId();
-  const created = page.waitForResponse(async (response) => {
-    if (response.request().method() !== "POST" || new URL(response.url()).pathname !== "/api/boards" || response.status() !== 201) return false;
-    return (await response.json()).board.id !== previous;
-  });
+  const createRequest = page.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname === "/api/boards");
   await page.getByRole("button", { name: "+ New page", exact: true }).click();
-  const creation = await created;
-  const { board } = await creation.json();
+  const request = await createRequest;
+  const creation = await request.response();
+  expect(creation).not.toBeNull();
+  expect(creation!.ok()).toBeTruthy();
+  const { board } = await creation!.json();
   await expect.poll(getBoardId).toBe(board.id);
   await expect(page.getByLabel("Page title", { exact: true })).toHaveValue("Untitled");
 }

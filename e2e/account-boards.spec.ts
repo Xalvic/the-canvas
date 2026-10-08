@@ -121,7 +121,7 @@ test("signing in lists owned boards without uploading or changing guest IndexedD
   cloud.signedIn = true;
   await page.reload(); await backToDevice(page);
   await restoreAccount(page, cloud); await browse(page);
-  await expect(page.getByText("Account sketch", { exact: true })).toBeVisible();
+  await expect(page.locator(".page-list").getByText("Account sketch", { exact: true })).toBeVisible();
   await closeDialogs(page);
   await expect(page.getByLabel("Page title")).toHaveValue("Account sketch");
   expect(Object.values((await canvasState(page)).objects)).toEqual(cloud.boards.get(firstId)!.document!.content.objects);
@@ -477,7 +477,7 @@ test("reconnect refreshes the page list while automatically saving the active lo
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before reconnect"), savedBoard(secondId, "Another page")]);
   await page.goto("/scribble/"); await backToDevice(page);
   await restoreAccount(page, cloud); await browse(page);
-  await expect(page.getByText("Before reconnect", { exact: true })).toBeVisible();
+  await expect(page.locator(".page-list").getByText("Before reconnect", { exact: true })).toBeVisible();
   await closeDialogs(page);
   await page.context().setOffline(true);
   await page.getByLabel(/^(Page|Drawing) title$/).fill("Local reconnect draft"); await page.getByLabel(/^(Page|Drawing) title$/).press("Enter");
@@ -495,7 +495,7 @@ test("an older list refresh cannot roll back an acknowledged rename", async ({ p
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before rename")]);
   await page.goto("/scribble/"); await backToDevice(page);
   await restoreAccount(page, cloud); await browse(page);
-  await expect(page.getByText("Before rename", { exact: true })).toBeVisible();
+  await expect(page.locator(".page-list").getByText("Before rename", { exact: true })).toBeVisible();
   let release!: () => void;
   let started!: () => void;
   cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
@@ -509,11 +509,11 @@ test("an older list refresh cannot roll back an acknowledged rename", async ({ p
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   await page.getByRole("textbox", { name: "Rename Before rename", exact: true }).fill("Acknowledged rename");
   await page.getByRole("textbox", { name: "Rename Before rename", exact: true }).press("Enter");
-  await expect(page.getByText("Acknowledged rename", { exact: true })).toBeVisible();
+  await expect(page.locator(".page-list").getByText("Acknowledged rename", { exact: true })).toBeVisible();
   await expect.poll(() => cloud.boards.get(firstId)!.title).toBe("Acknowledged rename");
   release();
   await expect(page.locator(".page-list").getByText("Before rename", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Acknowledged rename", { exact: true })).toBeVisible();
+  await expect(page.locator(".page-list").getByText("Acknowledged rename", { exact: true })).toBeVisible();
   expect(cloud.mutations.map((mutation) => mutation.method)).toEqual(["PATCH"]);
 });
 
