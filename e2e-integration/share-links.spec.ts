@@ -214,7 +214,8 @@ test("a transient recipient failure offers Retry, while invalid/stopped links re
     await expect(recipient.getByText(title, { exact: true })).toHaveCount(0); await expect(entry).not.toContainText("Ask its owner");
     await entry.getByRole("button", { name: "Retry shared page" }).click(); await expect(recipient.getByLabel("Page title")).toHaveValue(title);
     const dialog = await settings(page); await dialog.getByRole("button", { name: "Stop sharing", exact: true }).click(); await expect(dialog.getByText("Link sharing is off.", { exact: true })).toBeVisible();
-    await recipient.goto("/scribble/"); await openLink(recipient, url); await expect(entry).toContainText("Ask its owner for a current link");
+    await recipient.goto("/scribble/"); await expect(recipient.locator(".account-trigger")).not.toHaveText("Connecting…");
+    await openLink(recipient, url); await expect(entry).toContainText("Ask its owner for a current link");
     expect((await recipientContext.request.get(`${BASE_URL}/api/boards/${id}/document`)).status()).toBe(404);
     await recipient.evaluate(() => { window.location.hash = "share=invalid"; }); await expect(entry).toContainText("Check the original link");
   } finally { await recipientContext.close(); }

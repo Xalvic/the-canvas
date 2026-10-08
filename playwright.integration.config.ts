@@ -19,7 +19,7 @@ export default defineConfig({
     {
       command: "node --env-file=.env.docker --import tsx scripts/e2e-api-fixture.ts",
       url: "http://127.0.0.1:4301/health",
-      env: { API_PORT: "4301", SCRIBBLE_E2E_FIXTURE: "1", SCRIBBLE_FIXTURE_TOKEN: process.env.SCRIBBLE_FIXTURE_TOKEN },
+      env: { API_PORT: "4301", SCRIBBLE_E2E_FIXTURE: "1", SCRIBBLE_E2E_SHARE_LINKS: "1", SCRIBBLE_FIXTURE_TOKEN: process.env.SCRIBBLE_FIXTURE_TOKEN },
       reuseExistingServer: false,
       timeout: 30_000,
     },

@@ -33,9 +33,17 @@ export async function backToDevice(page: Page) {
 }
 export async function newAccountBoard(page: Page) {
   await browse(page);
-  const previous = await page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().account?.boardId);
+  const getBoardId = () => page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().account?.boardId);
+  await expect.poll(getBoardId).toBeTruthy();
+  const previous = await getBoardId();
+  const created = page.waitForResponse(async (response) => {
+    if (response.request().method() !== "POST" || new URL(response.url()).pathname !== "/api/boards" || response.status() !== 201) return false;
+    return (await response.json()).board.id !== previous;
+  });
   await page.getByRole("button", { name: "+ New page", exact: true }).click();
-  await expect.poll(() => page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().account?.boardId)).not.toBe(previous);
+  const creation = await created;
+  const { board } = await creation.json();
+  await expect.poll(getBoardId).toBe(board.id);
   await expect(page.getByLabel("Page title", { exact: true })).toHaveValue("Untitled");
 }
 export async function explicitSave(page: Page, kind: "Save a copy" | "Allow image upload") {
