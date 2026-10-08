@@ -1,10 +1,16 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: {
+    error: { code: "UNAUTHENTICATED", details: { googleSignInEnabled: true } },
+  } }));
+});
+
 test("legacy board styles stay independent of saved tool preferences, including zero opacity", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await page.evaluate(async () => {
     const storePath = "/scribble/src/store/documentStore.ts";
     const preferencePath = "/scribble/src/store/toolPreferencesStore.ts";
@@ -65,7 +71,7 @@ test("legacy board styles stay independent of saved tool preferences, including 
   });
   await page.waitForTimeout(900);
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await expect(page.locator(".stroke-shape")).toHaveCount(2);
   await expect(page.locator(".text-object-value")).toHaveCSS("opacity", "1");
   await expect(page.locator(".text-object-value")).toHaveCSS(
@@ -108,7 +114,7 @@ test("legacy board styles stay independent of saved tool preferences, including 
   await page.getByRole("button", { name: "Close appearance" }).click();
   await page.waitForTimeout(900);
   await page.reload();
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await expect(
     page.locator('[data-stroke-object-id="old-stroke"] .stroke-shape'),
   ).toHaveAttribute("opacity", "0");
@@ -121,7 +127,7 @@ test("shows actual storage failures and cancels unfinished creation without hist
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   await page.getByRole("button", { name: "Frame tool", exact: true }).click();
   await page.mouse.move(150, 500);
   await page.mouse.down();
@@ -140,7 +146,8 @@ test("shows actual storage failures and cancels unfinished creation without hist
       throw new DOMException("Storage full", "QuotaExceededError");
     };
   });
-  await page.getByLabel("Board title").fill("Changed title");
-  await expect(page.locator(".save-status")).toHaveText("Couldn’t save on this device");
+  await page.getByLabel("Drawing title").fill("Changed title");
+  await page.getByLabel("Drawing title").press("Enter");
+  await expect(page.locator(".save-status")).toHaveCount(0);
   await expect(page.locator(".board-notice")).toContainText("Couldn’t save on this device");
 });

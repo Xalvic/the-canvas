@@ -2,8 +2,17 @@ import { Prisma } from "./generated/prisma/client.js";
 import { HttpError } from "./errors.js";
 import type { BoardRole } from "./boards.js";
 
+const linkRoleSql = (userId: string) => Prisma.sql`(
+  SELECT l.role FROM board_share_links l
+  JOIN board_share_link_grants g ON g.board_id = l.board_id AND g.generation = l.generation
+  WHERE l.board_id = b.id AND l.enabled AND g.user_id = ${userId}::uuid
+)`;
+
 export const boardRoleSql = (userId: string) => Prisma.sql`
-  CASE WHEN b.owner_id = ${userId}::uuid THEN 'owner' ELSE m.role END
+  CASE WHEN b.owner_id = ${userId}::uuid THEN 'owner'
+    WHEN m.role = 'editor' OR ${linkRoleSql(userId)} = 'editor' THEN 'editor'
+    WHEN m.role = 'viewer' OR ${linkRoleSql(userId)} = 'viewer' THEN 'viewer'
+    ELSE NULL END
 `;
 
 export async function lockBoardAccess(tx: Prisma.TransactionClient, boardId: string, userId: string, required: "read" | "edit" | "owner", readLock: "share" | "update" = "update") {
@@ -16,10 +25,14 @@ export async function lockBoardAccess(tx: Prisma.TransactionClient, boardId: str
   `;
   const board = boards[0];
   if (!board || !board.owner_id) return undefined;
-  const member = board.owner_id === userId ? null : await tx.boardMember.findUnique({
-    where: { boardId_userId: { boardId, userId } }, select: { role: true },
-  });
-  const role = board.owner_id === userId ? "owner" : member?.role;
+  // A fresh statement after the parent lock observes committed revocations and
+  // downgrades, including when this transaction had to wait for the owner.
+  const [effective] = await tx.$queryRaw<{ role: BoardRole | null }[]>`
+    SELECT ${boardRoleSql(userId)} AS role FROM boards b
+    LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${userId}::uuid
+    WHERE b.id = ${boardId}::uuid
+  `;
+  const role = effective?.role;
   if (role !== "owner" && role !== "editor" && role !== "viewer") return undefined;
   if ((required === "owner" && role !== "owner") || (required === "edit" && role === "viewer")) {
     throw new HttpError(403, "BOARD_FORBIDDEN", required === "owner" ? "Only the owner can manage this board" : "This board is read-only");

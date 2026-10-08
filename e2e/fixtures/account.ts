@@ -28,6 +28,7 @@ export async function mockAccount(page: Page, initial: SavedBoard[] = []) {
   const receipts = new Map<string, string>();
   const cloud = {
     signedIn: true,
+    shareLinksEnabled: false,
     failSaves: false,
     failLists: false,
     loseNextSaveResponse: false,
@@ -51,7 +52,7 @@ export async function mockAccount(page: Page, initial: SavedBoard[] = []) {
     await route.fulfill({ json: { workspace: { initialized: true, lastOpenedBoardId: accessible } } });
   });
   await page.route("**/api/invitations", (route) => route.fulfill({ json: { invitations: [] } }));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user, capabilities: { guestTransfer: 1 } } : guest }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ status: cloud.signedIn ? 200 : 401, json: cloud.signedIn ? { user, capabilities: { guestTransfer: 1, ...(cloud.shareLinksEnabled ? { shareLinks: 1 } : {}) } } : guest }));
   await page.route("**/api/auth/logout", (route) => {
     cloud.signedIn = false;
     return route.fulfill({ status: 204 });

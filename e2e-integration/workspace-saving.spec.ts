@@ -7,7 +7,7 @@ async function workspacePage(page: Page) {
   await signIn(page.context().request);
   await page.goto("/scribble/");
   await expect(page.getByLabel("Page title")).toBeVisible();
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   return (await canvasState(page)).account!.boardId;
 }
 async function image(page: Page, mime = "image/png", source = "drop") {
@@ -24,7 +24,7 @@ async function image(page: Page, mime = "image/png", source = "drop") {
 async function history(page: Page, action: "undo" | "redo") {
   await page.evaluate(async (action) => (await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts")).useDocumentStore.getState()[action](), action);
 }
-async function saved(page: Page) { await expect(page.locator(".save-status")).toHaveText("Saved to account", { timeout: 20_000 }); }
+async function saved(page: Page) { await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account", { timeout: 20_000 }); }
 
 test("drawing and page title save automatically and preserve zoom, pan and atomic undo", async ({ page, context }) => {
   const id = await workspacePage(page);
@@ -65,8 +65,8 @@ for (const [mime, source] of [["image/png", "drop"], ["image/jpeg", "paste"], ["
 test("offline image and title changes stay local and save on reconnect without a button", async ({ page, context }) => {
   const id = await workspacePage(page); await context.setOffline(true);
   await page.getByLabel("Page title").fill("Offline page edits"); await page.getByLabel("Page title").press("Enter"); await image(page);
-  await expect(page.locator(".save-status")).toHaveText("Changes pending · saved on this device");
-  await page.screenshot({ path: "workspace-ux-evidence/m9-offline-pending.png" });
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Changes pending · saved on this device");
+  await page.screenshot({ path: "workspace-ux-evidence/m11-offline-pending.png" });
   await flushLocalDraft(page);
   expect((await state(context.request, id)).assets).toHaveLength(0);
   await context.setOffline(false); await saved(page);
@@ -129,7 +129,7 @@ test("legacy unconsented files show one review and upload only after consent", a
   await page.getByRole("button", { name: "Review image upload" }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   expect((await state(context.request, id)).assets).toHaveLength(0);
-  await explicitSave(page, "Upload and save"); await saved(page);
+  await explicitSave(page, "Allow image upload"); await saved(page);
   await page.reload(); await saved(page);
   await expect(page.getByRole("button", { name: "Review image upload" })).toHaveCount(0);
   expect((await state(context.request, id)).assets).toHaveLength(1);
@@ -171,7 +171,7 @@ test("revoked editing access stops automatic image requests and preserves the fi
       posts++; await membership(context.request, id, editor.user.id, "viewer"); await route.continue();
     });
     await image(tab);
-    await expect(tab.locator(".save-status")).toHaveText("Can view · account board");
+    await expect(tab.locator(".save-status")).toHaveAccessibleName("Can view · account board");
     expect(posts).toBe(1);
     expect((await canvasState(tab)).objects).toHaveLength(1);
     expect((await state(context.request, id)).assets).toHaveLength(0);

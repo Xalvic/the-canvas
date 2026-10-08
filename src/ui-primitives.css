@@ -1,0 +1,140 @@
+/* Native controls share presentation. Canvas editors and tool-dock geometry are excluded. */
+:is(.ui-button:where(:not(.tool-button)), .workspace-controls button, .board-notice button, .app-dialog button,
+    .page-sidebar button, .board-sharing button, .workspace-gate button,
+    .invitation-entry button, .server-boards-refresh, .account-google) {
+  min-height: var(--control-size);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-control);
+  line-height: var(--line-height-ui);
+  cursor: pointer;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+:is(.ui-button:where(:not(.tool-button)), .workspace-controls button, .board-notice button, .app-dialog button,
+    .page-sidebar button, .board-sharing button, .workspace-gate button,
+    .invitation-entry button, .server-boards-refresh, .account-google):hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--surface-hover);
+}
+
+:is(.ui-button:where(:not(.tool-button)), .workspace-controls button, .board-notice button, .app-dialog button,
+    .page-sidebar button, .board-sharing button, .workspace-gate button,
+    .invitation-entry button, .server-boards-refresh, .account-google):is(:disabled, [aria-disabled="true"]) {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+:is(.ui-button, .workspace-controls button, .app-dialog button, .board-sharing button).primary-action,
+.account-google {
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-weight: var(--weight-strong);
+}
+
+:is(.ui-button, .workspace-controls button, .app-dialog button, .board-sharing button).primary-action:hover:not(:disabled),
+.account-google:hover:not([aria-disabled="true"]) {
+  background: var(--accent-hover);
+}
+
+:is(.ui-button, .page-sidebar button, .app-dialog button).danger-action {
+  color: var(--danger);
+}
+
+:is(.ui-button, .page-sidebar button, .app-dialog button).danger-action:hover:not(:disabled) {
+  background: var(--danger-surface);
+}
+
+/* Checkbox/range controls retain their native geometry and explicit consent semantics. */
+:is(.ui-input, .dialog-field input, .dialog-field select, .dialog-field textarea,
+    .board-sharing input, .board-sharing select, .sidebar-search input, .page-rename) {
+  min-width: 0;
+  width: 100%;
+  min-height: var(--control-size);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--font-size-control);
+  line-height: var(--line-height-ui);
+}
+
+:is(.ui-input, .dialog-field input, .dialog-field textarea, .sidebar-search input)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+:is(.ui-input, .dialog-field input, .dialog-field select, .dialog-field textarea,
+    .board-sharing input, .board-sharing select, .sidebar-search input, .page-rename):disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+:is(.ui-button, .ui-input, .workspace-controls, .board-notice, .app-dialog, .page-sidebar,
+    .board-sharing, .workspace-gate, .invitation-entry, .toolbar-area, .tool-options,
+    .zoom-dock, .server-boards) :is(button, input, select, textarea, a[href], summary):focus-visible,
+:is(.ui-button, .ui-input, .server-boards-refresh, .account-google):focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-offset);
+}
+
+/* Inset focus remains visible inside bounded scrolling surfaces. */
+:is(.popup-menu, .tool-options, .mobile-selection-actions) button:focus-visible {
+  outline-offset: calc(-1 * var(--focus-width));
+}
+
+:is(.ui-button:where(:not(.tool-button)), .workspace-controls button, .app-dialog button, .popup-menu button) svg {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  stroke-width: 1.8;
+}
+
+.ui-status { padding: var(--space-2) var(--space-3); }
+
+:is(.ui-status, .board-notice),
+:is(.ui-status, .board-notice)[data-tone] {
+  --status-text: var(--text-secondary);
+  --status-surface: var(--surface);
+  color: var(--status-text);
+  background: var(--status-surface);
+  border-radius: var(--radius-surface);
+  font-size: var(--font-size-label);
+  line-height: var(--line-height-ui);
+}
+
+:is(.ui-status, .board-notice)[data-tone="pending"] {
+  --status-text: var(--warning);
+  --status-surface: var(--warning-surface);
+}
+
+:is(.ui-status, .board-notice)[data-tone="error"] {
+  --status-text: var(--danger);
+  --status-surface: var(--danger-surface);
+}
+
+.ui-status[data-tone="success"] {
+  --status-text: var(--success);
+  --status-surface: var(--success-surface);
+}
+
+:is(.app-dialog, .page-sidebar, .workspace-gate) [role="alert"],
+.server-boards-error {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(button.ui-button, a.account-google, button.server-boards-refresh),
+  :is(.workspace-controls, .board-notice, .app-dialog, .page-sidebar, .board-sharing,
+      .workspace-gate, .invitation-entry, .toolbar-area, .tool-options, .zoom-dock)
+      :is(button, input, select, textarea, a[href], summary, .tool-tooltip) {
+    transition: none;
+    animation: none;
+    scroll-behavior: auto;
+  }
+}

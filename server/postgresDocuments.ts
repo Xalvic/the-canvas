@@ -33,7 +33,7 @@ export function createPostgresDocumentStore(prisma: PrismaClient): BoardDocument
         FROM boards b LEFT JOIN board_documents d ON d.board_id = b.id
         LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${ownerId}::uuid
         WHERE b.id = ${boardId}::uuid AND b.owner_id IS NOT NULL
-          AND (b.owner_id = ${ownerId}::uuid OR m.role IN ('editor', 'viewer'))
+          AND (${boardRoleSql(ownerId)}) IS NOT NULL
       `;
       const row = rows[0];
       if (!row) return { status: "board-not-found" };

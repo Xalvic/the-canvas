@@ -27,6 +27,8 @@ model Board {
   operationReceipts BoardOperationReceipt[]
   creationReceipts BoardCreationReceipt[]
   lastOpenedWorkspaces WorkspaceState[]
+  shareLink BoardShareLink?
+  shareLinkReceipts BoardShareLinkReceipt[]
 
   @@index([ownerId, createdAt, id], map: "boards_owner_created_idx", where: raw("(owner_id IS NOT NULL)"))
   @@map("boards")
@@ -57,6 +59,8 @@ model User {
   creationReceipts BoardCreationReceipt[]
   workspace WorkspaceState?
   workspaceInitializations WorkspaceInitializationReceipt[]
+  shareLinkGrants BoardShareLinkGrant[]
+  shareLinkReceipts BoardShareLinkReceipt[]
 
   @@map("users")
 }
@@ -110,6 +114,51 @@ model BoardInvitation {
   @@unique([boardId, email], map: "board_invitations_board_id_email_key")
   @@index([email, expiresAt], map: "board_invitations_email_expires_idx")
   @@map("board_invitations")
+}
+
+model BoardShareLink {
+  boardId String @id @map("board_id") @db.Uuid
+  enabled Boolean @default(false)
+  role String @default("viewer")
+  generation Int @default(0)
+  settingsVersion Int @default(0) @map("settings_version")
+  tokenHash String? @unique(map: "board_share_links_token_hash_key") @map("token_hash")
+  tokenCiphertext String? @map("token_ciphertext")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  grants BoardShareLinkGrant[]
+
+  @@map("board_share_links")
+}
+
+model BoardShareLinkGrant {
+  boardId String @map("board_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  generation Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  link BoardShareLink @relation(fields: [boardId], references: [boardId], onDelete: Cascade, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([boardId, userId])
+  @@index([userId, boardId], map: "board_share_link_grants_user_idx")
+  @@map("board_share_link_grants")
+}
+
+model BoardShareLinkReceipt {
+  boardId String @map("board_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  requestId String @map("request_id") @db.Uuid
+  payloadHash String @map("payload_hash")
+  settingsVersion Int @map("settings_version")
+  createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(6)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([boardId, actorId, requestId])
+  @@index([actorId, createdAt], map: "board_share_link_receipts_actor_created_idx")
+  @@map("board_share_link_receipts")
 }
 
 model BoardAsset {

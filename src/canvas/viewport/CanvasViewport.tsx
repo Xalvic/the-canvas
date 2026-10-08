@@ -154,7 +154,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 function isChromeTarget(target: EventTarget | null): boolean {
   return !!document.querySelector("dialog[open]") || target instanceof Element &&
-    !!target.closest(".board-header, .page-sidebar, .toolbar-area, .tool-options, .mobile-selection-actions, .zoom-dock");
+    !!target.closest(".workspace-controls, .workspace-account-corner, .board-notice, .page-sidebar, .toolbar-area, .tool-options, .mobile-selection-actions, .zoom-dock");
 }
 
 function normalizedWheelDelta(event: WheelEvent): Point {
@@ -227,9 +227,6 @@ export function CanvasViewport() {
     const object = objects[id];
     return object !== undefined && isFrameObject(object);
   });
-  const selectedStrokeIds = [...selectedIds].filter(
-    (id) => objects[id]?.type === "stroke",
-  );
 
   const showCanvasNotice = useCallback((message: string) => {
     setCanvasNotice(message);
@@ -1853,19 +1850,13 @@ export function CanvasViewport() {
         aria-hidden="true"
       />
 
-      {isBoardHydrated && objectCount === 0 && (
+      {isBoardHydrated && objectCount === 0 && activeTool === "select" && (
         <div className="empty-prompt" aria-hidden="true">
-          <span className="empty-prompt-icon">+</span>
           <div className="empty-prompt-content">
-            <strong>Start creating</strong>
+            <strong>{readOnly ? "This page is empty" : "Start creating"}</strong>
             <span className="empty-prompt-copy">
-              Double-click for a note, or choose a drawing tool
+              {readOnly ? "You have view access" : "Double-click for a note, or choose a drawing tool"}
             </span>
-            <div className="empty-prompt-tools">
-              <span><kbd>N</kbd> Note</span>
-              <span><kbd>T</kbd> Text</span>
-              <span><kbd>P</kbd> Pen</span>
-            </div>
           </div>
         </div>
       )}
@@ -1890,108 +1881,17 @@ export function CanvasViewport() {
         <Toolbar />
       </div>
 
-      <aside className="canvas-hint" aria-label="Canvas navigation help">
-        {readOnly && <span><strong>Read-only</strong> · Select and copy · Space-drag to pan</span>}
-        {!readOnly && activeTool === "select" && (
-          <>
-            {selectedCount === 1 && selectedConnectorIds.length === 1 ? (
-              <>
-                <span><strong>Drag an endpoint</strong> to reconnect</span>
-                <i aria-hidden="true" />
-                <span><strong>A</strong> toggle arrow</span>
-                <i aria-hidden="true" />
-                <span><strong>Delete</strong> remove</span>
-              </>
-            ) : selectedCount === 1 && selectedStrokeIds.length === 1 ? (
-              <>
-                <span><strong>Drag</strong> to move stroke</span>
-                <i aria-hidden="true" />
-                <span><strong>Ctrl/⌘ D</strong> duplicate</span>
-                <i aria-hidden="true" />
-                <span><strong>Delete</strong> remove stroke</span>
-              </>
-            ) : selectedCount === 1 && selectedFrameIds.length === 1 ? (
-              <>
-                <span><strong>Double-click title</strong> to rename</span>
-                <i aria-hidden="true" />
-                <span><strong>M</strong> toggle moving contents</span>
-                <i aria-hidden="true" />
-                <span><strong>Delete</strong> remove frame</span>
-              </>
-            ) : selectedGroupIds.size > 0 ? (
-              <>
-                <span><strong>Drag any member</strong> to move group</span>
-                <i aria-hidden="true" />
-                <span><strong>Ctrl/⌘ Shift G</strong> ungroup</span>
-                <i aria-hidden="true" />
-                <span><strong>Delete</strong> remove</span>
-              </>
-            ) : selectedCount > 0 ? (
-              <>
-                <span><strong>Ctrl/⌘ G</strong> group selection</span>
-                <i aria-hidden="true" />
-                <span><strong>Ctrl/⌘ C · V</strong> copy and paste</span>
-                <i aria-hidden="true" />
-                <span><strong>Delete</strong> remove</span>
-              </>
-            ) : (
-              <>
-                <span><strong>Drag empty space</strong> to select</span>
-                <i aria-hidden="true" />
-                <span><strong>Space-drag</strong> to pan</span>
-              </>
-            )}
-          </>
-        )}
-        {activeTool === "hand" && (
-          <>
-            <span><strong>Drag</strong> to pan</span>
-            <i aria-hidden="true" />
-            <span><strong>Scroll</strong> to move around</span>
-          </>
-        )}
-        {activeTool === "card" && (
-          <>
-            <span><strong>Click empty space</strong> to add a note</span>
-            <i aria-hidden="true" />
-            <span><strong>Esc</strong> to return to Select</span>
-          </>
-        )}
-        {activeTool === "text" && (
-          <>
-            <span><strong>Click empty space</strong> to add text</span>
-            <i aria-hidden="true" />
-            <span><strong>Esc</strong> to return to Select</span>
-          </>
-        )}
-        {activeTool === "connector" && (
-          <>
-            <span><strong>Drag from an anchor</strong> to connect</span>
-            <i aria-hidden="true" />
-            <span><strong>Shift-drag</strong> for no arrow</span>
-            <i aria-hidden="true" />
-            <span><strong>Esc</strong> to Select</span>
-          </>
-        )}
-        {activeTool === "frame" && (
-          <>
-            <span><strong>Drag empty space</strong> to draw a frame</span>
-            <i aria-hidden="true" />
-            <span><strong>Click</strong> for a default frame</span>
-            <i aria-hidden="true" />
-            <span><strong>Esc</strong> to Select</span>
-          </>
-        )}
-        {activeTool === "pen" && (
-          <>
-            <span><strong>Drag</strong> to draw</span>
-            <i aria-hidden="true" />
-            <span><strong>Stylus pressure</strong> supported</span>
-            <i aria-hidden="true" />
-            <span><strong>Esc</strong> to Select</span>
-          </>
-        )}
-      </aside>
+      {activeTool === "select" && selectedCount > 0 && (
+        <aside className="canvas-hint" aria-label="Selection help">
+          <span>{readOnly ? "Select and copy" :
+            selectedCount === 1 && selectedConnectorIds.length === 1 ? "Drag an endpoint to reconnect" :
+            selectedCount === 1 && selectedFrameIds.length === 1 ? "Double-click title to rename" :
+            selectedGroupIds.size > 0 ? "Drag any member to move the group" :
+            "Drag to move selection"}</span>
+          <i aria-hidden="true" />
+          <span>{readOnly ? "Space-drag to pan" : "Ctrl/⌘ D to duplicate"}</span>
+        </aside>
+      )}
 
       <div
         className="zoom-dock"

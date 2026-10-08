@@ -3,17 +3,24 @@ import { accountMenu, browse, closeDialogs, details, rowActions } from "../e2e/f
 import { BASE_URL, canvasState, createNote, flushLocalDraft, membership, mutationHeaders, signIn, state } from "./fixture";
 
 async function pages(request: APIRequestContext) { return (await (await request.get(`${BASE_URL}/api/boards`)).json()).boards as { id: string; title: string }[]; }
-async function ready(page: Page) { await expect(page.getByLabel("Page title")).toBeVisible(); await expect(page.locator(".save-status")).toHaveText("Saved to account"); return (await canvasState(page)).account!.boardId; }
+async function ready(page: Page) {
+  await expect(page.getByLabel("Page title")).toBeVisible();
+  // Quiet save chrome is hidden on mobile; wait for its state without requiring visibility.
+  await expect(page.locator(".save-status")).toHaveAttribute("aria-label", "Saved to account");
+  return (await canvasState(page)).account!.boardId;
+}
 async function start(page: Page) { await signIn(page.context().request); await page.goto("/scribble/"); return ready(page); }
 
 test("guest UI stays usable without the API, saves locally, and has one actionable device failure", async ({ page }) => {
   await page.route(`${BASE_URL}/api/**`, (route) => route.abort("failed"));
   await page.goto("/scribble/"); await expect(page.getByLabel("Drawing title")).toBeVisible();
   await expect(page.getByRole("button", { name: "Pages", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /New page|Save to account|Share/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(New page|Save to account)$/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeVisible();
   await expect(page.locator(".save-status")).toHaveCount(0);
   await createNote(page, "Guest survives API outage", 450, 510); await flushLocalDraft(page); await page.reload();
   await expect(page.getByText("Guest survives API outage", { exact: true })).toBeVisible();
+  await flushLocalDraft(page);
   await page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().markSaveError("Controlled device failure"));
   await expect(page.locator(".board-notice")).toHaveCount(1);
   await details(page); await expect(page.getByRole("button", { name: "Retry device save", exact: true })).toBeVisible();
@@ -31,8 +38,11 @@ test("owners create, rename inline, cancel, share the current page and delete th
   await rename.fill("Owner page"); await rename.press("Enter");
   await expect(page.getByLabel("Page title")).toHaveValue("Owner page"); await ready(page);
   const title = page.getByLabel("Page title"); await title.fill("Cancelled header title"); await title.press("Escape"); await expect(title).toHaveValue("Owner page");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Share", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Share Owner page", exact: true })).toBeVisible(); await closeDialogs(page);
+  await expect(page.getByRole("status").filter({ hasText: "Link copied" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect((await (await context.request.get(`${BASE_URL}/api/boards/${second}/share-link`)).json()).settings.enabled).toBe(true);
   await rowActions(page, "Owner page"); await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click(); expect(await pages(context.request)).toHaveLength(2);
   await rowActions(page, "Owner page"); await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
@@ -72,7 +82,7 @@ test("desktop sidebar visibility survives reload and leaves the world viewport u
   await flushLocalDraft(page); await page.reload(); await ready(page); await expect(page.locator(".page-sidebar")).toHaveCount(0);
   expect(await page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/viewportStore.ts")).useViewportStore.getState().viewport)).toEqual({ x: 120, y: -90, zoom: 1.5 });
   await page.getByRole("button", { name: "Pages", exact: true }).click(); await expect(page.locator(".page-sidebar")).toBeVisible();
-  await page.screenshot({ path: "workspace-ux-evidence/m9-owner-desktop.png" });
+  await page.screenshot({ path: "workspace-ux-evidence/m11-owner-desktop.png" });
 });
 
 test("mobile pages start closed and a direct selection closes the drawer", async ({ page, context }) => {
@@ -84,7 +94,7 @@ test("mobile pages start closed and a direct selection closes the drawer", async
   await list.locator("li").filter({ has: page.locator('.page-open:not([aria-current="page"])') }).locator(".page-open").click();
   await ready(page); expect((await canvasState(page)).account!.boardId).toBe(first);
   await expect(page.getByRole("dialog", { name: "Pages", exact: true })).toHaveCount(0); expect(await pages(context.request)).toHaveLength(2);
-  await page.screenshot({ path: "workspace-ux-evidence/m9-owner-mobile.png" });
+  await page.screenshot({ path: "workspace-ux-evidence/m11-owner-mobile.png" });
 });
 
 test("shared editors rename and save while viewers have no editing or sharing controls", async ({ browser }) => {

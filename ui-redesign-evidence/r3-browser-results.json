@@ -1,0 +1,1703 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "E:\\PROJECTS\\the-canvas\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "-c",
+      "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r3-disposable.config.ts"
+    ],
+    "configFile": "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r3-disposable.config.ts",
+    "rootDir": "E:/PROJECTS/the-canvas/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "layout",
+        "name": "layout",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "r3-disposable-layout.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "preferences",
+        "name": "preferences",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "responsive.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "semantics",
+        "name": "semantics",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "ux-simplification.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "primitives",
+        "name": "primitives",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "r3-disposable-primitives.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "shell",
+        "name": "shell",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "r3-disposable-shell.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "appearance",
+        "name": "appearance",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "usability.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "pen",
+        "name": "pen",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "pen-input.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "editor",
+        "name": "editor",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "editor-controls.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r3-browser-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
+      "url": "http://127.0.0.1:4173",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "r3-disposable-layout.spec.ts",
+      "file": "r3-disposable-layout.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "guest chrome fits light/dark, narrow screens, tablet and landscape",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4369,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:39:57.615Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-d5cb0f2c5a82f8db6cd1",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 17,
+          "column": 3
+        },
+        {
+          "title": "owner chrome fits light/dark, narrow screens, tablet and landscape",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 7434,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:39:57.616Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-b8e07c3b932d2d89feaa",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 17,
+          "column": 3
+        },
+        {
+          "title": "toolbar traversal, settings Escape, menus and focused zoom isolate canvas shortcuts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 775,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:02.157Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-64227bc9aec3dc4b1b92",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 52,
+          "column": 1
+        },
+        {
+          "title": "mobile More tools navigates, dismisses and restores focus; dock collapse keeps zoom/history",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 829,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:02.945Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-3572af4e110557b90065",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "viewer toolbar skips disabled tools and keeps navigation available",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 892,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:03.787Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-577583dc58d246fb56f0",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 88,
+          "column": 1
+        },
+        {
+          "title": "text editing and IME rename retain work in reduced keyboard viewports",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1055,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:04.692Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-665ff7e984f80b79aa2e",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 98,
+          "column": 1
+        },
+        {
+          "title": "drawer and sharing stay inside the visual viewport when a keyboard pans the page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1088,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:05.206Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-07b3c3eff9f50e7a8c0b",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 111,
+          "column": 1
+        },
+        {
+          "title": "mobile object appearance replaces the action row in short landscape and restores Style focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 879,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:05.764Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-f5d58b4ad0ed07f66d30",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 126,
+          "column": 1
+        },
+        {
+          "title": "a pending save notice and expanded mobile settings reserve separate space",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 9615,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:06.306Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-7e7362b49cefb02e8242",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 139,
+          "column": 1
+        },
+        {
+          "title": "device write failure stays below measured chrome and retries the existing queue",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2601,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:06.655Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-fe13b6ab889b963dfe08",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 149,
+          "column": 1
+        },
+        {
+          "title": "theme text, active tools, boundaries and focus retain readable contrast",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 494,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:09.268Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-b7d9a4de09406f44f1b0",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 165,
+          "column": 1
+        },
+        {
+          "title": "mobile safe areas and equivalent 200% layout keep chrome and dialogs reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1477,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:09.772Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-2413cf648fffe50c8498",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 181,
+          "column": 1
+        },
+        {
+          "title": "sidebar and resized chrome preserve world coordinates, drag/resize, pen and atomic history",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1474,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:11.262Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ba1d28e072e703fc9415-4d097eb6aed72f893fac",
+          "file": "r3-disposable-layout.spec.ts",
+          "line": 203,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "responsive.spec.ts",
+      "file": "responsive.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "mobile dock, settings tray, and persisted themes fit narrow screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1256,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:13.284Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-e4b06a6294ef42c89ad2",
+          "file": "responsive.spec.ts",
+          "line": 27,
+          "column": 1
+        },
+        {
+          "title": "phone and tablet breakpoints keep controls reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1809,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:14.673Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-53989bc7fab0e2526dd4",
+          "file": "responsive.spec.ts",
+          "line": 83,
+          "column": 1
+        },
+        {
+          "title": "light is the default and replaces the retired system preference",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 692,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:16.666Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-e1c287bb68a1e0c39432",
+          "file": "responsive.spec.ts",
+          "line": 108,
+          "column": 1
+        },
+        {
+          "title": "touch select pans empty space, drags objects, pinches, and multi-selects",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1332,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:16.495Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-0f21088f3ea85d9612e2",
+          "file": "responsive.spec.ts",
+          "line": 121,
+          "column": 1
+        },
+        {
+          "title": "mobile text creation and contextual editing keep canvas gestures out of the editor",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 743,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:17.517Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-4a2762fa487860740ed9",
+          "file": "responsive.spec.ts",
+          "line": 252,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "ux-simplification.spec.ts",
+      "file": "ux-simplification.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "minimal guest UI keeps local saving quiet and consent keyboard actions isolated",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "semantics",
+              "projectName": "semantics",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1999,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:18.439Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b31a542d2b8bc5b83aba-94f99a1f817a5686d537",
+          "file": "ux-simplification.spec.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "missing images and device failures produce one notice with menus closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "semantics",
+              "projectName": "semantics",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 3673,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:18.980Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b31a542d2b8bc5b83aba-d2bf78660d9d2e7e6162",
+          "file": "ux-simplification.spec.ts",
+          "line": 44,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "r3-disposable-primitives.spec.ts",
+      "file": "r3-disposable-primitives.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "light native sharing controls keep contrast, validation, focus and actionable errors",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "primitives",
+              "projectName": "primitives",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1305,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:21.088Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "311aa17f231527616e2e-6d5dd6aff742705fd89a",
+          "file": "r3-disposable-primitives.spec.ts",
+          "line": 21,
+          "column": 3
+        },
+        {
+          "title": "dark native sharing controls keep contrast, validation, focus and actionable errors",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "primitives",
+              "projectName": "primitives",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1294,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:22.538Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "311aa17f231527616e2e-88d5286fc70d197af085",
+          "file": "r3-disposable-primitives.spec.ts",
+          "line": 21,
+          "column": 3
+        }
+      ]
+    },
+    {
+      "title": "r3-disposable-shell.spec.ts",
+      "file": "r3-disposable-shell.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "flat desktop sidebar and adaptive drawer retain visibility, coordinates and one account controller",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "shell",
+              "projectName": "shell",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2136,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:23.412Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6507463ef405db898f1-86a25443f64ad6b74329",
+          "file": "r3-disposable-shell.spec.ts",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "title": "title editing commits on Enter and blur, cancels on Escape and respects composing keys",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "shell",
+              "projectName": "shell",
+              "results": [
+                {
+                  "workerIndex": 8,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4807,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:24.442Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6507463ef405db898f1-fd15bec0611cdd84005e",
+          "file": "r3-disposable-shell.spec.ts",
+          "line": 44,
+          "column": 1
+        },
+        {
+          "title": "page search, shared roles and scrolled row actions preserve rename and deletion confirmation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "shell",
+              "projectName": "shell",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1246,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:25.697Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6507463ef405db898f1-e2f49d3a643ccc78e57b",
+          "file": "r3-disposable-shell.spec.ts",
+          "line": 63,
+          "column": 1
+        },
+        {
+          "title": "drawer backdrop and footer keys cannot draw, delete or paste; modal focus includes relocated controls",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "shell",
+              "projectName": "shell",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1254,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:26.955Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6507463ef405db898f1-80ef626d4058839e886b",
+          "file": "r3-disposable-shell.spec.ts",
+          "line": 87,
+          "column": 1
+        },
+        {
+          "title": "mobile page navigation closes the drawer and footer theme/help preserve account and canvas work",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "shell",
+              "projectName": "shell",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1392,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:28.222Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f6507463ef405db898f1-dc64b8512cd24c5246df",
+          "file": "r3-disposable-shell.spec.ts",
+          "line": 116,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "usability.spec.ts",
+      "file": "usability.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "one-shot Note, Text and Frame; continuous Pen; silent autosave; accessible icon toolbar",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "appearance",
+              "projectName": "appearance",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2738,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:29.993Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d975817c2913cd240bb9-fd83fd1fb282661e6cf4",
+          "file": "usability.spec.ts",
+          "line": 45,
+          "column": 1
+        },
+        {
+          "title": "text inherits preferences, resizes for XL, preserves styles through reload and supports undoable appearance",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "appearance",
+              "projectName": "appearance",
+              "results": [
+                {
+                  "workerIndex": 10,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2624,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:30.244Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d975817c2913cd240bb9-ec0bce6ff21ce420973d",
+          "file": "usability.spec.ts",
+          "line": 164,
+          "column": 1
+        },
+        {
+          "title": "stroke appearance slider previews without document writes and commits one history entry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "appearance",
+              "projectName": "appearance",
+              "results": [
+                {
+                  "workerIndex": 9,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1814,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:32.874Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d975817c2913cd240bb9-d6bee1ea304cd0983b97",
+          "file": "usability.spec.ts",
+          "line": 217,
+          "column": 1
+        },
+        {
+          "title": "mobile contextual panels stay on screen and touch velocity is expressive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "appearance",
+              "projectName": "appearance",
+              "results": [
+                {
+                  "workerIndex": 10,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2238,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:33.050Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d975817c2913cd240bb9-05063c73e7e0e4c1ccda",
+          "file": "usability.spec.ts",
+          "line": 272,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "pen-input.spec.ts",
+      "file": "pen-input.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "Escape and explicit tool change discard drafts; reused pointer can start again",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "pen",
+              "projectName": "pen",
+              "results": [
+                {
+                  "workerIndex": 11,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 920,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:35.241Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4ffc8ec56bba1cecb947-51c1aaaaab1155de1a4b",
+          "file": "pen-input.spec.ts",
+          "line": 87,
+          "column": 1
+        },
+        {
+          "title": "high-zoom selection contains the ink; drag and thickness edits keep geometry and history aligned",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "pen",
+              "projectName": "pen",
+              "results": [
+                {
+                  "workerIndex": 12,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 983,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:35.957Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4ffc8ec56bba1cecb947-e0d9e784e3726d1ac476",
+          "file": "pen-input.spec.ts",
+          "line": 189,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "editor-controls.spec.ts",
+      "file": "editor-controls.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "compact styles dismiss when drawing resumes and tool switches retain preferences and atomic ink",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2596,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:36.910Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-5a14ee604852a45c7338",
+          "file": "editor-controls.spec.ts",
+          "line": 28,
+          "column": 1
+        },
+        {
+          "title": "compact and short-view styles keep touch targets, scrolling and canvas coordinates",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 14,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2406,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:37.722Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-70f54861065da43679dd",
+          "file": "editor-controls.spec.ts",
+          "line": 59,
+          "column": 1
+        },
+        {
+          "title": "zoom percentage menu resets the existing viewport and returns keyboard focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 761,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:39.654Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-847f8531e3289d89f5c1",
+          "file": "editor-controls.spec.ts",
+          "line": 85,
+          "column": 1
+        },
+        {
+          "title": "visual viewport bounds dock, styles and focused controls above a simulated keyboard",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 14,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 749,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:40.261Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-1b38717c3b8d4a24d42c",
+          "file": "editor-controls.spec.ts",
+          "line": 106,
+          "column": 1
+        },
+        {
+          "title": "light rendered editor controls and account primary action retain contrast",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1006,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:40.440Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-c7bb115ba1851c061c10",
+          "file": "editor-controls.spec.ts",
+          "line": 125,
+          "column": 3
+        },
+        {
+          "title": "light account consent, help, empty canvas and recovery retain clear actions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 14,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1035,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:41.025Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-a278bc55c2c4be71e97b",
+          "file": "editor-controls.spec.ts",
+          "line": 143,
+          "column": 3
+        },
+        {
+          "title": "dark rendered editor controls and account primary action retain contrast",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1018,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:41.461Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-bbbd9c9d8828daadb28c",
+          "file": "editor-controls.spec.ts",
+          "line": 125,
+          "column": 3
+        },
+        {
+          "title": "dark account consent, help, empty canvas and recovery retain clear actions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 14,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1088,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:42.078Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-0a34263670db2205083a",
+          "file": "editor-controls.spec.ts",
+          "line": 143,
+          "column": 3
+        },
+        {
+          "title": "desktop styles and quiet history stay beside the exposed canvas with the sidebar open",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "editor",
+              "projectName": "editor",
+              "results": [
+                {
+                  "workerIndex": 13,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 947,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T14:40:42.494Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "accbf72a01d3a7f62322-f86dfd148c21bcafd550",
+          "file": "editor-controls.spec.ts",
+          "line": 168,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-07T14:39:54.457Z",
+    "duration": 49282.9,
+    "expected": 42,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

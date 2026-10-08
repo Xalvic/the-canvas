@@ -31,7 +31,7 @@ function clientFlowCookie(cookie: string | undefined, browser: string | undefine
   return parts.length === 2 && pairedBrowser === browser && clientFlowSchema.safeParse(flowId).success ? flowId : null;
 }
 
-export function createAuthRouter(auth?: AuthDependencies, production?: ProductionDependencies) {
+export function createAuthRouter(auth?: AuthDependencies, production?: ProductionDependencies, shareLinksEnabled = false) {
   const router = Router();
   const sessionCookie: CookieOptions = { httpOnly: true, sameSite: "lax", secure: auth?.secureCookies ?? false, path: "/api" };
   const flowCookie: CookieOptions = { ...sessionCookie, path: "/api/auth/google" };
@@ -98,10 +98,10 @@ export function createAuthRouter(auth?: AuthDependencies, production?: Productio
     const session = token && auth ? await auth.store.getSession(hashToken(token)) : undefined;
     if (!session) {
       res.clearCookie(SESSION_COOKIE, sessionCookie);
-      throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue", { googleSignInEnabled: Boolean(auth?.provider), guestTransferEnabled: true });
+      throw new HttpError(401, "UNAUTHENTICATED", "Sign in to continue", { googleSignInEnabled: Boolean(auth?.provider), guestTransferEnabled: true, ...(shareLinksEnabled ? { shareLinksEnabled: true } : {}) });
     }
     if (production) await enforceUserBudget(production, res, session.user.id, true);
-    res.json({ user: session.user, capabilities: { guestTransfer: 1 } });
+    res.json({ user: session.user, capabilities: { guestTransfer: 1, ...(shareLinksEnabled ? { shareLinks: 1 } : {}) } });
   });
 
   router.post("/logout", async (req, res) => {

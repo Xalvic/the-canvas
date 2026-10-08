@@ -1,4 +1,5 @@
-import { browse, closeDialogs, rowActions } from "../e2e/fixtures/ui";
+import { browse, closeDialogs } from "../e2e/fixtures/ui";
+import { linkSettings } from "../e2e/fixtures/shareLinks";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { BASE_URL, canvasState, connected, contextPage, editNote, flushLocalDraft, mutationHeaders, openBoard, signIn, state } from "./fixture";
@@ -19,11 +20,13 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
   await page.goto("/scribble/");
   await openBoard(page, title);
 
-  await page.getByRole("button", { name: "Share", exact: true }).click();
-  const sharing = page.getByRole("region", { name: `Sharing ${title}`, exact: true });
-  await sharing.getByLabel("Google email", { exact: true }).fill(editorEmail);
-  await sharing.getByLabel("Invite role").selectOption("editor");
-  await sharing.getByRole("button", { name: "Create invitation", exact: true }).click();
+  // Existing invitation APIs remain compatible; redesigned UI creates reusable links.
+  expect((await context.request.post(`${BASE_URL}/api/boards/${boardId}/invitations`, {
+    headers: mutationHeaders, data: { email: editorEmail, role: "editor" },
+  })).status()).toBe(201);
+  const dialog = await linkSettings(page);
+  await dialog.getByText("Existing invited access", { exact: true }).click();
+  const sharing = page.getByRole("region", { name: `Existing access to ${title}`, exact: true });
   await expect(sharing.getByRole("button", { name: "Copy invitation link", exact: true })).toBeVisible();
 
   // Identity is the sole test fixture: a verified Google account creates a real
@@ -36,7 +39,11 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     await expect(inbox.getByText(title, { exact: true })).toBeVisible();
     expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(404);
     await inbox.getByRole("button", { name: "Accept invitation", exact: true }).click();
-    await openBoard(editor, title);
+    await inbox.getByRole("button", { name: "Open page", exact: true }).click();
+    await expect(editor.getByLabel("Page title")).toHaveValue(title);
+    await closeDialogs(editor);
+    await editor.getByRole("button", { name: "Zoom options", exact: true }).click();
+    await editor.getByRole("menuitem", { name: "Reset viewport", exact: true }).click();
     await Promise.all([connected(page), connected(editor)]);
     await editNote(editor, "Shared baseline", "Shared editor save");
     await expect.poll(async () => (await state(context.request, boardId)).document!.content.objects[0]).toMatchObject({ title: "Shared editor save" });
@@ -55,12 +62,13 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     await editNote(editor, "Shared editor save", "Private draft after invitation");
     await flushLocalDraft(editor);
     await closeDialogs(page);
-    await page.getByRole("button", { name: "Share", exact: true }).click();
+    const accessDialog = await linkSettings(page);
+    await accessDialog.getByText("Existing invited access", { exact: true }).click();
     await sharing.getByLabel(`Role for ${editorEmail}`, { exact: true }).selectOption("viewer");
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toBeEnabled();
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toHaveValue("viewer");
     await editorContext.setOffline(false);
-    await expect(editor.locator(".save-status")).toHaveText("Can view · account board", { timeout: 10_000 });
+    await expect(editor.locator(".save-status")).toHaveAccessibleName("Can view · account board", { timeout: 10_000 });
     await expect(editor.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
     expect((await canvasState(editor)).objects[0]).toMatchObject({ title: "Private draft after invitation" });
     const beforeRemoval = await state(context.request, boardId);
@@ -75,7 +83,7 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
       .getByRole("button", { name: "Remove access", exact: true }).click();
     await page.getByRole("button", { name: "Confirm removal", exact: true }).click();
     await expect(sharing.getByLabel(`Role for ${editorEmail}`, { exact: true })).toHaveCount(0);
-    await expect(editor.locator(".save-status")).toHaveText("Access removed", { timeout: 10_000 });
+    await expect(editor.getByText("Access removed", { exact: true })).toBeVisible({ timeout: 10_000 });
     expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(404);
     expect((await canvasState(editor)).objects[0]).toMatchObject({ title: "Private draft after invitation" });
     await flushLocalDraft(editor);
@@ -89,9 +97,9 @@ test("actual invitation and acceptance grant editing; owner downgrade/removal pr
     expect(afterRemoval.receipts).toEqual(beforeRemoval.receipts);
     await closeDialogs(page);
     await connected(page);
-    await page.screenshot({ path: "docs/ux-evidence/after-live-desktop.png" });
+    await page.screenshot({ path: "workspace-ux-evidence/m11-live-desktop.png" });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: "docs/ux-evidence/after-live-mobile.png" });
+    await page.screenshot({ path: "workspace-ux-evidence/m11-live-mobile.png" });
   } finally {
     await editorContext.setOffline(false);
     await editorContext.close();

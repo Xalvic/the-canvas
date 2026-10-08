@@ -5,8 +5,7 @@ import { browse, closeDialogs, details } from "./fixtures/ui";
 async function controlsFit(page: Page) {
   await expect.poll(() => page.evaluate(() => {
     const visible = (element: HTMLElement) => element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden" && !element.closest('dialog:not([open])');
-    const header = document.querySelector<HTMLElement>(".board-header")!;
-    const controls = [...header.children].filter((element): element is HTMLElement => element instanceof HTMLElement && !element.matches(".header-spacer, dialog"));
+    const controls = [...document.querySelectorAll(".workspace-title-controls > *, .workspace-share-controls > *")].filter((element): element is HTMLElement => element instanceof HTMLElement && !element.matches("dialog"));
     const chrome = [...document.querySelectorAll<HTMLElement>(".desktop-tool-dock,.mobile-tool-dock,.history-controls,.zoom-controls,.tool-options,.mobile-selection-actions,.board-notice,.page-sidebar:not(dialog)")];
     const items = [...controls, ...chrome].filter(visible).map((element) => ({ name: element.className, rect: element.getBoundingClientRect() }));
     const overlaps = items.flatMap((a, index) => items.slice(index + 1).filter((b) => Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left) > 1 && Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top) > 1).map((b) => `${a.name}/${b.name}`));
@@ -21,7 +20,7 @@ for (const signedIn of [false, true]) {
     await page.goto("/scribble/");
     await expect(page.getByLabel(signedIn ? "Page title" : "Drawing title", { exact: true })).toBeEnabled();
     if (signedIn) {
-      await expect(page.locator(".save-status")).toHaveText("Saved to account");
+      await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
       await page.evaluate(async () => {
         const { useCollaborationStore } = await import(/* @vite-ignore */ "/scribble/src/store/collaborationStore.ts");
         useCollaborationStore.setState({ status: "connected", participants: [{ clientId: "layout-peer", userId: "fixture-peer", displayName: "Layout collaborator", cursor: null, selectedIds: [] }] });
@@ -38,9 +37,9 @@ for (const signedIn of [false, true]) {
         const expand = page.getByRole("button", { name: "Expand settings", exact: true });
         if (await expand.isVisible()) await expand.click();
         await controlsFit(page);
-        if (size.width === 390 || size.width === 1440) await page.screenshot({ path: `workspace-ux-evidence/m10-${signedIn ? "owner" : "guest"}-${size.width}-${theme}.png` });
+        if (size.width === 390 || size.width === 1440) await page.screenshot({ path: `workspace-ux-evidence/m11-${signedIn ? "owner" : "guest"}-${size.width}-${theme}.png` });
         await page.getByRole("button", { name: "Close settings", exact: true }).click();
-        if (signedIn && size.width < 768) {
+        if (signedIn && size.width <= 1100) {
           await browse(page); await expect(page.getByRole("dialog", { name: "Pages", exact: true })).toBeInViewport();
           for (let i = 0; i < 12; i++) { await page.keyboard.press("Tab"); expect(await page.locator("dialog[open]").evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true); }
           await page.keyboard.press("Escape"); await expect(page.getByRole("button", { name: "Pages", exact: true })).toBeFocused();
@@ -101,8 +100,8 @@ test("text editing and IME rename retain work in reduced keyboard viewports", as
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto("/scribble/"); await expect(page.getByLabel("Page title")).toBeEnabled();
   await page.getByRole("button", { name: "Text tool", exact: true }).click(); await page.mouse.click(120, 270);
   const input = page.getByRole("textbox", { name: "Edit text", exact: true }); await input.fill("Mobile text");
-  await page.setViewportSize({ width: 390, height: 420 }); await expect(input).toBeInViewport(); await expect(page.locator(".board-header")).toBeHidden(); await expect(page.locator(".zoom-dock")).toBeHidden();
-  await input.fill("Keyboard viewport retained text"); await page.keyboard.press("Escape"); await page.setViewportSize({ width: 390, height: 844 }); await expect(page.locator(".board-header")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 420 }); await expect(input).toBeInViewport(); await expect(page.locator(".workspace-title-controls")).toBeHidden(); await expect(page.locator(".zoom-dock")).toBeHidden();
+  await input.fill("Keyboard viewport retained text"); await page.keyboard.press("Escape"); await page.setViewportSize({ width: 390, height: 844 }); await expect(page.locator(".workspace-title-controls")).toBeVisible();
   await browse(page); await page.getByRole("button", { name: "Actions for IME page", exact: true }).click(); await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   const title = page.getByRole("textbox", { name: "Rename IME page", exact: true }); await title.dispatchEvent("compositionstart"); await title.fill("例のページ");
   await title.dispatchEvent("keydown", { key: "Enter", isComposing: true }); await expect(title).toBeVisible(); await title.dispatchEvent("compositionend"); await title.press("Enter"); await closeDialogs(page);
@@ -116,11 +115,13 @@ test("drawer and sharing stay inside the visual viewport when a keyboard pans th
   await page.evaluate(() => {
     Object.defineProperties(window.visualViewport!, { height: { configurable: true, value: 380 }, offsetTop: { configurable: true, value: 120 } }); window.visualViewport!.dispatchEvent(new Event("resize"));
   });
-  for (const label of ["Pages", "Share"]) {
-    await page.getByRole("button", { name: label, exact: true }).click(); const dialog = page.locator("dialog[open]"); const box = (await dialog.boundingBox())!;
+  for (const label of ["Pages", "Link settings"]) {
+    if (label === "Pages") await page.getByRole("button", { name: label, exact: true }).click();
+    else { await page.getByRole("button", { name: "App menu", exact: true }).click(); await page.getByRole("menuitem", { name: label, exact: true }).click(); }
+    const dialog = page.locator("dialog[open]"); const box = (await dialog.boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(120); expect(box.y + box.height).toBeLessThanOrEqual(500);
     for (let i = 0; i < 10; i++) { await page.keyboard.press("Tab"); expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true); }
-    await page.screenshot({ path: `workspace-ux-evidence/m10-keyboard-${label.toLowerCase()}.png` }); await page.keyboard.press("Escape"); await expect(page.getByRole("button", { name: label, exact: true })).toBeFocused();
+    await page.screenshot({ path: `workspace-ux-evidence/m11-keyboard-${label.toLowerCase().replaceAll(" ", "-")}.png` }); await page.keyboard.press("Escape"); await expect(page.getByRole("button", { name: label === "Pages" ? label : "App menu", exact: true })).toBeFocused();
   }
 });
 
@@ -144,7 +145,7 @@ test("a pending save notice and expanded mobile settings reserve separate space"
   await page.getByRole("button", { name: "Pen tool", exact: true }).click(); await page.mouse.move(100, 220); await page.mouse.down(); await page.mouse.move(200, 230, { steps: 5 }); await page.mouse.up();
   await expect(page.locator(".board-notice")).toBeVisible({ timeout: 20000 }); await page.getByRole("button", { name: "Expand settings", exact: true }).click(); await controlsFit(page);
   const message = (await page.locator(".board-notice").boundingBox())!, panel = (await page.locator(".tool-options").boundingBox())!;
-  expect(panel.y).toBeGreaterThan(message.y + message.height); await page.screenshot({ path: "workspace-ux-evidence/m10-pending-mobile.png" });
+  expect(panel.y).toBeGreaterThan(message.y + message.height); await page.screenshot({ path: "workspace-ux-evidence/m11-pending-mobile.png" });
 });
 
 test("device write failure stays below measured chrome and retries the existing queue", async ({ page }) => {
@@ -185,10 +186,10 @@ test("mobile safe areas and equivalent 200% layout keep chrome and dialogs reach
   const client = await page.context().newCDPSession(page);
   await client.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 24, bottom: 34, left: 18, right: 18 } });
   await controlsFit(page);
-  expect((await page.locator(".board-header").boundingBox())!.y).toBeGreaterThanOrEqual(24);
+  expect((await page.locator(".workspace-title-controls").boundingBox())!.y).toBeGreaterThanOrEqual(24);
   const zoom = (await page.locator(".zoom-dock").boundingBox())!; expect(zoom.y + zoom.height).toBeLessThanOrEqual(844 - 34);
   await page.getByRole("button", { name: "Pen tool", exact: true }).click(); await page.getByRole("button", { name: "Expand settings", exact: true }).click(); await controlsFit(page);
-  await page.screenshot({ path: "workspace-ux-evidence/m10-safe-area.png" });
+  await page.screenshot({ path: "workspace-ux-evidence/m11-safe-area.png" });
   // Half the CSS viewport and twice the density models 200% layout, not browser chrome zoom.
   const context = await browser.newContext({ viewport: { width: 720, height: 450 }, deviceScaleFactor: 2 });
   try {
@@ -197,7 +198,7 @@ test("mobile safe areas and equivalent 200% layout keep chrome and dialogs reach
     await browse(zoomPage); await expect(zoomPage.getByRole("dialog", { name: "Pages", exact: true })).toBeInViewport(); await closeDialogs(zoomPage);
     await zoomPage.getByRole("button", { name: "App menu", exact: true }).click(); await zoomPage.getByRole("menuitem", { name: "Help and shortcuts" }).click();
     await expect(zoomPage.getByRole("button", { name: "Close Help and shortcuts" })).toBeInViewport(); await closeDialogs(zoomPage);
-    await zoomPage.screenshot({ path: "workspace-ux-evidence/m10-zoom-layout.png" });
+    await zoomPage.screenshot({ path: "workspace-ux-evidence/m11-zoom-layout.png" });
   } finally { await context.close(); }
 });
 

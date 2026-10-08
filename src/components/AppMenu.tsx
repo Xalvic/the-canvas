@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Menu as MenuIcon } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Ellipsis, CircleHelp, Moon, Sun } from "lucide-react";
 import { Menu } from "./Menu";
 import { HelpDialog } from "./HelpDialog";
 import { useThemeStore } from "../store/themeStore";
@@ -11,7 +12,7 @@ import { downloadBoardAsset } from "../api/assets";
 import { COMMIT_CANVAS_INTERACTIONS_EVENT } from "../canvas/viewport/pointerInteractionEvents";
 import { flushLocalBoardSave } from "../persistence/useLocalBoardPersistence";
 
-export function AppMenu({ details, blocked }: { details: () => void; blocked: boolean }) {
+export function AppMenu({ details, blocked, footerTarget, linkSettings }: { details: () => void; blocked: boolean; footerTarget?: HTMLElement | null; linkSettings?: () => void }) {
   const [help, setHelp] = useState(false), [exporting, setExporting] = useState(false), [error, setError] = useState<string | null>(null);
   const theme = useThemeStore((store) => store.preference), setTheme = useThemeStore((store) => store.setPreference);
   async function exportDrawing() {
@@ -44,14 +45,21 @@ export function AppMenu({ details, blocked }: { details: () => void; blocked: bo
     finally { setExporting(false); }
   }
   return <>
-    <Menu label="App menu" trigger={<MenuIcon size={20} aria-hidden="true" />} triggerClass="app-menu-trigger icon-button">
+    <Menu label="App menu" trigger={<Ellipsis size={20} aria-hidden="true" />} triggerClass="app-menu-trigger icon-button">
       <strong>Scribble</strong>
+      {linkSettings && <button type="button" role="menuitem" disabled={blocked} onClick={linkSettings}>Link settings</button>}
       <button type="button" role="menuitem" disabled={blocked || exporting} onClick={() => void exportDrawing()}>{exporting ? "Exporting…" : "Export drawing data"}</button>
       <button type="button" role="menuitem" disabled={blocked} onClick={details}>Save details</button>
-      <button type="button" role="menuitem" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "Light theme" : "Dark theme"}</button>
-      <button type="button" role="menuitem" onClick={() => setHelp(true)}>Help and shortcuts</button>
+      {!footerTarget && <>
+        <button type="button" role="menuitem" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? "Light theme" : "Dark theme"}</button>
+        <button type="button" role="menuitem" onClick={() => setHelp(true)}>Help and shortcuts</button>
+      </>}
     </Menu>
+    {footerTarget && createPortal(<>
+      <button className="ui-button sidebar-help" type="button" onClick={() => setHelp(true)}><CircleHelp size={18} aria-hidden="true" />Help and shortcuts</button>
+      <button className="ui-button icon-button" type="button" aria-label={theme === "dark" ? "Light theme" : "Dark theme"} title={theme === "dark" ? "Light theme" : "Dark theme"} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}</button>
+    </>, footerTarget)}
     <HelpDialog open={help} close={() => setHelp(false)} />
-    {error && <div className="board-notice" role="alert">{error}<button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
+    {error && <div className="board-notice" data-tone="error" role="alert">{error}<button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
   </>;
 }

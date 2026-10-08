@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { boardRequest, mutation, parseResponse } from "./boards";
+import { boardRequest, expectedAccountHeaders, mutation, parseResponse } from "./boards";
 
 export const memberRoleSchema = z.enum(["editor", "viewer"]);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
@@ -12,11 +12,11 @@ const sharingSchema = z.object({
 const boardPath = (id: string) => `/api/boards/${encodeURIComponent(id)}`;
 const invitePath = (id: string) => `/api/invitations/${encodeURIComponent(id)}`;
 
-export async function getBoardSharing(id: string, signal?: AbortSignal) {
-  return parseResponse(await boardRequest(`${boardPath(id)}/sharing`, { signal }, "Could not load sharing"), sharingSchema);
+export async function getBoardSharing(id: string, signal?: AbortSignal, accountId?: string) {
+  return parseResponse(await boardRequest(`${boardPath(id)}/sharing`, { signal, ...expectedAccountHeaders(accountId) }, "Could not load sharing"), sharingSchema);
 }
-export async function getInvitations(signal?: AbortSignal) {
-  return (await parseResponse(await boardRequest("/api/invitations", { signal }, "Could not load invitations"), z.object({ invitations: z.array(incomingSchema) }))).invitations;
+export async function getInvitations(signal?: AbortSignal, accountId?: string) {
+  return (await parseResponse(await boardRequest("/api/invitations", { signal, ...expectedAccountHeaders(accountId) }, "Could not load invitations"), z.object({ invitations: z.array(incomingSchema) }))).invitations;
 }
 export async function inviteToBoard(id: string, email: string, role: MemberRole, signal?: AbortSignal) {
   const body = { email: z.email().max(254).parse(email.trim().toLowerCase()), role: memberRoleSchema.parse(role) };

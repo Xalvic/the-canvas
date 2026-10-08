@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { PanelLeft } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Clock3, PanelLeft } from "lucide-react";
 import { AppMenu } from "../AppMenu";
 import { Dialog } from "../Dialog";
 import { BoardIdentity } from "../BoardIdentity/BoardIdentity";
@@ -8,30 +8,36 @@ import { RecoveryDialog } from "./RecoveryDialog";
 import { StatusAnnouncement } from "../StatusAnnouncement";
 import { savePresentation } from "../SaveStatus";
 import { BoardSignInRequired } from "../../api/boards";
-import { accountBoardListOptions, accountBoardKeys, retryBoardRead } from "../../api/accountBoardQueries";
-import { getInvitations } from "../../api/sharing";
+import { accountBoardListOptions, accountInvitationListOptions, accountBoardKeys } from "../../api/accountBoardQueries";
 import { Account } from "../Account/Account";
 import { useAccountBoardSession } from "../../persistence/accountBoardSession";
 import { useBoardStore } from "../../store/boardStore";
 import { useUiStore } from "../../store/uiStore";
 import { useDocumentStore } from "../../store/documentStore";
 import { CollaborationSummary, useCollaborationCursor } from "../CollaborationPresence";
-import { BoardSharing, InvitationInbox } from "./Sharing";
+import { InvitationInbox } from "./Sharing";
+import { ShareControls } from "./ShareControls";
 import { PageSidebar } from "./PageSidebar";
 import { SaveFlow, type SaveFlowKind } from "./SaveFlow";
 import { invitationIntent } from "./invitationIntent";
 import { useWorkspaceController } from "../../persistence/workspaceController";
+import { useVisiblePolling } from "./useVisiblePolling";
 
 export function ServerBoards() {
-  const headerRef = useRef<HTMLElement>(null);
+  const titleControlsRef = useRef<HTMLDivElement>(null);
+  const shareControlsRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLElement>(null);
+  const [shareFeedback, setShareFeedback] = useState<HTMLElement | null>(null);
+  const [footerAccountTarget, setFooterAccountTarget] = useState<HTMLDivElement | null>(null);
+  const [cornerAccountTarget, setCornerAccountTarget] = useState<HTMLDivElement | null>(null);
+  const [footerUtilitiesTarget, setFooterUtilitiesTarget] = useState<HTMLDivElement | null>(null);
   const { session, state: accountBoards } = useAccountBoardSession();
   const { workspace, state: lifecycle } = useWorkspaceController(session);
   const lifecycleUser = lifecycle.account?.status === "signed-in" ? lifecycle.account.user.id : null;
   const userId = accountBoards.userId === lifecycleUser ? accountBoards.userId : null;
-  const boards = useQuery({ ...accountBoardListOptions(userId ?? ""), enabled: !!userId });
-  const invitations = useQuery({ queryKey: [...accountBoardKeys.owner(userId ?? ""), "invitations"], queryFn: ({ signal }) => getInvitations(signal), enabled: !!userId, retry: retryBoardRead, networkMode: "always", refetchInterval: 30000 });
+  const queryClient = useQueryClient();
   const activeAccount = useBoardStore((board) => board.account);
+  const sessionVersion = useBoardStore((board) => board.sessionVersion);
   const accessRole = useBoardStore((board) => board.accessRole);
   const tabRecoveryId = useBoardStore((board) => board.tabRecoveryId);
   const tabReadOnly = useBoardStore((board) => board.tabReadOnly);
@@ -48,27 +54,21 @@ export function ServerBoards() {
   const localSaveStatus = useBoardStore((board) => board.saveStatus);
   const localSaveError = useBoardStore((board) => board.saveError);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  const [drawer, setDrawer] = useState(() => window.matchMedia("(max-width: 1100px)").matches);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const visiblePolling = useVisiblePolling();
+  const boards = useQuery({ ...accountBoardListOptions(userId ?? ""), enabled: !!userId, refetchInterval: sidebarOpen ? visiblePolling : false });
+  // One polling observer owns the invitation cache, including while its dialog is open.
+  const invitations = useQuery({ ...accountInvitationListOptions(userId ?? ""), enabled: !!userId, refetchInterval: sidebarOpen || inboxOpen ? visiblePolling : false });
   const [inviteLink] = useState(invitationIntent);
   const [saveFlow, setSaveFlow] = useState<SaveFlowKind | null>(null);
   const [accountOpenRequest, setAccountOpenRequest] = useState(0);
+  const [guestShareRequest, setGuestShareRequest] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const status = savePresentation({ local: localSaveStatus, localError: localSaveError, cloud: accountBoards.status, account: !!activeAccount, role: accessRole, tabReadOnly, tabOwnership, pendingImages, recovery: !!tabRecoveryId });
 
-  useLayoutEffect(() => {
-    const header = headerRef.current, shell = header?.closest<HTMLElement>(".app-shell");
-    if (!header || !shell) return;
-    // Measure chrome only. The canvas keeps its full size and world origin.
-    const measure = () => shell.style.setProperty("--workspace-chrome-top", `${header.getBoundingClientRect().bottom - shell.getBoundingClientRect().top + 10}px`);
-    const observer = new ResizeObserver(measure);
-    observer.observe(header); measure();
-    window.addEventListener("resize", measure);
-    return () => { observer.disconnect(); window.removeEventListener("resize", measure); shell.style.removeProperty("--workspace-chrome-top"); };
-  }, []);
-
   useEffect(() => {
-    const viewport = window.visualViewport, shell = headerRef.current?.closest<HTMLElement>(".app-shell");
+    const viewport = window.visualViewport, shell = titleControlsRef.current?.closest<HTMLElement>(".app-shell");
     if (!viewport || !shell) return;
     const measure = () => {
       shell.style.setProperty("--visual-height", `${viewport.height}px`);
@@ -82,7 +82,7 @@ export function ServerBoards() {
   }, []);
 
   useEffect(() => useUiStore.subscribe((next, previous) => {
-    if (next.activeTool !== previous.activeTool && window.matchMedia("(max-width: 767px)").matches) {
+    if (next.activeTool !== previous.activeTool && window.matchMedia("(max-width: 1100px)").matches) {
       setSidebarOpen(false);
     }
   }), []);
@@ -93,9 +93,9 @@ export function ServerBoards() {
   useEffect(() => { setSharingId(null); setSaveFlow(null); setDetailsOpen(false); }, [userId]);
   useEffect(() => { if (inviteLink) setInboxOpen(true); }, [inviteLink, userId]);
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
+    const media = window.matchMedia("(max-width: 1100px)");
     const restore = () => {
-      setMobile(media.matches);
+      setDrawer(media.matches);
       let visible = true;
       try { visible = localStorage.getItem(`scribble:page-sidebar:${userId}`) !== "closed"; } catch { /* Visibility is optional. */ }
       setSidebarOpen(!!userId && !media.matches && visible);
@@ -104,19 +104,37 @@ export function ServerBoards() {
     return () => media.removeEventListener("change", restore);
   }, [userId]);
   useEffect(() => { if (userId && invitations.error instanceof BoardSignInRequired) session.expire(); }, [userId, invitations.error, session]);
+  useEffect(() => {
+    if (!userId || !sidebarOpen || !visiblePolling) return;
+    void queryClient.refetchQueries({ queryKey: accountBoardKeys.list(userId), exact: true, stale: true }, { cancelRefetch: false });
+    void queryClient.refetchQueries({ queryKey: accountBoardKeys.invitations(userId), exact: true, stale: true }, { cancelRefetch: false });
+  }, [queryClient, userId, sidebarOpen, visiblePolling]);
+  useEffect(() => {
+    if (!userId) return;
+    const refresh = () => {
+      if (document.visibilityState === "hidden" || navigator.onLine === false) return;
+      // TanStack handles visibility/reconnect. Also cover focus without a visibility change.
+      void queryClient.refetchQueries({ queryKey: accountBoardKeys.owner(userId), type: "active", stale: true,
+        predicate: (query) => ["list", "invitations", "sharing"].includes(String(query.queryKey[2])) }, { cancelRefetch: false });
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [queryClient, userId]);
   const changeSidebar = (open: boolean) => {
     setSidebarOpen(open);
-    if (!mobile && userId) try { localStorage.setItem(`scribble:page-sidebar:${userId}`, open ? "open" : "closed"); } catch { /* Visibility is optional. */ }
+    if (!drawer && userId) try { localStorage.setItem(`scribble:page-sidebar:${userId}`, open ? "open" : "closed"); } catch { /* Visibility is optional. */ }
     if (!open) document.querySelector<HTMLButtonElement>(".sidebar-trigger")?.focus();
   };
   useEffect(() => {
-    if (!userId || !activeAccount) return;
-    void session.refreshAccess();
-    const refresh = () => void session.refreshAccess();
-    const timer = setInterval(refresh, 30000);
+    if (!userId || !activeAccount || !visiblePolling) return;
+    const refresh = () => {
+      if (document.visibilityState !== "hidden" && navigator.onLine !== false) void session.refreshAccess();
+    };
+    refresh();
+    const timer = setInterval(refresh, visiblePolling);
     window.addEventListener("focus", refresh);
     return () => { clearInterval(timer); window.removeEventListener("focus", refresh); };
-  }, [userId, activeAccount?.boardId, session]);
+  }, [userId, activeAccount?.boardId, session, visiblePolling]);
 
   const blocked = lifecycle.status === "signing-out" || !!activeAccount && activeAccount.ownerId !== lifecycleUser ||
     !!lifecycleUser && lifecycle.phase !== "device" && (lifecycle.phase !== "ready" || !activeAccount);
@@ -133,32 +151,62 @@ export function ServerBoards() {
   const notice = deviceFailure ? historyError ?? status.label : lifecycle.creationError ?? lifecycle.error ?? (consentNotice ? "These older images need your permission to upload. Their files stay on this device." : status.attention || accountBoards.error ? accountBoards.error ?? status.label : null);
 
   useLayoutEffect(() => {
-    const notice = noticeRef.current, header = headerRef.current, shell = header?.closest<HTMLElement>(".app-shell");
-    if (!notice || !header || !shell) return;
-    const measure = () => shell.style.setProperty("--workspace-content-top", `${notice.getBoundingClientRect().bottom - shell.getBoundingClientRect().top + 12}px`);
+    const title = titleControlsRef.current, share = shareControlsRef.current;
+    const notice = noticeRef.current, shell = title?.closest<HTMLElement>(".app-shell");
+    if (!title || !share || !shell) return;
+    // Measure the independent overlays, never the canvas or a spanning header.
+    const measure = () => {
+      const origin = shell.getBoundingClientRect().top;
+      const top = Math.max(title.getBoundingClientRect().bottom, share.getBoundingClientRect().bottom) - origin + 12;
+      shell.style.setProperty("--workspace-actions-width", `${share.getBoundingClientRect().width}px`);
+      shell.style.setProperty("--workspace-chrome-top", `${top}px`);
+      const noticeBottom = notice ? notice.getBoundingClientRect().bottom - origin + 12 : top;
+      shell.style.setProperty("--workspace-notice-bottom", `${noticeBottom}px`);
+      shell.style.setProperty("--workspace-content-top", `${Math.max(noticeBottom, shareFeedback ? shareFeedback.getBoundingClientRect().bottom - origin + 12 : top)}px`);
+    };
     const observer = new ResizeObserver(measure);
-    observer.observe(header); observer.observe(notice); measure();
+    observer.observe(title); observer.observe(share); if (notice) observer.observe(notice); if (shareFeedback) observer.observe(shareFeedback); measure();
     window.addEventListener("resize", measure);
-    return () => { observer.disconnect(); window.removeEventListener("resize", measure); shell.style.removeProperty("--workspace-content-top"); };
-  }, [!!notice, blocked]);
+    return () => {
+      observer.disconnect(); window.removeEventListener("resize", measure);
+      shell.style.removeProperty("--workspace-chrome-top"); shell.style.removeProperty("--workspace-content-top"); shell.style.removeProperty("--workspace-actions-width");
+      shell.style.removeProperty("--workspace-notice-bottom");
+    };
+  }, [!!notice, blocked, sidebarOpen, drawer, shareFeedback]);
 
   return (
     <>
-      <header ref={headerRef} className="board-header workspace-header" data-sidebar={userId && sidebarOpen && !mobile} aria-label="Canvas controls" onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()}>
-        <AppMenu details={() => setDetailsOpen(true)} blocked={blocked} />
-        {userId && <button className="sidebar-trigger icon-button" type="button" aria-label="Pages" aria-expanded={sidebarOpen} aria-haspopup={mobile ? "dialog" : undefined} onClick={() => changeSidebar(!sidebarOpen)}><PanelLeft size={20} aria-hidden="true" /></button>}
-        {!blocked ? <BoardIdentity location={activeAccount && accessRole !== "owner" ? accessRole === "editor" ? "Can edit" : accessRole === "viewer" ? "Can view" : "Access removed" : undefined} /> : <strong className="workspace-brand">Scribble</strong>}
-        <div className="header-spacer" />
-        {!blocked && activeAccount && !status.attention && <button className="save-status" type="button" onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">{status.label}</button>}
-        {!blocked && <CollaborationSummary />}
-        {!blocked && activeAccount && userId && accessRole === "owner" && <button className="primary-action header-save" type="button" disabled={accountBoards.busy} onClick={() => setSharingId(activeAccount.boardId)}>Share</button>}
-        <Account workspace={workspace} lifecycle={lifecycle} openRequest={accountOpenRequest} />
-      </header>
-      {userId && <PageSidebar key={userId} open={sidebarOpen} mobile={mobile} close={() => changeSidebar(false)} session={session} boards={boards.data} activeId={!blocked ? activeAccount?.boardId : undefined} busy={busy}
-        loading={boards.isPending} refreshing={boards.isFetching} error={boards.isError && !(boards.error instanceof BoardSignInRequired)} refresh={() => void boards.refetch()}
-        navigate={workspace.openPage} newPage={workspace.newPage} invitations={inboxEntry} />}
+      <div className="workspace-controls" role="group" aria-label="Canvas controls" onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()}>
+        <div ref={titleControlsRef} className="workspace-title-controls">
+          {userId && <button className="ui-button sidebar-trigger icon-button" type="button" aria-label="Pages" aria-expanded={sidebarOpen} aria-haspopup={drawer ? "dialog" : undefined} onClick={() => changeSidebar(!sidebarOpen)}><PanelLeft size={20} aria-hidden="true" /></button>}
+          {!blocked ? <BoardIdentity location={activeAccount && accessRole !== "owner" ? accessRole === "editor" ? "Can edit" : accessRole === "viewer" ? "Can view" : "Access removed" : undefined} /> : <strong className="workspace-brand">Scribble</strong>}
+          <AppMenu details={() => setDetailsOpen(true)} blocked={blocked} footerTarget={footerUtilitiesTarget}
+            linkSettings={!blocked && activeAccount && userId && accessRole === "owner" ? () => setSharingId(activeAccount.boardId) : undefined} />
+          {!blocked && activeAccount && !status.attention && <button className="ui-button save-status icon-button" type="button" title={status.label} aria-label={status.label} onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">{status.label === "Saved to account" ? <Check size={18} aria-hidden="true" /> : <Clock3 size={18} aria-hidden="true" />}</button>}
+        </div>
+        <div ref={shareControlsRef} className="workspace-share-controls">
+          {!blocked && <CollaborationSummary />}
+          {!blocked && activeAccount && userId && accessRole === "owner" && lifecycle.account?.status === "signed-in" && <ShareControls key={`${userId}:${activeAccount.boardId}:${sessionVersion}`}
+            account={lifecycle.account} boardId={activeAccount.boardId} version={sessionVersion} title={boardTitle} session={session} workspace={workspace}
+            settingsOpen={sharingId === activeAccount.boardId} closeSettings={() => setSharingId(null)}
+            feedbackSlot={setShareFeedback}
+            pendingChanges={accountBoards.status !== "saved" || pendingImages > 0}
+            autoCopy={lifecycle.shareDestination?.userId === userId && lifecycle.shareDestination.boardId === activeAccount.boardId} />}
+          {!blocked && !activeAccount && <button className="ui-button primary-action header-save" type="button" disabled={busy} onClick={() => setGuestShareRequest((value) => value + 1)}>Share</button>}
+          <div ref={setCornerAccountTarget} className="workspace-account-corner" />
+        </div>
+      </div>
+      <Account workspace={workspace} lifecycle={lifecycle} openRequest={accountOpenRequest} shareDrawingRequest={guestShareRequest} triggerTarget={footerAccountTarget ?? cornerAccountTarget} inSidebar={!!footerAccountTarget} />
+      {lifecycle.sharedPage && <section className="shared-page-entry ui-status" aria-label="Shared page" data-tone={lifecycle.sharedPage === "error" || lifecycle.sharedPage === "unavailable" ? "error" : "pending"} onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+        <p role={lifecycle.sharedPage === "error" || lifecycle.sharedPage === "unavailable" ? "alert" : "status"}>{lifecycle.sharedPage === "sign-in" ? "Sign in with Google to open this page." : lifecycle.sharedPage === "opening" ? "Opening the shared page…" : lifecycle.error ?? "This shared page is unavailable. Ask its owner for a current link."}</p>
+        {lifecycle.sharedPage === "sign-in" && <button className="ui-button primary-action" type="button" onClick={() => setAccountOpenRequest((value) => value + 1)}>Sign in to open page</button>}
+        {lifecycle.sharedPage === "error" && <button className="ui-button" type="button" onClick={() => void workspace.retry()}>Retry shared page</button>}
+      </section>}
+      {userId && <PageSidebar key={userId} open={sidebarOpen} mobile={drawer} close={() => changeSidebar(false)} session={session} boards={boards.data} activeId={!blocked ? activeAccount?.boardId : undefined} busy={busy}
+        loading={boards.isPending} retrying={boards.isFetching} error={boards.isError && !(boards.error instanceof BoardSignInRequired)} retry={() => void boards.refetch({ cancelRefetch: false })}
+        navigate={workspace.openPage} newPage={workspace.newPage} invitations={inboxEntry} accountSlot={setFooterAccountTarget} utilitiesSlot={setFooterUtilitiesTarget} />}
       {!userId && inviteLink && <aside className="invitation-entry" aria-label="Invitation">{inboxEntry}</aside>}
-      {blocked && <section className="workspace-gate" aria-label="Workspace" aria-live="polite">
+      {blocked && !lifecycle.sharedPage && <section className="workspace-gate" aria-label="Workspace" aria-live="polite">
         <p>{lifecycle.status === "signing-out" ? "Signing out…" : lifecycle.phase === "empty" ? "Your workspace is empty." : lifecycle.phase === "transfer-pending" ? lifecycle.transferProgress ?? "Your drawing transfer is ready to resume." : lifecycle.phase === "error" || lifecycle.status === "service-error" ? "Couldn’t open your workspace." : "Opening your workspace…"}</p>
         {lifecycle.phase === "transfer-pending" && lifecycle.transfer && !lifecycle.transferProgress && <>
           <button type="button" onClick={() => void workspace.resumeTransfer()}>Retry transfer</button>
@@ -170,7 +218,7 @@ export function ServerBoards() {
         {lifecycle.creationError && <><p role="alert">{lifecycle.creationError}</p><button type="button" disabled={busy} onClick={() => void workspace.newPage()}>Retry new page</button></>}
       </section>}
       {!blocked && activeAccount && !status.attention && <StatusAnnouncement message={status.label} />}
-      {!blocked && notice && <aside ref={noticeRef} className="board-notice" aria-label={consentNotice ? "Older image consent" : "Drawing needs attention"}>
+      {!blocked && notice && <aside ref={noticeRef} className="board-notice" onKeyDown={(event) => event.stopPropagation()} onKeyUp={(event) => event.stopPropagation()} data-tone={deviceFailure || lifecycle.creationError || lifecycle.error || accountBoards.error || accessRole === "none" || tabOwnership === "unavailable" ? "error" : "pending"} aria-label={consentNotice ? "Older image consent" : "Drawing needs attention"}>
         <span role="alert">{notice}{(tabRecoveryId || accountBoards.hasRecovery) && " · Device draft available"}</span>
         {deviceFailure ? <button type="button" onClick={() => setDetailsOpen(true)}>Details</button> : lifecycle.creationError ? <button type="button" disabled={busy} onClick={() => void workspace.newPage()}>Retry new page</button> : lifecycle.error ? <button type="button" onClick={() => void workspace.retry()}>Retry workspace</button> : consentNotice ? <button type="button" disabled={busy} onClick={() => setSaveFlow("images")}>Review image upload</button> : <>
           {userId && activeAccount && !readOnly && accountBoards.status === "error" && !busy && <button type="button" onClick={() => void session.retrySave()}>Retry save</button>}
@@ -181,7 +229,6 @@ export function ServerBoards() {
       <Dialog open={inboxOpen} title="Invitations" close={() => setInboxOpen(false)}>
         {userId ? <InvitationInbox key={userId} userId={userId} session={session} navigate={workspace.openPage} opened={() => setInboxOpen(false)} /> : <><p>Sign in with the invited Google email, then choose Accept invitation.</p><button type="button" onClick={() => { setInboxOpen(false); setAccountOpenRequest((value) => value + 1); }}>Sign in with Google</button></>}
       </Dialog>
-      {userId && sharingId && (activeAccount?.boardId === sharingId ? accessRole === "owner" : boards.data?.some((board) => board.id === sharingId && (board.role ?? "owner") === "owner")) && <BoardSharing key={`${userId}:${sharingId}`} userId={userId} boardId={sharingId} title={activeAccount?.boardId === sharingId ? boardTitle : boards.data?.find((board) => board.id === sharingId)?.title ?? "Account board"} session={session} close={() => setSharingId(null)} />}
       {userId && saveFlow && <SaveFlow kind={saveFlow} session={session} imageCount={saveFlow === "images" ? pendingImages : Object.values(objects).filter((object) => object.type === "image").length} close={() => setSaveFlow(null)} />}
     </>
   );

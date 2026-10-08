@@ -1,0 +1,23 @@
+{
+  "unchanged": 282,
+  "allowedChanges": [
+    "e2e-integration/cloud-images.spec.ts",
+    "e2e-integration/collaboration.spec.ts",
+    "e2e-integration/guest-transfer.spec.ts",
+    "e2e-integration/sharing.spec.ts",
+    "e2e-integration/workspace-journals.spec.ts",
+    "e2e-integration/workspace-saving.spec.ts",
+    "e2e-integration/workspace-ui.spec.ts",
+    "e2e/ux-layout.spec.ts",
+    "e2e/workspace-wake.spec.ts",
+    "UI_REDESIGN_IMPLEMENTATION_PLAN.md",
+    "docs/ui-redesign-r7.md",
+    "e2e/editor-controls.spec.ts",
+    "e2e/ui-primitives.spec.ts",
+    "e2e/workspace-shell.spec.ts",
+    "src/persistence/shareLinkActions.test.ts",
+    "src/workspace-shell.css"
+  ],
+  "unexpected": [],
+  "additions": []
+}

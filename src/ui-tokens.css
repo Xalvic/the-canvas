@@ -1,0 +1,116 @@
+/* R0 visual decisions. Theme selection and persisted preferences stay in themeStore. */
+:root {
+  --font-ui: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-ui: 14px;
+  --font-size-control: 13px;
+  --font-size-label: 12px;
+  --font-size-caption: 11px;
+  --font-size-heading: 18px;
+  --line-height-ui: 1.5;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-control: 8px;
+  --radius-surface: 12px;
+  --radius-tooltip: 6px;
+  --control-size: 36px;
+  --control-size-touch: 44px;
+  --icon-size: 20px;
+  --icon-size-compact: 18px;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --motion-fast: 120ms;
+  --disabled-opacity: .55;
+
+  --accent: #635bff;
+  --accent-soft: #eeedff;
+  --accent-ink: #ffffff;
+  --accent-hover: #554de8;
+  --app-bg: #f7f7f4;
+  --canvas-bg: #f7f7f4;
+  --surface: #ffffff;
+  --surface-raised: rgb(255 255 255 / .94);
+  --surface-translucent: rgb(255 255 255 / .86);
+  --surface-sidebar: #f0f0ec;
+  --surface-subtle: #f0f0ec;
+  --surface-hover: #e9e9e3;
+  --border: #ddded7;
+  --border-soft: rgb(36 37 34 / .09);
+  --text-primary: #20211f;
+  --text-secondary: #55574f;
+  --muted: #66685f;
+  --control-text: var(--text-secondary);
+  --control-muted: #b9bab5;
+  --control-border: #85877f;
+  --tooltip-bg: #252622;
+  --tooltip-text: #ffffff;
+  --shadow-sm: 0 1px 2px rgb(24 25 22 / .08);
+  --shadow-lg: 0 7px 24px rgb(24 25 22 / .08);
+  --backdrop: rgb(20 18 30 / .4);
+  --danger: #9e3636;
+  --danger-surface: #fff3f1;
+  --warning: #805d15;
+  --warning-surface: #fff9e9;
+  --success: #356544;
+  --success-surface: #eef6ef;
+
+  /* Existing canvas paint tokens; no drawing style or grid preference changes. */
+  --grid-dot: 157 158 151;
+  --grid-dot-opacity: .34;
+  --connector: #7d7e78;
+  --handle-border: #ffffff;
+  --frame-border: #c9cac4;
+  --frame-fill: rgb(255 255 255 / .34);
+  --frame-header: rgb(247 247 244 / .94);
+  --text-backdrop: transparent;
+}
+
+:root[data-theme="dark"] {
+  --accent: #8d87ff;
+  --accent-soft: #39364e;
+  --accent-ink: #20211f;
+  --accent-hover: #a09aff;
+  --app-bg: #20211f;
+  --canvas-bg: #20211f;
+  --surface: #2d2e2b;
+  --surface-raised: rgb(48 49 46 / .97);
+  --surface-translucent: rgb(45 46 43 / .9);
+  --surface-sidebar: #272824;
+  --surface-subtle: #272824;
+  --surface-hover: #393b35;
+  --border: #454740;
+  --border-soft: rgb(231 232 225 / .11);
+  --text-primary: #f0f1eb;
+  --text-secondary: #d1d2cb;
+  --muted: #aaaca5;
+  --control-muted: #74766f;
+  --control-border: #8a8e84;
+  --tooltip-bg: #f1f2ec;
+  --tooltip-text: #20211f;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .25);
+  --shadow-lg: 0 9px 28px rgb(0 0 0 / .32);
+  --backdrop: rgb(0 0 0 / .5);
+  --danger: #f3aaa4;
+  --danger-surface: #492826;
+  --warning: #edcd84;
+  --warning-surface: #393326;
+  --success: #b4dabd;
+  --success-surface: #29372c;
+
+  --grid-dot: 182 184 177;
+  --grid-dot-opacity: .2;
+  --connector: #a4a69f;
+  --handle-border: #252623;
+  --frame-border: #656761;
+  --frame-fill: rgb(255 255 255 / .045);
+  --frame-header: rgb(45 46 43 / .95);
+  --text-backdrop: rgb(244 244 238 / .9);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  :root { --control-size: var(--control-size-touch); }
+}

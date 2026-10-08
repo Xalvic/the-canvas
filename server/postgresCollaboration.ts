@@ -28,7 +28,7 @@ export function createPostgresCollaborationStore(prisma: PrismaClient): Collabor
         FROM boards b LEFT JOIN board_documents d ON d.board_id = b.id
         LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${userId}::uuid
         WHERE b.id = ${boardId}::uuid AND b.owner_id IS NOT NULL
-          AND (b.owner_id = ${userId}::uuid OR m.role IN ('editor', 'viewer'))
+          AND (${boardRoleSql(userId)}) IS NOT NULL
       `;
       return rows[0];
     },

@@ -39,7 +39,7 @@ for (const missing of ["none", "locks", "channel", "both"] as const) {
     await flush(page);
     const before = await local(page);
     const other = await context.newPage(); await guest(other); await other.bringToFront();
-    await expect(other.getByLabel("Board title", { exact: true })).toBeEnabled();
+    await expect(other.getByLabel("Drawing title", { exact: true })).toBeEnabled();
     expect((await local(other)).objects).toEqual(before.objects);
     expect((await local(other)).viewport).toEqual(before.viewport);
     await expect.poll(async () => (await local(page)).ownership).toBe("passive");
@@ -50,7 +50,7 @@ for (const missing of ["none", "locks", "channel", "both"] as const) {
     await page.bringToFront();
     // Headless Chromium does not emit a tab-switch focus event consistently.
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+    await expect(page.getByLabel("Drawing title", { exact: true })).toBeEnabled();
     expect((await local(page)).objects).toEqual(shared.objects);
     expect((await local(page)).history).toBe(0);
     await page.getByRole("button", { name: "Note tool", exact: true }).click();
@@ -79,19 +79,19 @@ test("guest handoff waits for text composition and preserves the final committed
   const continueHere = other.getByRole("button", { name: "Continue editing here", exact: true });
   if (await continueHere.isVisible()) await continueHere.click();
   await closeDialogs(other);
-  await expect(other.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await expect(other.getByLabel("Drawing title", { exact: true })).toBeEnabled();
   expect(Object.values((await local(other)).objects).some((object: any) => object.title === "Final composed text")).toBe(true);
 });
 
 test("an active pen stroke is committed once before guest ownership is handed off", async ({ page, context }) => {
   await guest(page);
-  await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await expect(page.getByLabel("Drawing title", { exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Pen tool", exact: true }).click();
   await page.mouse.move(700, 600); await page.mouse.down();
   await page.mouse.move(780, 650, { steps: 5 });
   expect(Object.keys((await local(page)).objects)).toHaveLength(0);
   const other = await context.newPage(); await guest(other);
-  await expect(other.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await expect(other.getByLabel("Drawing title", { exact: true })).toBeEnabled();
   const objects = Object.values((await local(other)).objects) as any[];
   expect(objects).toHaveLength(1); expect(objects[0].type).toBe("stroke");
   expect(objects[0].points.length).toBeGreaterThan(1);
@@ -124,6 +124,6 @@ test("without signal transports a held Web Lock stays safe, snapshots poll and e
   await details(other);
   await other.evaluate(() => { document.hasFocus = () => true; });
   await other.getByRole("button", { name: "Continue editing here", exact: true }).click(); await closeDialogs(other);
-  await expect(other.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await expect(other.getByLabel("Drawing title", { exact: true })).toBeEnabled();
   expect(Object.values((await local(other)).objects).some((object: any) => object.title === "Polled latest snapshot")).toBe(true);
 });

@@ -1,0 +1,240 @@
+{
+  "captured": "2026-10-07",
+  "inherited": [
+    {
+      "status": " D",
+      "path": "WORKSPACE_UX_IMPLEMENTATION_PLAN.md",
+      "sha256": null
+    },
+    {
+      "status": " M",
+      "path": "docs/ux-simplification-plan.md",
+      "sha256": "3FC6147E0C229A7388A46DBBB1AB1D4D791220B978F273C184AFDD34FD211879"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/cloud-images.spec.ts",
+      "sha256": "992A68DE0269AB180C25F6EDD5F87C0709C93BA179BE25F978550415A835866E"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/collaboration.spec.ts",
+      "sha256": "D783ADB4C22CFACFB9FD0F7C9E895FC7D34E976190ED5A71497440314E3AD1E3"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/guest-transfer.spec.ts",
+      "sha256": "50460A383B24156A09FB1FCBD54DCD3CB8A03C06806E3CDD9A644AAE844D8D0E"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/sharing.spec.ts",
+      "sha256": "EB38753F6B33CAE085B9948147A8EB1B9900799CCAC9D8826C96F35CD789DC37"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-journals.spec.ts",
+      "sha256": "1F446535E484693D39844B7F9BC91AD9163D6E5D61DD6BF66DB550208DF16F44"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-saving.spec.ts",
+      "sha256": "E399BC205F14EAE074E66DF9D9159FEFC48A4C2009B4D757F87401DCAB50115F"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-ui.spec.ts",
+      "sha256": "3C7219FC0D8342BD51E51CEB72A3FFC57A24313D358F6A7718DE5EDB902763ED"
+    },
+    {
+      "status": " M",
+      "path": "e2e/authentication.spec.ts",
+      "sha256": "757B12794723844C002E12CF2ED44DEEEE2B40ED02CFBD951049FE02D177FB91"
+    },
+    {
+      "status": " M",
+      "path": "e2e/compatibility.spec.ts",
+      "sha256": "B31A4158206B523FF44574FE42B6E815716F4D5016749A0D6E63FFD8AE1D455F"
+    },
+    {
+      "status": " M",
+      "path": "e2e/fixtures/ui.ts",
+      "sha256": "8B25F5E68D9E1EE55A82A6AC0E14276CDDDE204243CC1E9455AF82A28674D203"
+    },
+    {
+      "status": " M",
+      "path": "e2e/private-server-boards.spec.ts",
+      "sha256": "C2D49C9572A33EB52F09434D0F630CE2ED6D5E06710AA14BC1B04239F7FAAF8D"
+    },
+    {
+      "status": " M",
+      "path": "e2e/ux-layout.spec.ts",
+      "sha256": "56A2BCA82F14AD640419CF8AD1D4374FE117BA08934A7691B3D4A966ADF4F0B7"
+    },
+    {
+      "status": " M",
+      "path": "e2e/workspace-tabs.spec.ts",
+      "sha256": "1A1662F6566987D6DA4FA16A7D1A2F22DCD86833F91262794F0EA65B8B2F8323"
+    },
+    {
+      "status": " M",
+      "path": "e2e/workspace-wake.spec.ts",
+      "sha256": "6B425AD389F7AF7A83D0E6029E381F499B18D090ACF257E26D7C3CD284A0AA7A"
+    },
+    {
+      "status": " M",
+      "path": "scripts/backup-restore-proof.mjs",
+      "sha256": "4CCD27B1C934A20EE51A9D5DCC674B5C1C95C9253C8C9C0D3209A80E2FDB8F73"
+    },
+    {
+      "status": " M",
+      "path": "scripts/test-database.mjs",
+      "sha256": "216F3AECAC99BD89E3520A00481293E221614AA9FD14153AF8C8426084548566"
+    },
+    {
+      "status": " M",
+      "path": "server/collaboration.test.ts",
+      "sha256": "9A9E08465E37A151DB038B8CF4526E0A525009A08CD78766DB7C94DAA8FC55D4"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountBoardSession.test.ts",
+      "sha256": "4EE99069614DC8DE6D0CAFE1D2D252F2F399A6DF0FA2C592CBFE5C40F511F1FE"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountBoardSession.ts",
+      "sha256": "5E7FEFB8676C8BF4014B414B56E8ED0A49675B857B9FEB031D4BDB8B741BBE99"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountImageUploads.ts",
+      "sha256": "BC232B475A7146A29176DAB73300F3DA56FD60A35B641314FA290890F1549437"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/guestTransfer.test.ts",
+      "sha256": "99DD2DAD53186D2B9481B005011C030DAE28FB27EEEE8FAB4D5DBADE31AC6FC5"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/guestTransfer.ts",
+      "sha256": "BFEB50460A57ADA32DB8CCC8625BA89AC16785E6EB3685EC7866965C27801C16"
+    },
+    {
+      "status": "??",
+      "path": "docs/workspace-ux-m11.md",
+      "sha256": "A3C3555C51B18BB926220B83F25173BCBA2FB1ADFA514DE7358937FE61D7BD7B"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-database-audit.mjs",
+      "sha256": "3EE71946EAD16AE3949CAB4E0CFE0A4D9B7672CB5182D561C2482EDC959E5523"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-database-isolation.json",
+      "sha256": "2408A3CF0FA1732A8F3FF40F3ED95FE19A7DC5A0812735349C63CB85C9E011DC"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-1440-dark.png",
+      "sha256": "1F022E61DE998DB550491365D46AE9BD4E3363AFE780307381E863D32925C440"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-1440-light.png",
+      "sha256": "27A6268E77EAC09091BC2403F94D914ED63D247E9A9C6F030D8B4C34D7A4B1E1"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-390-dark.png",
+      "sha256": "7344C5D2F940CA5D8B138167FE8DF599B3D85A065FF1C7754E3FC8865DF2481F"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-390-light.png",
+      "sha256": "AAE9015112F5FE86BFD1374BD9E1BC0BF74359A07F0427C2C823A4F9D34D6379"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-keyboard-pages.png",
+      "sha256": "17C07CCF05337209A737F6A7C4D2BAEFFB8C27450F1012C36E3E6490E6272E91"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-keyboard-share.png",
+      "sha256": "FFA512D6DF07404A1EBCB779EC7C5A9BFE33AF819BC431112310E8F2D9850E5E"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-live-desktop.png",
+      "sha256": "A99418BF95BB21A62BB5329663F2F16744225882079AB3394A44FD25D7D20A9C"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-live-mobile.png",
+      "sha256": "20046C1F45D5A44E12BADDE0E163D5629BF9B30BE7BC9E7FC4D170EA2B96BA08"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-mobile-consent.png",
+      "sha256": "610974013C67589557A3222FF3243E04FF577659AC0BD555E13E2F1A11CA4B9C"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-offline-pending.png",
+      "sha256": "585271AE0494F563C2F92D4EDDF88D7F9D750DB2683B32E373070A8476613289"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-1440-dark.png",
+      "sha256": "836F5D66D77052EA26BD5B8A2B5378F66E133841964BBCF75B320F8075E0DC8E"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-1440-light.png",
+      "sha256": "1C46D72483773AB3205885F1BE5B96FA8D2B136178BF72786BB40AA11A36EB92"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-390-dark.png",
+      "sha256": "7E75FAAD63D42FC36ED428365DE94451AAA3E384F0F941330D952E9D9EF4F01B"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-390-light.png",
+      "sha256": "A8F529C4E810A5F250C758F3D64AC3A1A6C4CBD9895F64788AF116C104A81429"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-desktop.png",
+      "sha256": "47BFF7A6F64E53973B507A733D266C42137DC03D2967C3F2BE8FBA0C92DEA222"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-mobile.png",
+      "sha256": "B9096A5B8C0605281F4B79AE8AEEC8F11AFE431B4AFFD40AC01CEED929522428"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-pending-mobile.png",
+      "sha256": "220E39D8C02739003F3FE5CE34010D8D6E9909C4AC45FDAB4D2C8A2487C29B4A"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-safe-area.png",
+      "sha256": "1154A99C695BBE9AFC690D72266A27D736F82B4EF0C51E794FE670E757E80CC7"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-typecheck.json",
+      "sha256": "7C612148EF01CEEC0217336BC76CEA249EC592BAA02DA94929C6F4C4F863B011"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-zoom-layout.png",
+      "sha256": "410F8127C112B380BAB617837D1BF1068DA29A34738425BCC9D0F070BE6E16D3"
+    }
+  ]
+}

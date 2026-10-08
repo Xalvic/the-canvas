@@ -19,7 +19,7 @@ export function SaveFlow({ kind, session, imageCount, close }: {
     {imageCount > 0 && <p>{imageCount} {imageCount === 1 ? "image" : "images"} will be uploaded. Cloud images support JPEG, PNG and WebP up to 5 MiB each.</p>}
     {state.imageUpload && <p role="status">Uploading images… {state.imageUpload.completed}/{state.imageUpload.total}</p>}
     {started && !finished && state.busy && !state.imageUpload && <p role="status">Preparing and saving your board…</p>}
-    {finished && !state.error && <p role="status">{state.status === "saved" ? kind === "images" ? "Account board saved." : "Account copy is ready." : "Edits are still waiting to save. Check Save details."}</p>}
+    {finished && !state.error && <p className="ui-status" data-tone={state.status === "saved" ? "success" : "pending"} role="status">{state.status === "saved" ? kind === "images" ? "Account board saved." : "Account copy is ready." : "Edits are still waiting to save. Check Save details."}</p>}
     {state.error && <p role="alert">{state.error}</p>}
     {finished && state.error && <p>{changedBoard || kind === "images" ? "Keep this destination page open. Completed image uploads are retained; use Save details to retry this page’s save." : "Creation may have reached your account if the response was lost. Refresh My pages and inspect the result before creating another copy. The source page remains here."}</p>}
     <div className="dialog-actions">

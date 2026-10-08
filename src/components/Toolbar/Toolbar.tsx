@@ -71,6 +71,8 @@ const mobileMoreTools = tools.filter(({ id }) =>
   (["hand", "connector", "frame"] as ActiveTool[]).includes(id),
 );
 
+const COMPACT_SETTINGS = "(max-width: 1100px), (max-height: 500px)";
+
 function ToolButton({
   id,
   label,
@@ -175,10 +177,10 @@ export function Toolbar() {
   }, [dockCollapsed]);
 
   useEffect(() => {
-    const compact = window.matchMedia("(max-width: 767px)");
+    const compact = window.matchMedia(COMPACT_SETTINGS);
     const collapseContextPanels = (matches: boolean) => {
       if (!matches) return;
-      setCollapsedPanels((state) => ({
+      setCollapsedPanels((state) => state.pen && state.text ? state : ({
         ...state,
         pen: true,
         text: true,
@@ -188,11 +190,26 @@ export function Toolbar() {
     const handleChange = (event: MediaQueryListEvent) =>
       collapseContextPanels(event.matches);
     compact.addEventListener("change", handleChange);
-    return () => compact.removeEventListener("change", handleChange);
+    // Collapse presentation once on returning to the canvas, outside pointer-move paths.
+    const returnToCanvas = (event: PointerEvent) => {
+      if (!compact.matches || !(event.target instanceof Element) ||
+        !event.target.closest(".canvas-viewport") ||
+        event.target.closest(".toolbar-area, .tool-options, .zoom-dock, .mobile-selection-actions")) return;
+      collapseContextPanels(true);
+      setAppearanceId(null);
+    };
+    document.addEventListener("pointerdown", returnToCanvas, true);
+    return () => {
+      compact.removeEventListener("change", handleChange);
+      document.removeEventListener("pointerdown", returnToCanvas, true);
+    };
   }, []);
 
   const chooseTool = (tool: ActiveTool) => {
     setAppearanceId(null);
+    if (window.matchMedia(COMPACT_SETTINGS).matches) {
+      setCollapsedPanels((state) => state.pen && state.text ? state : ({ ...state, pen: true, text: true }));
+    }
     setActiveTool(tool);
   };
 
@@ -232,6 +249,7 @@ export function Toolbar() {
                 type="button"
                 className="tool-button"
                 aria-label="Edit appearance"
+                aria-pressed={appearanceId === editable.id}
                 aria-expanded={appearanceId === editable.id}
                 aria-describedby="tooltip-appearance"
                 onClick={() =>

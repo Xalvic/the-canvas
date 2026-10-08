@@ -1,0 +1,619 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "E:\\PROJECTS\\the-canvas\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "-c",
+      "ui-redesign-evidence/r5-integration.config.ts"
+    ],
+    "configFile": "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r5-integration.config.ts",
+    "rootDir": "E:/PROJECTS/the-canvas/e2e-integration",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": "E:\\PROJECTS\\the-canvas\\e2e-integration\\teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r5-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "E:/PROJECTS/the-canvas/e2e-integration",
+        "testIgnore": [],
+        "testMatch": [
+          "share-links.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "ui-redesign-evidence/r5-browser-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "share-links.spec.ts",
+      "file": "share-links.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "one-click reusable Share, two recipients, server-enforced viewer/editor roles and live revocation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10771,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:21.393Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-ad16d36654b44a31fb9c",
+          "file": "share-links.spec.ts",
+          "line": 41,
+          "column": 1
+        },
+        {
+          "title": "signed-out recipient keeps guest work, survives cancelled Google sign-in and opens without an incidental page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4122,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:32.329Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-df752c6137f3ab67bd09",
+          "file": "share-links.spec.ts",
+          "line": 86,
+          "column": 1
+        },
+        {
+          "title": "clipboard failure offers selectable fallback and a fresh copy click without a second link mutation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1074,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:36.472Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-98ab282b91b187261660",
+          "file": "share-links.spec.ts",
+          "line": 116,
+          "column": 1
+        },
+        {
+          "title": "lost committed response and reload retry the original intent, while a later Stop supersedes it",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2147,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:37.557Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-3df7f6954b83d47dbcda",
+          "file": "share-links.spec.ts",
+          "line": 129,
+          "column": 1
+        },
+        {
+          "title": "navigation fences a delayed Share response and preserves edited work",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3544,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:39.718Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-b60925668792f8d70ab4",
+          "file": "share-links.spec.ts",
+          "line": 147,
+          "column": 1
+        },
+        {
+          "title": "guest Share requires explicit transfer consent and resumes on its sole exact destination",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2354,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:43.273Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-2a2e7e23532869684210",
+          "file": "share-links.spec.ts",
+          "line": 161,
+          "column": 1
+        },
+        {
+          "title": "legacy invitation acceptance and independent invited membership survive Stop",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2182,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:45.641Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-0f9ba456d66615474992",
+          "file": "share-links.spec.ts",
+          "line": 178,
+          "column": 1
+        },
+        {
+          "title": "light/dark desktop/mobile Link settings stay bounded with keyboard focus and no email form",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2036,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:47.839Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-0dfe04610c18a427ef9b",
+          "file": "share-links.spec.ts",
+          "line": 194,
+          "column": 1
+        },
+        {
+          "title": "a transient recipient failure offers Retry, while invalid/stopped links reveal no document",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3285,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:49.889Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-546218a424f254ac662a",
+          "file": "share-links.spec.ts",
+          "line": 207,
+          "column": 1
+        },
+        {
+          "title": "unsupported capability makes Share recoverable without copying a nonfunctional URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1516,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:53.195Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-9ffd513816a72a13a089",
+          "file": "share-links.spec.ts",
+          "line": 223,
+          "column": 1
+        },
+        {
+          "title": "blocked tab storage keeps the recipient link and provides explicit Google redirect recovery",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2041,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:54.722Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-122a0c2686e3df1f6ab0",
+          "file": "share-links.spec.ts",
+          "line": 232,
+          "column": 1
+        },
+        {
+          "title": "opening a link preserves a pending consented transfer and resumes its recorded destination",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4140,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:10:56.780Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-c14a46e2412d42ae8dac",
+          "file": "share-links.spec.ts",
+          "line": 245,
+          "column": 1
+        },
+        {
+          "title": "session expiry clears the recipient canvas and restores the retained guest drawing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3776,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:11:00.938Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-b853795309a6c6ad2876",
+          "file": "share-links.spec.ts",
+          "line": 272,
+          "column": 1
+        },
+        {
+          "title": "share errors reserve space below recovery notices and above appearance controls without moving the canvas",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "timedOut",
+                  "duration": 60036,
+                  "error": {
+                    "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
+                    "stack": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                  },
+                  "errors": [
+                    {
+                      "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                    },
+                    {
+                      "location": {
+                        "file": "E:\\PROJECTS\\the-canvas\\e2e-integration\\share-links.spec.ts",
+                        "column": 56,
+                        "line": 298
+                      },
+                      "message": "Error: locator.boundingBox: Test timeout of 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.tool-options')\u001b[22m\n\n\n  296 |     const notice = (await page.locator(\".board-notice\").boundingBox())!, toast = (await feedback.boundingBox())!;\n  297 |     expect(toast.y).toBeGreaterThanOrEqual(notice.y + notice.height);\n> 298 |     const panel = (await page.locator(\".tool-options\").boundingBox())!; expect(panel.y).toBeGreaterThan(toast.y + toast.height);\n      |                                                        ^\n  299 |     expect(await page.locator(\".canvas-viewport\").boundingBox()).toEqual(canvas);\n  300 |     await page.screenshot({ path: \"ui-redesign-evidence/r5-pending-share-error.png\" });\n  301 |   } finally {\n    at E:\\PROJECTS\\the-canvas\\e2e-integration\\share-links.spec.ts:298:56"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:11:04.727Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r5-test-results\\share-links-share-errors-r-2af60-s-without-moving-the-canvas\\error-context.md"
+                    }
+                  ]
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-840b2c3d45061f0497e1",
+          "file": "share-links.spec.ts",
+          "line": 287,
+          "column": 1
+        },
+        {
+          "title": "another tab's settings change requires review before Stop and never silently rebases",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1578,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T18:12:05.420Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "591eb4d23313562f12c7-807b295e45b51a507d30",
+          "file": "share-links.spec.ts",
+          "line": 307,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-07T18:10:16.540Z",
+    "duration": 111142.44200000001,
+    "expected": 14,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

@@ -8,7 +8,7 @@ describe("account API boundary", () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ user }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     const signal = new AbortController().signal;
-    expect(await getAccount(signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false });
+    expect(await getAccount(signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false, shareLinksEnabled: false });
     expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/auth/me", { credentials: "same-origin", signal });
   });
   it.each([true, false])("handles guest state without treating sign-in availability %s as a login", async (enabled) => {
@@ -34,13 +34,18 @@ describe("account API boundary", () => {
 });
 it("advertises transfer support only for the compatible signed-in server contract", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ user, capabilities: { guestTransfer: 1 } }))));
-  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: true });
+  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: true, shareLinksEnabled: false });
 });
 it("older servers retain identity while leaving transfer support disabled", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ user }))));
-  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false });
+  expect(await getAccount(new AbortController().signal)).toEqual({ status: "signed-in", user, guestTransferEnabled: false, shareLinksEnabled: false });
 });
 it("preserves Google-only guest availability and optional transfer support", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "UNAUTHENTICATED", details: { googleSignInEnabled: true, guestTransferEnabled: true } } }), { status: 401 })));
   expect(await getAccount(new AbortController().signal)).toEqual({ status: "guest", googleSignInEnabled: true, guestTransferEnabled: true });
+});
+
+it.each([1, 2])("enables link APIs only for supported capability version %s", async (version) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ user, capabilities: { guestTransfer: 1, shareLinks: version } }))));
+  expect(await getAccount(new AbortController().signal)).toMatchObject({ status: "signed-in", user, shareLinksEnabled: version === 1 });
 });

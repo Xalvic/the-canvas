@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Users } from "lucide-react";
 import { screenToWorld, type Point, type Viewport } from "../canvas/viewport/viewportMath";
 import { isCanvasSpatialObject } from "../canvas/objects/types";
 import { useCollaborationStore } from "../store/collaborationStore";
@@ -88,9 +89,10 @@ export function CollaborationSummary() {
   const label = status === "connected" ? `Live · ${others.length} ${others.length === 1 ? "collaborator" : "collaborators"}` :
     status === "error" ? "Live updates unavailable" : status === "reconnecting" ? "Reconnecting live updates…" : "Connecting live updates…";
   if (status === "disconnected") return null;
+  const summary = <><Users size={18} aria-hidden="true" /><span className="collaboration-label">{label}</span></>;
   return <>
-    {others.length > 0 ? <button type="button" className="collaboration-summary" data-collaboration-status={status} aria-haspopup="dialog" onClick={() => setPeopleOpen(true)}>{label}</button> :
-      <span className="collaboration-summary" data-collaboration-status={status}>{label}</span>}
+    {others.length > 0 ? <button type="button" className="ui-button collaboration-summary" title={label} aria-label={label} data-collaboration-status={status} aria-haspopup="dialog" onClick={() => setPeopleOpen(true)}>{summary}</button> :
+      <span className="collaboration-summary" title={label} data-collaboration-status={status}>{summary}</span>}
     <Dialog open={peopleOpen} title="People on this board" close={() => setPeopleOpen(false)}>
       <p>Other people currently connected to live updates:</p>
       {others.length === 0 ? <p>No other collaborators connected.</p> : <ul>{others.map((participant) => <li key={participant.clientId}>{participant.displayName?.trim() || "Collaborator"}</li>)}</ul>}

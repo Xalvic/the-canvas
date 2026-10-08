@@ -1,0 +1,851 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "E:\\PROJECTS\\the-canvas\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "-c",
+      "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r1-disposable.config.ts"
+    ],
+    "configFile": "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r1-disposable.config.ts",
+    "rootDir": "E:/PROJECTS/the-canvas/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 2
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r1-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "layout",
+        "name": "layout",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "r1-disposable-layout.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r1-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "preferences",
+        "name": "preferences",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "responsive.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r1-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "semantics",
+        "name": "semantics",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "ux-simplification.spec.ts"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r1-test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 2
+        },
+        "id": "primitives",
+        "name": "primitives",
+        "testDir": "E:/PROJECTS/the-canvas/e2e",
+        "testIgnore": [
+          "pen-production.spec.ts"
+        ],
+        "testMatch": [
+          "ui-primitives.spec.ts"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "E:/PROJECTS/the-canvas/ui-redesign-evidence/r1-browser-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 2,
+    "webServer": {
+      "command": "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
+      "url": "http://127.0.0.1:4173",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "r1-disposable-layout.spec.ts",
+      "file": "r1-disposable-layout.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "guest chrome fits light/dark, narrow screens, tablet and landscape",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4360,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:41.256Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-c8960b162b224eb66c6f",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 18,
+          "column": 3
+        },
+        {
+          "title": "owner chrome fits light/dark, narrow screens, tablet and landscape",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 6433,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:41.288Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-a29b11a900670f734a68",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 18,
+          "column": 3
+        },
+        {
+          "title": "toolbar traversal, settings Escape, menus and focused zoom isolate canvas shortcuts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 947,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:45.788Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-56dde37d2d7c8a3050bb",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 53,
+          "column": 1
+        },
+        {
+          "title": "mobile More tools navigates, dismisses and restores focus; dock collapse keeps zoom/history",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1015,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:46.754Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-a76446896dc8e33d4403",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 74,
+          "column": 1
+        },
+        {
+          "title": "viewer toolbar skips disabled tools and keeps navigation available",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1124,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:47.788Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-443164b3bd168e03cdbc",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 89,
+          "column": 1
+        },
+        {
+          "title": "text editing and IME rename retain work in reduced keyboard viewports",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1465,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:47.896Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-ccaf36469f2df7050d26",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 99,
+          "column": 1
+        },
+        {
+          "title": "drawer and sharing stay inside the visual viewport when a keyboard pans the page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1320,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:48.929Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-881950036a1d9c6f1c7e",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 112,
+          "column": 1
+        },
+        {
+          "title": "mobile object appearance replaces the action row in short landscape and restores Style focus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1047,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:49.377Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-3329015f2bac61c9b9fc",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 127,
+          "column": 1
+        },
+        {
+          "title": "a pending save notice and expanded mobile settings reserve separate space",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9671,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:50.264Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-32d296247c7169d83c69",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 140,
+          "column": 1
+        },
+        {
+          "title": "device write failure stays below measured chrome and retries the existing queue",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2732,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:50.444Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-fea2034ea05cf0157ae1",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 150,
+          "column": 1
+        },
+        {
+          "title": "theme text, active tools, boundaries and focus retain readable contrast",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 527,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:53.191Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-26368fdf9c4e9322e9ba",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 166,
+          "column": 1
+        },
+        {
+          "title": "mobile safe areas and equivalent 200% layout keep chrome and dialogs reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1448,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:53.729Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-8f0a20bcd9184f60363f",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 182,
+          "column": 1
+        },
+        {
+          "title": "sidebar and resized chrome preserve world coordinates, drag/resize, pen and atomic history",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "layout",
+              "projectName": "layout",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1474,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:55.188Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b09cd7c359c97ce24831-abdcfb700fd589eb0773",
+          "file": "r1-disposable-layout.spec.ts",
+          "line": 204,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "responsive.spec.ts",
+      "file": "responsive.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "mobile dock, settings tray, and persisted themes fit narrow screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1221,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:57.207Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-e4b06a6294ef42c89ad2",
+          "file": "responsive.spec.ts",
+          "line": 27,
+          "column": 1
+        },
+        {
+          "title": "phone and tablet breakpoints keep controls reachable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1465,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:27:58.563Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-53989bc7fab0e2526dd4",
+          "file": "responsive.spec.ts",
+          "line": 83,
+          "column": 1
+        },
+        {
+          "title": "light is the default and replaces the retired system preference",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "preferences",
+              "projectName": "preferences",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 791,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:28:00.522Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e0223b006feb3d306446-e1c287bb68a1e0c39432",
+          "file": "responsive.spec.ts",
+          "line": 108,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "ux-simplification.spec.ts",
+      "file": "ux-simplification.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "minimal guest UI keeps local saving quiet and consent keyboard actions isolated",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "semantics",
+              "projectName": "semantics",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 2512,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:28:00.601Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b31a542d2b8bc5b83aba-94f99a1f817a5686d537",
+          "file": "ux-simplification.spec.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "app menu keyboard navigation restores focus and help describes automatic page saving",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "semantics",
+              "projectName": "semantics",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 932,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:28:02.003Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b31a542d2b8bc5b83aba-445d5f65555354e82ab5",
+          "file": "ux-simplification.spec.ts",
+          "line": 121,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "ui-primitives.spec.ts",
+      "file": "ui-primitives.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "light native sharing controls keep contrast, validation, focus and actionable errors",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "primitives",
+              "projectName": "primitives",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1452,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:28:03.666Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "558c2d087fdd9d10f2d3-f7523697c392f9dee9e0",
+          "file": "ui-primitives.spec.ts",
+          "line": 21,
+          "column": 3
+        },
+        {
+          "title": "dark native sharing controls keep contrast, validation, focus and actionable errors",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "primitives",
+              "projectName": "primitives",
+              "results": [
+                {
+                  "workerIndex": 7,
+                  "parallelIndex": 1,
+                  "status": "passed",
+                  "duration": 1407,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T13:28:03.923Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "558c2d087fdd9d10f2d3-af356dceba351bb505ab",
+          "file": "ui-primitives.spec.ts",
+          "line": 21,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-07T13:27:37.816Z",
+    "duration": 27971.396999999997,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

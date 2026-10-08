@@ -5,11 +5,14 @@ import {
 } from "./boards";
 import type { CanvasDocument } from "../persistence/canvasDocument";
 import { applyBoardOperation, type CollaborationOperationInput } from "./collaboration";
+import { getBoardSharing, getInvitations } from "./sharing";
 
 export const accountBoardKeys = {
   all: ["account-boards"] as const,
   owner: (ownerId: string) => ["account-boards", ownerId] as const,
   list: (ownerId: string) => ["account-boards", ownerId, "list"] as const,
+  invitations: (ownerId: string) => ["account-boards", ownerId, "invitations"] as const,
+  sharing: (ownerId: string, boardId: string) => ["account-boards", ownerId, "sharing", boardId] as const,
   document: (ownerId: string, boardId: string) => ["account-boards", ownerId, "document", boardId] as const,
 };
 
@@ -18,17 +21,49 @@ export function retryBoardRead(failureCount: number, error: Error) {
     (error instanceof BoardApiError && error.status >= 500));
 }
 
+export const ACCOUNT_METADATA_INTERVAL = 30_000;
+const metadataReadOptions = {
+  staleTime: ACCOUNT_METADATA_INTERVAL,
+  gcTime: 5 * 60_000,
+  retry: retryBoardRead,
+  retryDelay: 500,
+  // Fail promptly offline; reconnect refreshes reads but never replays writes.
+  networkMode: "always" as const,
+  refetchOnReconnect: "always" as const,
+  refetchOnWindowFocus: true,
+  refetchOnMount: true,
+  refetchIntervalInBackground: false,
+};
+
 export function accountBoardListOptions(ownerId: string) {
   return queryOptions({
+    ...metadataReadOptions,
     queryKey: accountBoardKeys.list(ownerId),
-    queryFn: ({ signal }) => listServerBoards(signal),
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-    retry: retryBoardRead,
-    retryDelay: 500,
-    // Fail promptly offline; reconnect refreshes reads but never replays writes.
-    networkMode: "always",
-    refetchOnReconnect: "always",
+    queryFn: ({ signal }) => listServerBoards(signal, ownerId),
+  });
+}
+
+export function accountInvitationListOptions(ownerId: string) {
+  return queryOptions({
+    ...metadataReadOptions,
+    queryKey: accountBoardKeys.invitations(ownerId),
+    queryFn: ({ signal }) => getInvitations(signal, ownerId),
+  });
+}
+
+export function accountBoardSharingOptions(ownerId: string, boardId: string) {
+  return queryOptions({
+    ...metadataReadOptions,
+    queryKey: accountBoardKeys.sharing(ownerId, boardId),
+    queryFn: ({ signal }) => getBoardSharing(boardId, signal, ownerId),
+  });
+}
+
+/** Refresh metadata after access changes without fetching/replacing editor documents. */
+export function invalidateAccountMetadata(client: QueryClient, ownerId: string) {
+  return client.invalidateQueries({
+    queryKey: accountBoardKeys.owner(ownerId),
+    predicate: (query) => ["list", "invitations", "sharing"].includes(String(query.queryKey[2])),
   });
 }
 

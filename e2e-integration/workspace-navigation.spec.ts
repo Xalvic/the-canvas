@@ -60,7 +60,7 @@ test("explicit page, last-opened restore, Back/Forward and per-page history/view
 });
 
 test("sign-in preserves the guest original and sign-out journals active text before restoring it", async ({ page, context }) => {
-  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
+  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveAccessibleName("Sign in with Google");
   await createNote(page, "Retained guest original", 330, 500); await flushLocalDraft(page);
   await signIn(context.request); await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(async () => (await pages(context.request)).length).toBe(1);
@@ -99,7 +99,7 @@ test("account service failure and slow checks retain the loaded page; confirmed 
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(async () => (await canvasState(page)).account).toBeNull();
   await expect(page.getByRole("alert").filter({ hasText: "Your session ended" })).toBeVisible();
-  await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
+  await expect(page.locator(".account-trigger")).toHaveAccessibleName("Sign in with Google");
 });
 
 test("lost initialization response is recovered without creating a second page", async ({ page, context }) => {
@@ -155,7 +155,7 @@ test("page and invitation intent survive a simulated authentication redirect wit
   const { subject } = await signIn(context.request); const board = await pageRecord(context.request, "Linked page");
   await context.request.post(`${BASE_URL}/api/auth/logout`, { headers: mutationHeaders });
   await page.goto(`/scribble/?page=${board.id}&invite=${invite}`);
-  await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
+  await expect(page.locator(".account-trigger")).toHaveAccessibleName("Sign in with Google");
   await page.evaluate(async () => {
     (await import(/* @vite-ignore */ "/scribble/src/persistence/workspaceNavigation.ts")).rememberPageIntent();
     (await import(/* @vite-ignore */ "/scribble/src/components/ServerBoards/invitationIntent.ts")).rememberInvitationIntent();
@@ -175,13 +175,13 @@ test("a lost account save remains journaled while switching pages and navigating
   await page.goto(`/scribble/?page=${first.id}`); await active(page, first.id);
   await network(context.request, 1);
   await createNote(page, "Pending response retained", 330, 500);
-  await expect(page.locator(".save-status")).toContainText("Changes pending");
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/);
   const pending = (await canvasState(page)).account!.pendingOperation!.input;
   await flushLocalDraft(page);
   await openBoard(page, second.title); await active(page, second.id);
   await page.goBack(); await active(page, first.id);
   await expect(page.getByText("Pending response retained", { exact: true })).toBeVisible();
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect((await canvasState(page)).account!.pendingOperation).toBeUndefined();
   const persisted = await state(context.request, first.id);
   expect(persisted.receipts).toHaveLength(1);

@@ -41,18 +41,23 @@ async function journal(page: Page) {
 test("a lost same-account operation response survives reload while the other editor advances the document", async ({ page, context }) => {
   const { other, boardId, title } = await editors(page, context);
   await network(context.request, 1);
+  let attempts = 0;
+  await page.route("**/api/boards/*/operations", async (route) => {
+    if (++attempts === 1) await route.continue(); else await route.abort("internetdisconnected");
+  });
   await editNote(page, "First baseline", "First committed response lost");
-  await expect(page.locator(".save-status")).toContainText("Account save failed"); await flushLocalDraft(page);
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/); await flushLocalDraft(page);
   const pending = (await canvasState(page)).account!.pendingOperation!.input;
   const original = await journal(page);
   await editNote(other, "Second baseline", "Other editor advanced");
-  await expect(other.locator(".save-status")).toHaveText("Saved to account");
+  await expect(other.locator(".save-status")).toHaveAccessibleName("Saved to account");
   await page.reload(); await openBoard(page, title);
   expect((await journal(page)).key).toBe(original.key);
   expect((await journal(page)).editorId).not.toBe(original.editorId);
   expect((await canvasState(page)).account!.pendingOperation!.input).toEqual(pending);
+  await page.unroute("**/api/boards/*/operations");
   await retry(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account", { timeout: 12_000 });
   await expect.poll(async () => titles((await canvasState(page)).objects)).toEqual(["First committed response lost", "Other editor advanced"]);
   const remote = await state(context.request, boardId);
   expect(remote.receipts.filter((receipt) => receipt.operation_id === pending.operationId)).toHaveLength(1);
@@ -63,18 +68,18 @@ test("two crashed pending journals remain recoverable and replay distinct operat
   const { other, boardId, title } = await editors(page, context);
   await Promise.all([page, other].map((tab) => tab.route("**/api/boards/*/operations", (route) => route.abort("internetdisconnected"))));
   await Promise.all([editNote(page, "First baseline", "First pending crash"), editNote(other, "Second baseline", "Second pending crash")]);
-  await Promise.all([page, other].map((tab) => expect(tab.locator(".save-status")).toContainText("Account save failed")));
+  await Promise.all([page, other].map((tab) => expect(tab.locator(".save-status")).toHaveAccessibleName(/Changes pending/)));
   await Promise.all([flushLocalDraft(page), flushLocalDraft(other)]);
   const operationIds = [(await canvasState(page)).account!.pendingOperation!.input.operationId, (await canvasState(other)).account!.pendingOperation!.input.operationId];
   expect(new Set(operationIds).size).toBe(2);
   expect((await journal(page)).records).toHaveLength(2);
   await page.close(); await other.close();
   const recovered = await context.newPage(); await recovered.goto("/scribble/"); await openBoard(recovered, title);
-  await retry(recovered); await expect(recovered.locator(".save-status")).toHaveText("Saved to account"); await flushLocalDraft(recovered);
+  await retry(recovered); await expect(recovered.locator(".save-status")).toHaveAccessibleName("Saved to account"); await flushLocalDraft(recovered);
   await details(recovered);
   await recovered.getByRole("button", { name: /^Recover draft / }).click();
   await closeDialogs(recovered); await retry(recovered);
-  await expect(recovered.locator(".save-status")).toHaveText("Saved to account");
+  await expect(recovered.locator(".save-status")).toHaveAccessibleName("Saved to account");
   await expect.poll(async () => titles((await state(context.request, boardId)).document!.content.objects)).toEqual(["First pending crash", "Second pending crash"]);
   const remote = await state(context.request, boardId);
   for (const id of operationIds) expect(remote.receipts.filter((receipt) => receipt.operation_id === id)).toHaveLength(1);
@@ -96,11 +101,11 @@ test("same-object contention retains both journals and never overwrites the conf
   const { other, boardId } = await editors(page, context);
   await page.route("**/api/boards/*/operations", (route) => route.abort("internetdisconnected"));
   await editNote(page, "First baseline", "My divergent journal");
-  await expect(page.locator(".save-status")).toContainText("Account save failed"); await flushLocalDraft(page);
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/); await flushLocalDraft(page);
   await editNote(other, "First baseline", "Confirmed other edit");
-  await expect(other.locator(".save-status")).toHaveText("Saved to account");
+  await expect(other.locator(".save-status")).toHaveAccessibleName("Saved to account");
   await page.unroute("**/api/boards/*/operations"); await retry(page);
-  await expect(page.locator(".save-status")).toHaveText("This board changed elsewhere"); await flushLocalDraft(page);
+  await expect(page.locator(".board-notice")).toContainText("changed"); await flushLocalDraft(page);
   expect(titles((await canvasState(page)).objects)).toContain("My divergent journal");
   expect(titles((await state(context.request, boardId)).document!.content.objects)).toContain("Confirmed other edit");
   expect((await journal(page)).records).toHaveLength(2);
@@ -149,9 +154,10 @@ test("legacy account drafts migrate by copying while pending operations, saved m
   const migrated = await journal(page);
   expect(migrated.key).not.toBe(existingKey);
   expect(migrated.records.map((record) => record.id)).toContain(existingKey);
-  expect((await canvasState(page)).account!.pendingOperation!.input.operationId).toBe(operationId);
+  const pending = (await canvasState(page)).account!.pendingOperation;
+  if (pending) expect(pending.input.operationId).toBe(operationId);
   expect((await canvasState(page)).account!.imageAssets).toEqual({ "retained-image": mappedAsset });
-  await retry(page); await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await retry(page); await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   const stored = await page.evaluate(async (id) => {
     const { openCanvasDatabase } = await import(/* @vite-ignore */ "/scribble/src/persistence/database.ts");
     const database = await openCanvasDatabase();

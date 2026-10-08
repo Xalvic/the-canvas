@@ -48,7 +48,7 @@ export async function openBoard(page: Page, title: string) {
   await expect(page.getByLabel("Page title")).toHaveValue(title);
   await closeDialogs(page);
   await expect(page.getByLabel("Page title")).toBeVisible();
-  await page.getByRole("button", { name: "Reset viewport", exact: true }).click();
+  await page.getByRole("button", { name: "Zoom options", exact: true }).click(); await page.getByRole("menuitem", { name: "Reset viewport", exact: true }).click();
 }
 export async function connected(page: Page) {
   await expect(page.locator('[data-collaboration-status="connected"]')).toBeVisible();

@@ -2,6 +2,10 @@
 
 Created: 2026-10-06. Updated: 2026-10-06. Status: phases 0–4 implemented and locally gated; phase 5 local regression checks passed. Human usability and controlled release remain pending.
 
+Superseded by `../WORKSPACE_UX_IMPLEMENTATION_PLAN.md` (M0-M11 locally verified).
+This file and its wireframe are historical; current acceptance and release
+handoff are in `workspace-ux-m11.md`.
+
 ## Current implementation handoff
 
 Read `AGENTS.md`, the current handoff in `docs/learning-checkpoint.md`, and this

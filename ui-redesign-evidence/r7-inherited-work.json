@@ -1,0 +1,1494 @@
+{
+  "inherited": [
+    {
+      "status": " M",
+      "path": ".env.example",
+      "hash": "87a7090c550d7c48d65cf581333df90fb245549b99565b944514ef3f5f52e83a"
+    },
+    {
+      "status": " D",
+      "path": "WORKSPACE_UX_IMPLEMENTATION_PLAN.md",
+      "hash": null
+    },
+    {
+      "status": " M",
+      "path": "docs/ux-simplification-plan.md",
+      "hash": "3fc6147e0c229a7388a46dbbb1ab1d4d791220b978f273c184afdd34fd211879"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/cloud-images.spec.ts",
+      "hash": "992a68de0269ab180c25f6edd5f87c0709c93ba179be25f978550415a835866e"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/collaboration.spec.ts",
+      "hash": "d783adb4c22cfacfb9fd0f7c9e895fc7d34e976190ed5a71497440314e3ad1e3"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/guest-transfer.spec.ts",
+      "hash": "50460a383b24156a09fb1fcbd54dcd3cb8a03c06806e3cdd9a644aae844d8d0e"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/sharing.spec.ts",
+      "hash": "eb38753f6b33cae085b9948147a8eb1b9900799ccac9d8826c96f35cd789dc37"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-journals.spec.ts",
+      "hash": "1f446535e484693d39844b7f9bc91ad9163d6e5d61dd6bf66db550208df16f44"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-saving.spec.ts",
+      "hash": "e399bc205f14eae074e66df9d9159fefc48a4c2009b4d757f87401dcab50115f"
+    },
+    {
+      "status": " M",
+      "path": "e2e-integration/workspace-ui.spec.ts",
+      "hash": "3c7219fc0d8342bd51e51ceb72a3ffc57a24313d358f6a7718de5edb902763ed"
+    },
+    {
+      "status": " M",
+      "path": "e2e/authentication.spec.ts",
+      "hash": "757b12794723844c002e12cf2ed44deeee2b40ed02cfbd951049fe02d177fb91"
+    },
+    {
+      "status": " M",
+      "path": "e2e/compatibility.spec.ts",
+      "hash": "b31a4158206b523ff44574fe42b6e815716f4d5016749a0d6e63ffd8ae1d455f"
+    },
+    {
+      "status": " M",
+      "path": "e2e/fixtures/ui.ts",
+      "hash": "8b25f5e68d9e1ee55a82a6ac0e14276cddde204243cc1e9455af82a28674d203"
+    },
+    {
+      "status": " M",
+      "path": "e2e/private-server-boards.spec.ts",
+      "hash": "c2d49c9572a33eb52f09434d0f630ce2ed6d5e06710aa14bc1b04239f7faaf8d"
+    },
+    {
+      "status": " M",
+      "path": "e2e/ux-layout.spec.ts",
+      "hash": "d937df4eeeb2a84902252f5ff05e6c45cd4af587440c89438339e7633c38b156"
+    },
+    {
+      "status": " M",
+      "path": "e2e/workspace-tabs.spec.ts",
+      "hash": "1a1662f6566987d6da4fa16a7d1a2f22dcd86833f91262794f0ea65b8b2f8323"
+    },
+    {
+      "status": " M",
+      "path": "e2e/workspace-wake.spec.ts",
+      "hash": "6b425ad389f7af7a83d0e6029e381f499b18d090acf257e26d7c3cd284a0aa7a"
+    },
+    {
+      "status": " M",
+      "path": "prisma/schema.prisma",
+      "hash": "959544e61c229e3aa176c8c4f1ca8e25bf5560724f3a8092f27d3053e1530ab5"
+    },
+    {
+      "status": " M",
+      "path": "scripts/backup-restore-proof.mjs",
+      "hash": "4ccd27b1c934a20ee51a9d5dcc674b5c1c95c9253c8c9c0d3209a80e2fdb8f73"
+    },
+    {
+      "status": " M",
+      "path": "scripts/e2e-api-fixture.ts",
+      "hash": "1545aae234d5756d11b25f742846db4b04e8570c191685d0664e7eea30bb9dcd"
+    },
+    {
+      "status": " M",
+      "path": "scripts/test-database.mjs",
+      "hash": "1887616037f87fae7e5590ca18b79919b89a253d620aaf2cbb8d4984d7e4effd"
+    },
+    {
+      "status": " M",
+      "path": "server/app.ts",
+      "hash": "847b72f3b62b4f139d0f2f9fc8ffeba6284ceccd66caeccceb4ebc5416282713"
+    },
+    {
+      "status": " M",
+      "path": "server/authRoutes.ts",
+      "hash": "6c79dcd2bc1b5025314648a01804bd1a7b067526264b4eaf13c42759791d8f2a"
+    },
+    {
+      "status": " M",
+      "path": "server/boardPermissions.ts",
+      "hash": "d4546051747ab28789967c7a7d3afd3cff43be730662f42b65a71bba318d00a7"
+    },
+    {
+      "status": " M",
+      "path": "server/collaboration.test.ts",
+      "hash": "9a9e08465e37a151db038b8cf4526e0a525009a08cd78766db7c94daa8fc55d4"
+    },
+    {
+      "status": " M",
+      "path": "server/index.ts",
+      "hash": "9e1769a9abc4bcc60a3827ebf875105ba0891500083ee307e3cf6fe2e0e3eae8"
+    },
+    {
+      "status": " M",
+      "path": "server/migrations.test.ts",
+      "hash": "04bb6ebaa6227cdd784f3121c25d87fa67afc21be3dc96571534ea6d89660254"
+    },
+    {
+      "status": " M",
+      "path": "server/migrations.ts",
+      "hash": "2c65e65cb601988998b4d4b5bd74327702f23cca135bed049de904fd438a7298"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresAssets.test.ts",
+      "hash": "676ebc0fc56a740089bc8c7c90aad0379730ed91afaf90d23738f6a51815f190"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresAuth.test.ts",
+      "hash": "4de3e8744fa7993298c05ae7aa2284aa673b4df6cebb568651ec9eaae41288ec"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresBoards.test.ts",
+      "hash": "9b37671d5c5801dd8c15a198fe48ab6ee6997d0e78d577df1a5b2d71b6f7a607"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresBoards.ts",
+      "hash": "8b03024ff21376507b8a97e14f1c40adb33d7b055fa3bea154658b14d9e41c7f"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresCollaboration.test.ts",
+      "hash": "32fff67f9cb3c650177d15a69140f1e1e9f5966682f5b8453481e2bbaee4b6e2"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresCollaboration.ts",
+      "hash": "e36e66b60e956ba41feaafc79d1d6afd68c9606fc2f17936a5407240e36a3b4f"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresDocuments.ts",
+      "hash": "3317e563d643deef3f5e2ecee6b8a1e51d62c51c54f740aca311041491c51eae"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresSharing.test.ts",
+      "hash": "9c0c2eb3d5343226ac6e0b41d49fdf39c51203db9843fe8a65acac180843d10f"
+    },
+    {
+      "status": " M",
+      "path": "server/postgresWorkspace.ts",
+      "hash": "5dd795b8124a3722ef2f5740de216046bc6c495f3512f263cfbe4c6d9b6e5b84"
+    },
+    {
+      "status": " M",
+      "path": "server/production.ts",
+      "hash": "40fd091c73024eff426a049fb24b62f4a981c3d6ac8629878b2104e0139a90b5"
+    },
+    {
+      "status": " M",
+      "path": "src/api/accountBoardQueries.ts",
+      "hash": "4854bc825ecdbaeebd04732e5b9898e210db01d1ae4928d7049895bde69bd73a"
+    },
+    {
+      "status": " M",
+      "path": "src/api/auth.test.ts",
+      "hash": "801d76032515bf989b9eda9765dd3abe0c53225ec693ae1216221c79e811f044"
+    },
+    {
+      "status": " M",
+      "path": "src/api/auth.ts",
+      "hash": "b7eaf94d379513042325f4877a4f23ea41dc342703080122771e16dda7303d71"
+    },
+    {
+      "status": " M",
+      "path": "src/api/boards.ts",
+      "hash": "c34ab09781813d86940ce51658036fa193b4f2603fe13ceb9fc078687cf2e894"
+    },
+    {
+      "status": " M",
+      "path": "src/api/sharing.ts",
+      "hash": "cc6a7006e8dce75fa3bf8de9db6fec755aea66af6b3fcb6b18b726b07190b76c"
+    },
+    {
+      "status": " M",
+      "path": "src/canvas/viewport/CanvasViewport.tsx",
+      "hash": "a9fdc9050cba5d66ec08c3dc6f5c3d2f2b71dd42ba3339d50ea9b07b5a8fd919"
+    },
+    {
+      "status": " M",
+      "path": "src/components/Account/Account.tsx",
+      "hash": "71a648c1c7e22ce2ca74861aede8c410505a66332da792bb53138d77b4ed1740"
+    },
+    {
+      "status": " M",
+      "path": "src/components/AppMenu.tsx",
+      "hash": "d5df9056b2b40caa786ac7438b1ee559ce77c6ece1313a04bdeb4d3b6edc3304"
+    },
+    {
+      "status": " M",
+      "path": "src/components/BoardIdentity/BoardIdentity.tsx",
+      "hash": "289d003a153c6adce8eb958a8322f460ba7febce26e6cc2362e6671b7bbf2d93"
+    },
+    {
+      "status": " M",
+      "path": "src/components/CollaborationPresence.tsx",
+      "hash": "e67ccd1fdd823138f4a8bc12edad1f8fc22604b5356178ee9ea6279cfadf0035"
+    },
+    {
+      "status": " M",
+      "path": "src/components/Dialog.tsx",
+      "hash": "c30aaea0164ba248fd5234bb36676475051a36cd4ebbd01a06adf6e1ccd41bf6"
+    },
+    {
+      "status": " M",
+      "path": "src/components/Menu.tsx",
+      "hash": "43490107b291a4178a1e92b402898ed9a477cfaeddd1b623471a0bb96b28ab41"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ServerBoards/PageSidebar.tsx",
+      "hash": "6eca027391bbe83103846f1d1334aea9367d3c11f376dcdbeaaaefe64ea5f29a"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ServerBoards/SaveFlow.tsx",
+      "hash": "6c510d64d7c789a90cab54e4c5b2564d760811eb1ca867bde02b4b84c1995566"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ServerBoards/ServerBoards.tsx",
+      "hash": "318c3ba68ecb60625c026618d2420deea91fd487d1080943302e089ec1ed0cd9"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ServerBoards/Sharing.tsx",
+      "hash": "425871ee867c981ed8a794894931d13c591593195138c59c553f5fccb0f88494"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ToolOptions/ToolOptions.tsx",
+      "hash": "1e6b9708df51d820d44e1de615cf0cda65f54452243bd65eaaffba127dfb47ea"
+    },
+    {
+      "status": " M",
+      "path": "src/components/Toolbar/Toolbar.tsx",
+      "hash": "32c0fc07d4be499cdcbab53e8d8bce7165eebcb8b4a93e6fd6859f981f8495ba"
+    },
+    {
+      "status": " M",
+      "path": "src/components/ZoomControls/ZoomControls.tsx",
+      "hash": "7674caa03c5f64a733784f6b698565d5ae4e7e8b7c60e4399419d0b5f506cb44"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountBoardSession.test.ts",
+      "hash": "4ee99069614dc8de6d0cafe1d2d252f2f399a6df0fa2c592cbfe5c40f511f1fe"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountBoardSession.ts",
+      "hash": "5e7fefb8676c8bf4014b414b56e8ed0a49675b857b9feb031d4bdb8b741bbe99"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/accountImageUploads.ts",
+      "hash": "bc232b475a7146a29176dab73300f3da56fd60a35b641314fa290890f1549437"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/guestTransfer.test.ts",
+      "hash": "99dd2dad53186d2b9481b005011c030dae28fb27eeee8fab4d5dbade31ac6fc5"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/guestTransfer.ts",
+      "hash": "bfeb50460a57ada32db8ccc8625ba89ac16785e6eb3685ec7866965c27801c16"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/workspaceController.test.ts",
+      "hash": "a29eab4e78136b34e53a579677e074dba75b8f85baf9fcc76ae1455439003fca"
+    },
+    {
+      "status": " M",
+      "path": "src/persistence/workspaceController.ts",
+      "hash": "7c8e8a34873ec1ec0d9a459b46d542255ffc3240ec62b4102815a99292a42ea9"
+    },
+    {
+      "status": " M",
+      "path": "src/styles.css",
+      "hash": "9994914d15fd6f0c7780f14d92b4c355950d8d7b416cd7b07613ca3678af15ab"
+    },
+    {
+      "status": "??",
+      "path": "UI_REDESIGN_IMPLEMENTATION_PLAN.md",
+      "hash": "518dde052058fcbb5ef9dfae96e831af9eefd0a0a1590af52b09c43345dc96be"
+    },
+    {
+      "status": "??",
+      "path": "db/012_create_board_share_links.sql",
+      "hash": "2d2fae830b9451160fcc694db010dc19932673810cba622fc8b67c27bf25d6fd"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-proposal.html",
+      "hash": "cb1e4be628fdf6e41edafa9ac934a153203627a27751410e1b9e23192ada40ea"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r0.md",
+      "hash": "77cd0d5b85a877f4586ff82499ad7c571f254ba8932e947d1ef70f90379560fe"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r1.md",
+      "hash": "71c0dc2ec16a039d0d13b855c341b8d4c11d5e8122fadfcf647f0b00844ce0a8"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r2.md",
+      "hash": "8b4106cf013869c20db7b144607a90a54547f465e498d49936d2ca171d72c6f3"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r3.md",
+      "hash": "b6d273a8b596b18f8d33e9ffd16c6b504e4677e6270d832351ac5d25e2512ea5"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r4.md",
+      "hash": "e4e8f54d6b97c4d7a0feaaeaf723681f9723bddf0104a1efb76a039adf21d8a2"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r5.md",
+      "hash": "95bca546fb2041fbea0c69698a7d38ac4cff5d9be91a100494a6934589ca9d20"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r6.md",
+      "hash": "a4a8e90def7b94b5d9fc976f9c6f55e90e1125eb58ce5df6507c8eba8cb3af62"
+    },
+    {
+      "status": "??",
+      "path": "docs/ui-redesign-r7.md",
+      "hash": "3848e45b2aa50743f0390fb5c91e661550367e5ab364c66c6b6dc9c936578bee"
+    },
+    {
+      "status": "??",
+      "path": "docs/workspace-ux-m11.md",
+      "hash": "a3c3555c51b18bb926220b83f25173bcba2fb1adfa514de7358937fe61d7bd7b"
+    },
+    {
+      "status": "??",
+      "path": "e2e-integration/share-links.spec.ts",
+      "hash": "225190d8ba3a80590860e836a9bd617c0b55929173e965f546c732e4a6036692"
+    },
+    {
+      "status": "??",
+      "path": "e2e/editor-controls.spec.ts",
+      "hash": "747261cc945fa7e1a0e2012a3f336a86f4a5a88ce3ee38c234a317eee957d2a5"
+    },
+    {
+      "status": "??",
+      "path": "e2e/ui-primitives.spec.ts",
+      "hash": "966273adef10e69b525215dd619b3d93291f248390f0e4e001a90886f10d5079"
+    },
+    {
+      "status": "??",
+      "path": "e2e/workspace-shell.spec.ts",
+      "hash": "4d3b2d46ba92607ae0fbadf02eb833f3403e0bed3a3e3d7c668b271ecb3cf9bf"
+    },
+    {
+      "status": "??",
+      "path": "server/postgresShareLinks.test.ts",
+      "hash": "bd2a30dce6e20cf307d98b05e340fd82f3cbfbcb87a6803ffda5f486b25a9477"
+    },
+    {
+      "status": "??",
+      "path": "server/postgresShareLinks.ts",
+      "hash": "40d06bfc40f58c145fe4e5a6f4c3bae5f33a46c30b1fd4e23da02d48f8086023"
+    },
+    {
+      "status": "??",
+      "path": "server/shareLinkCrypto.ts",
+      "hash": "477c13c96d53928fc43f7c44c2d53f4c053ef743e87d2b10078bdbe0d838a8a7"
+    },
+    {
+      "status": "??",
+      "path": "server/shareLinkRoutes.ts",
+      "hash": "6736753e3039c1200d460a2eec45663052768c736ad7a4ec14497785debc4010"
+    },
+    {
+      "status": "??",
+      "path": "server/shareLinks.test.ts",
+      "hash": "e0abfbf55f6610fc3d80505ad72a72e38e5f5494d0f77e36d29617fde9020409"
+    },
+    {
+      "status": "??",
+      "path": "server/shareLinks.ts",
+      "hash": "f8b619962075a7ef8c062d80cae2e3fcadabbc7d159b026d705fd0b1f39a6eb8"
+    },
+    {
+      "status": "??",
+      "path": "server/testFixtures/shareLinkServer.ts",
+      "hash": "4304416b3e234ad19c458f99eeb73bc9d9beaffb52d6c0f4443af928c521455a"
+    },
+    {
+      "status": "??",
+      "path": "src/api/shareLinks.test.ts",
+      "hash": "ec5c8b359cba1efe147452ca02430c4628d4c21e906f0b9d738c1edaf53c8432"
+    },
+    {
+      "status": "??",
+      "path": "src/api/shareLinks.ts",
+      "hash": "3c71da4a73718ec103fad0ee86282d4f32e6af1e178d18786e511a1ac8e7dcba"
+    },
+    {
+      "status": "??",
+      "path": "src/components/ServerBoards/ShareControls.tsx",
+      "hash": "9967536e53e652655e4bd388db8c30179349766e0cc2e7796c47d105b6ce75e3"
+    },
+    {
+      "status": "??",
+      "path": "src/components/ServerBoards/useVisiblePolling.ts",
+      "hash": "d5d9bb99d462d006d58421d376b01941c5667e3a55bf357bf7f1ede9b3a21190"
+    },
+    {
+      "status": "??",
+      "path": "src/editor-controls.css",
+      "hash": "995a9a5c59954a13b0561498431e8b98fd6f4685fe309452319f623a8b2c8b48"
+    },
+    {
+      "status": "??",
+      "path": "src/persistence/shareLinkActions.test.ts",
+      "hash": "fd5edb08c0bb83f7edb363fdfa6afd8ff95eac20e05f0734a5c759a57112dd68"
+    },
+    {
+      "status": "??",
+      "path": "src/persistence/shareLinkActions.ts",
+      "hash": "028440dc2fea2dae1f307de0538ce507820fd86b988e19236d1bdf2147525185"
+    },
+    {
+      "status": "??",
+      "path": "src/persistence/shareLinkIntent.test.ts",
+      "hash": "65d8385a43306379ebb701e27728fc26e4a0da203599304007278f4188ef0dbb"
+    },
+    {
+      "status": "??",
+      "path": "src/persistence/shareLinkIntent.ts",
+      "hash": "5002dac8d5550cdd387801649c301e194a66172518449b5fb579e200d1ddfcaa"
+    },
+    {
+      "status": "??",
+      "path": "src/share-controls.css",
+      "hash": "b192ed2a4a95bda4bd6f75c98fc81669b7203b47a1a5e7b8009799b5ffac1616"
+    },
+    {
+      "status": "??",
+      "path": "src/ui-primitives.css",
+      "hash": "9b0689e5dd49c2a7b45048d08379ced71ddff8b1080ded228809944743512ac6"
+    },
+    {
+      "status": "??",
+      "path": "src/ui-tokens.css",
+      "hash": "63259a447fb37526df2514e7cf1876065229a6141f3d4099a416d8be975dc1a9"
+    },
+    {
+      "status": "??",
+      "path": "src/workspace-shell.css",
+      "hash": "b547e56cbee57be6dad05459dd54b0902ff460d48c3157daee4bf8c3f14e78f7"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-guest-1440-dark.png",
+      "hash": "1f022e61de998db550491365d46ae9bd4e3363afe780307381e863d32925c440"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-guest-1440-light.png",
+      "hash": "27a6268e77eac09091bc2403f94d914ed63d247e9a9c6f030d8b4c34d7a4b1e1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-guest-390-dark.png",
+      "hash": "7344c5d2f940ca5d8b138167fe8df599b3d85a065ff1c7754e3fc8865df2481f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-guest-390-light.png",
+      "hash": "aae9015112f5fe86bfd1374bd9e1bc0bf74359a07f0427c2c823a4f9d34d6379"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-owner-1440-dark.png",
+      "hash": "836f5d66d77052ea26bd5b8a2b5378f66e133841964bbcf75b320f8075e0dc8e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-owner-1440-light.png",
+      "hash": "1c46d72483773ab3205885f1be5b96fa8d2b136178bf72786bb40aa11a36eb92"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-owner-390-dark.png",
+      "hash": "43239c91e46b5303e15733c5f5ce9eadf69a3dffbf7da49c1c441685ebf0a426"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-baseline-owner-390-light.png",
+      "hash": "a8f529c4e810a5f250c758f3d64ac3a1a6c4cbd9895f64788af116c104a81429"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-clipboard-fallback.png",
+      "hash": "58e962959fc0566bf2f95f6ebca60c0b1857f624caeb5c42dab35e6ee0abcd27"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-collapsed-desktop-dark.png",
+      "hash": "10affe3028217008ecc75b102f7459fbe5d6c56770bee6215385b00710536d9c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-collapsed-desktop-light.png",
+      "hash": "49db33fbc7b1b6383ae9140d6f5005679f1334e4381e8016a85f449eea27e53c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-empty-desktop.png",
+      "hash": "049b8a2a992d40aaf9144ceae8810a0585a0f3b8138f45acfab61282769eb84d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-guest-desktop-dark.png",
+      "hash": "b443ed3cc2898c4823c2b9b9ee2c674c83d6256ba43bb879241ea2b707364fdc"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-guest-desktop-light.png",
+      "hash": "8f41b41464e12b90cba1e4be30574070e0d9f69d105275d87198b1fae70ab698"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-guest-mobile-dark.png",
+      "hash": "b7d94c63cc309fee07daf31abf2c8dd9f719a01f44827c1679b53d886cbe0bd4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-guest-mobile-light.png",
+      "hash": "92acf5d85a0b4779a8af99e7b2aa0a92ece967390333772248e7504fd6e973d0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-guest-transfer-consent.png",
+      "hash": "eb77751abf7e44b998c3db15ec6a555e7659c3d05837df210b9630d085249fc2"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-inherited-work.json",
+      "hash": "e03d29b83123957fc0def3708a192c2d53ebfc1f697fa6382525c71b0d121c7b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-link-failure.png",
+      "hash": "f7161b4d84d5835b0551381344b84107dd9269b7b48dd27a25f5f919bc768686"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-link-settings.png",
+      "hash": "45b6e9209c681c4d47269084e0e660d98e180d9e7f4fe18f41395b2d311f3df1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-long-title-styles.png",
+      "hash": "369a82a59e9ed6adce117c9b24c0fa6410d061e5299cc4c80cfc801c55a66615"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-mobile-error-dark.png",
+      "hash": "8952f0b674d1bca4ae60de906cac362c2a161c9dcecc060fe428561f8f330b9e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-mobile-error-light.png",
+      "hash": "f017597da9d10afe2fc6fb6a47e4a98430e42e598528277a2ddb249dc45f7585"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-mobile-pending-dark.png",
+      "hash": "611cb2b7f0d3c5bff1fdb0f7e4db46c6df5ba102deca3b600928d75d1c64a00d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-mobile-pending-light.png",
+      "hash": "5f3ad01909e74331b6de4bafa3e69ce18781bd3079c1f8b0adc2a74d6ba2d9e3"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-owner-desktop-dark.png",
+      "hash": "d6d062f0383afafe576ff2cb8185310661cb0b960a4ddd0a354eb9544e46ebb8"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-owner-desktop-light.png",
+      "hash": "0a57494a0bc2c09496e8132f53c714adec487b9499a02cf477377accb5648c15"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-owner-link-copied.png",
+      "hash": "e824540c3c84f155798af54e7bd587581cd47c61dcfe1b96e4b9f93d55978974"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-owner-mobile-dark.png",
+      "hash": "65bbfd251de4a3afba7053a6615aed0ba1ddb6f83aeaf5723dfe9670a568d1bc"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-owner-mobile-light.png",
+      "hash": "a2a3b0fca61dc23b7788fc8465fa75f1010309034271f086e14badaff00fb921"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-preservation-verification.json",
+      "hash": "f7d167edd0d943cce9bf9d5a3642242f989f2c4cffc960ef83708d1c80c0a4a5"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-recipient-dark.png",
+      "hash": "d6c986766e974428e1ae3ce6a6d662c13683b3f2054ed61673158129e5ed84c0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-recipient-light.png",
+      "hash": "346fceabbb94a5aa84fef181207bf0d1505837441ec170edff7605a5e9a3e51d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-short-landscape-error.png",
+      "hash": "f3d8a9cc8875e9bbe76f21662a8b9480d449d674fbb4ccd0867664845ca14ddc"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-stopped-link.png",
+      "hash": "b94b5955aca14eb06256e1c427559850248ba09bd78423cc6fb78cc5579d8b66"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-verification.json",
+      "hash": "e529b9032ef27cd2cdd8dc1e63f1d24a08af444cb2231b5341976c3dace13281"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-verify.mjs",
+      "hash": "3ed76e2a06cbbe6635adbfd46643e5d03cbf3f563e692ecf3a8be9271b23a4aa"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r0-visual-viewport-consent.png",
+      "hash": "6f800fa43e4a254499c37208fdd757e07932cdadad4603615d8393d5465102a8"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-browser-results.json",
+      "hash": "369f30704b154eb84f6295f90ea99f577a53d9d58d92c23edfc6dfb15a613a95"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-check-preservation.mjs",
+      "hash": "a613c8c33e4b87a96593c3d773e50cfa08ae9b69b6ade0d00128a7ed3dbe661c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-guest-1440-dark.png",
+      "hash": "47ae356b90c987f13a3d6bbdc4821e879a1f9c50b338f56a263be7e0216f553c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-guest-1440-light.png",
+      "hash": "b032611c4429f70981e4937893b0ccc8ef30796f7d78373a746f1baf534b5311"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-guest-390-dark.png",
+      "hash": "b866d5b72ef2aed4f4e9ca87e148b533b1d82616d42a0e6576ea6e70097cfd8f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-guest-390-light.png",
+      "hash": "082e5eb935495c64eadc18088d8dfd6a4cb0b7c4d7bbec53f217355facb4090a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-inherited-work.json",
+      "hash": "0150878f3b7a8f81e2b29902f1c070ae9ce5eba10c5becc3cb7d60d38db835af"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-keyboard-pages.png",
+      "hash": "ee5f55c6eac501ca7a55c8dfc60c380a1a46d9407dbadfdc7f0a9f1d6abba71d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-keyboard-share.png",
+      "hash": "11c8ebfac3764dfca6c5f424b87a5ac302dba32141725d215a51e86307b709e7"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-menu-dark.png",
+      "hash": "2b0f8a3f7853527b1cfe39f13d8361315845e028d8214625698969bc1d224dbf"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-menu-light.png",
+      "hash": "5e6af2869ea2ef03a092f8410f96f6a0686d27fe8ba06c751073b09fedd28586"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-owner-1440-dark.png",
+      "hash": "645291008fec97d0eda9620c9354a3c783fe749e3aa716c7e4166b22dd80fcc9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-owner-1440-light.png",
+      "hash": "8edb5ef92f50ef6cf4469eea79464b4a960591d321817c64f9bb56c8ca557f9c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-owner-390-dark.png",
+      "hash": "9f8a35941ac51a14f30ce74f601236975d4434efb01c13c847665cc0bccbf0c9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-owner-390-light.png",
+      "hash": "52c17b3da9ca9164e970dd5638848ba5c25297c34fc5080e8b0e4aa75725dabb"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-pending-mobile.png",
+      "hash": "107bffa727caa3d1ec30c407c8714eb0acd6065b89fc0960b7a9063ee5d22198"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-preservation.json",
+      "hash": "86490686e9f367e62088b9550b6cf5d1bdaa0b77674e76d13d1de925dff265e9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-safe-area.png",
+      "hash": "e5da570a39d4ac42c861a65604130d36bf7df6a48935d181566820259e20ff95"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-sharing-dark.png",
+      "hash": "a79a00f06fd4d041046ad74ae77969477e6fed00241a97d815c71d813749f257"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-sharing-error-dark.png",
+      "hash": "f115d4941a00eb099d7b48862195b1258934f4343892e3e56c712a7c4c593ddd"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-sharing-error-light.png",
+      "hash": "b4ab89bae749b2285547671f45c0543bed36782d12f860266e2338442c3d523f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-sharing-light.png",
+      "hash": "972e6c74f31f60fa20cf29e2af3332205a97a5120a6f9970b3c5ef1b0f55c4fb"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-typecheck.json",
+      "hash": "a97fdd8e82b743cf0a60959de8260ccd01098cb76eb6f18970632de6f976a282"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-validate.mjs",
+      "hash": "36cbae81738d7f65e7d0c77bec0161aabb427c5a2881e7ceef996e44d4d35c58"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r1-zoom-layout.png",
+      "hash": "409f00eea47c1a496777b01bcb98647d52e5826e7050d349769922c47ae261ef"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-browser-results.json",
+      "hash": "246deff287121fc81daa62ce23801c8183990351e7217b1380c217c4f04a01b0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-check-preservation.mjs",
+      "hash": "623d67f60c075aed0242ab23068f8e37cae1a2fa3403d2a598e43bed98a451e6"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-drawer-dark.png",
+      "hash": "d70a917e10be8663862d22e0c4b2237779b8dcb4439bc1b50bf17b44b65720d2"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-guest-1440-dark.png",
+      "hash": "dc6a5b7eb44ec2665d1c40b4c31e4c57cdcd45598c01ed89dba2fe55f1dc6081"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-guest-1440-light.png",
+      "hash": "b8ede564840d24ec7dfd531ee3900aef256441b859b68bc20a4fabec5eeaf1d6"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-guest-390-dark.png",
+      "hash": "599d21cde527dc3459226611af3b4411d1999e2f9012f5234e501237b3bf29a9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-guest-390-light.png",
+      "hash": "b46203f3cc7b54a10a6092606ed4c50af2fe5cde07fdad0958410115dd2f7835"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-inherited-work.json",
+      "hash": "487351e860df895d2e36cddc42d0cd46d1889ffe711c64825dc16e5f036636fc"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-keyboard-pages.png",
+      "hash": "9410af57c7fcdfb81b58231080cee9a8a6fe7f0c21d6e88be05be051cef9869d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-keyboard-share.png",
+      "hash": "9016f24973814a41c9838364b48bfa64228ad1a4c7d31328073621048fd73d66"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-menu-dark.png",
+      "hash": "e6745573bfa5d559ec81f13dc31d50d472f7bef2d5caf372a46349ff1588753d"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-menu-light.png",
+      "hash": "5015e2b29335c85785e7d1877e295aeebe007f7f40b414125651ee6a765d1e98"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-owner-1440-dark.png",
+      "hash": "db9c9c063a0b34f4417157297270902a7c2b0c3461039a1d70348f4e6b28ce7c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-owner-1440-light.png",
+      "hash": "6eac40f44941320e16295969741b14b8c7cf8fdc4b67e1a6ae7962df43d40171"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-owner-390-dark.png",
+      "hash": "2aa7f1cce598e65f2ba08448caf3efb12d01915f1bd9772de0eddc19d930904a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-owner-390-light.png",
+      "hash": "1d9a7bac220b196f2bd917a8781ae7ad0eb51979966a516cf3c2975fa265a9cb"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-pending-mobile.png",
+      "hash": "1e2c853cb140c0d02b6034dea5771ea76492a331c02d7a8f5e7216b916c56ae5"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-preservation.json",
+      "hash": "aa868600d6c28c279944ddcf87c974efae0565f5693eb47c1f8d77ed2d8c9b8f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-r1-restoration.json",
+      "hash": "135e90ea4d6bc4610ef00181a9c1aedcae0ed0861f47f5c1f6d4c49ba9df2a39"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-safe-area.png",
+      "hash": "7a82f81a6d09fc3674796b42dae3ca980ccb8a275ccb43bee6003f73acb302ba"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-sharing-dark.png",
+      "hash": "9901a61d23e1d151dc6f592010621abeebcf5b36b12a4f593ec751c5ea7f7f32"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-sharing-error-dark.png",
+      "hash": "ee70d886dd5e0638068447202430bbe4f1e341915c45d02261e33688f2c38f57"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-sharing-error-light.png",
+      "hash": "fb22b525904b7cabc2fbf6573ad7d93e5664e4bfcfa5680f2a638ad3847f8fed"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-sharing-light.png",
+      "hash": "ce0d65c4832d777bb58031e9f7bc9db276734cce61ea1a6d09bc9d0775c6a735"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-typecheck.json",
+      "hash": "04ea442a86d13d9fd2eaa102fdd30a82436dafc67b2031a1f87f9ef718bb246b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-validate.mjs",
+      "hash": "81045d910604949cf0e0640380301683096dfcede305a1a27e077fb8c4790b57"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r2-zoom-layout.png",
+      "hash": "1e7cb6cb77710f8e74e55d8489cf1798397421914d9b8494dcf79817494328b0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-browser-results.json",
+      "hash": "86c78a48e1ca3a9705f97cb134c946957731ae1ce1e29e2fa8d29a1ca712c8ee"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-check-preservation.mjs",
+      "hash": "0cb2e791f8a141afeffbc6172f5b4856d34009259dc75d107a6ff49067ea3886"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-consent-dark.png",
+      "hash": "f1934d00b20af38a21e42effd27978173d9b8a9fafcb9c5f3da301f8169938fa"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-consent-light.png",
+      "hash": "d25f9d56b5e866fd78eb94f13099138414b3ef09edbcb58380e6ef91b5c24c83"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-drawer-dark.png",
+      "hash": "6b16ce09c18544e1cd3db6e24a0b2aa3fe27bf1d69fd90198cd5c8aa14566db6"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-guest-1440-dark.png",
+      "hash": "d4a5d3ca5a5a618262bc8a44ca4164d88c5022438ebb70f64475324472c272d4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-guest-1440-light.png",
+      "hash": "b4c98f4f9607f8e193bf529240e68e5fab3f6baef0c4ee8db154c20a8708bb9f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-guest-390-dark.png",
+      "hash": "b248460251a7a13cb2f35eaac821fc5c441ec5c858414ce89c70f03106d0e081"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-guest-390-light.png",
+      "hash": "01eb8ad0aaaa76902b973cdc6d818e36bfe16e341cd8c10781d398f8b1420565"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-help-dark.png",
+      "hash": "79048539ed491704123bde6b6efbbe157751ddf419898755b1efdd94819e54d0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-help-light.png",
+      "hash": "89b7de429bc0c986ee2ac3af45bdedd7e0afe3a39bf1c6fcf1a431aa5474ce74"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-inherited-work.json",
+      "hash": "4c937fc5a02ad60687d1e18bef87adb94ad7e13337fcf0b276384588766600f3"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-keyboard-controls.png",
+      "hash": "243f2390e1e4308f7f98eb501c94dd3e86b8d61b2cf368959609de07c093e09a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-keyboard-pages.png",
+      "hash": "2d27894f89d8631c6386e8abc609b52a59bf8d762061c663c68b7ae35e19c923"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-keyboard-share.png",
+      "hash": "21080b4a734186ee39b3f3ffa0114ad414a50ee8075156e095c41413bdf2054a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-menu-dark.png",
+      "hash": "55d646dcfc783a06cbbf4725a69f808f74ad64ca5070ef85bd800a5f2d2e6406"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-menu-light.png",
+      "hash": "f5e2c3828d3904308d2b0b7bc03cf0cf6663fd60b04014e3b5e2af61cb98f0d4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-owner-1440-dark.png",
+      "hash": "adfe9b03e75849b7742cc00de8af870929a353ccff31ba14fa159e9f871757b1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-owner-1440-light.png",
+      "hash": "60b0eaf6f85f1606a3072da0cdff4bde7a8760c6441b1eb8b6ccc6ee55e9b87f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-owner-390-dark.png",
+      "hash": "30ce07ae6a92690764789e392dc5fd3902a133d06b377c2fe750e9c45bd6eb45"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-owner-390-light.png",
+      "hash": "a73a15785ac9e3dd9a5c50e8083e9f940b4427cb101df9a5d90ab4617cf124fe"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-pending-mobile.png",
+      "hash": "bb3a3718197a0eda6987a3be48d3a20993592e3336a005625f29d032697f34ad"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-preservation.json",
+      "hash": "171ce747bd94df6fce829797bebf28aac54870e7d06cfb4043cc3e6e8ad157e1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-r2-restoration.json",
+      "hash": "6d4a21517cc33565385296318a03e5a59670c4164c12669474e5111a6eb32cf8"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-recovery-dark.png",
+      "hash": "5d2c9c92d350f018a5d90a72d0d7634a244143d25a68477fb7581884d48fbb5a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-recovery-light.png",
+      "hash": "a7fa6705a6a42e337eee9d0505b8a88d6eae90016de6bc0d13eb4193a41ff0b8"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-safe-area.png",
+      "hash": "0e551c18e22c8b5472e2756c7e5248dda5b37b6465e1b67a73cf7b3272cd83a9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-sharing-dark.png",
+      "hash": "c6779e8df16ca7c17825ca55f6da53e7c10a997bf18020a911e6025f9dc5d92b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-sharing-error-dark.png",
+      "hash": "803ec6b0eabac7c753b041616d80353364ad4e0fda19207ef797622f61d60b59"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-sharing-error-light.png",
+      "hash": "8a6aa99274fdfce231ded7f096b4949ad553a177a29c2fc08decd56fe8a70ea2"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-sharing-light.png",
+      "hash": "d4420d5f2017b4ebb369a4561cbf699d26fffe2a74c1225b0ccbb992078a2894"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-text-desktop-dark.png",
+      "hash": "061fca0c3ea283e1578006fe7b642c1c9c23699732890e4d10da9963dfebb23b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-text-desktop-light.png",
+      "hash": "70a945178861318ce85c4a35298d16ccc5d236d121f62a364c497024ac4206c4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-typecheck.json",
+      "hash": "df854a3eb2c78f76ce5977cbe9f1825f875d42b88c295dd1a62a32ebce5b353b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-validate.mjs",
+      "hash": "20d6c2392854504a2d66b24abfb0f21db9b40898480364a8ba0ccf53c2621f61"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r3-zoom-layout.png",
+      "hash": "6745b65b110d54eae6b47e56c3ba2ffe394866926d356f39c96f3ceff6f9f75c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-check-preservation.mjs",
+      "hash": "410399a2ae21c5c164dc757a6a7380787de39c70826213044942662f4c1811c0"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-database-audit.mjs",
+      "hash": "36a3f28fbbc5504302ce89198efdf34f34166a8ea66ee8a12a7e0d4d19becdf4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-database-isolation.json",
+      "hash": "814bd6d9c44424190cc73b3448f7be15bb7c51ad06756e555143155e9cfdb73f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-database-results.json",
+      "hash": "a63c2b25de8c478581c07737772b8b7016e8a426c9c5851ce1a665b3319a29f7"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-fast-results.json",
+      "hash": "93a771ff0964a7b38092cb0a853504be28d3d6188ada035a78cd5dd2eaab9b1a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-inherited-work.json",
+      "hash": "5b89da0b690966b6dd97c0ff19b11c173964b27b892cb183b4f59be47028612f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-preservation.json",
+      "hash": "f8f4ad644aeb915ede0c2b627c5f7fc7701ed2d87931ff5e9982c7ed120584f6"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-typecheck.json",
+      "hash": "58089f2c98588e56f2c8be3d387ba64af92d60de62b46622f2550975d03a9ae7"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r4-validate.mjs",
+      "hash": "907f45dde21131469f0197004df8f58bb3980c82c14802f1bf9e20fe5f893832"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-browser-results.json",
+      "hash": "52163ed46f0988adfc6b9a94e39220a2c4464dd04a457304ac7297dbd98484e1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-check-preservation.mjs",
+      "hash": "4e56ae6ac1ba4b8f7bdcaaca20e030e24b5300254990b3ebd2ec9c991c074da7"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-database-audit.mjs",
+      "hash": "42f994e08862a072d0c945f4c3500197b509b58ceadfda1f7501082e6635ef9e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-database-isolation.json",
+      "hash": "814bd6d9c44424190cc73b3448f7be15bb7c51ad06756e555143155e9cfdb73f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-consent-dark.png",
+      "hash": "58cc3dab5df9ee0810412a1c34a70f603f6807c8d3d7e51285ee9a561e328d02"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-consent-light.png",
+      "hash": "60e84b44071d984774b3ec61389fcddbc04c89733c55609def065f92feb6ddd9"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-help-dark.png",
+      "hash": "475576180f30c7b9b6ad734a7ff864c9dc2a9fdd5904e9d2f30be6f14e652635"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-help-light.png",
+      "hash": "bf1dc49486a11bed311696367adcaa04a0f2f5638a4cbbdb0d96222c62ff6de5"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-keyboard-controls.png",
+      "hash": "b83f8c39476f984c11f8fcdb0e1afe271e01dc7eae2c055aa349073ebb9cf6ac"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-recovery-dark.png",
+      "hash": "0d1437cc6c136d749831de638d946853191e38c13d8be9b29b8710f3f7a12710"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-recovery-light.png",
+      "hash": "7bfb0217e80e8c8b06e06bb4d4f18b0e384e6bfe68694e871f3812a34129d273"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-text-desktop-dark.png",
+      "hash": "061fca0c3ea283e1578006fe7b642c1c9c23699732890e4d10da9963dfebb23b"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-editor-text-desktop-light.png",
+      "hash": "70a945178861318ce85c4a35298d16ccc5d236d121f62a364c497024ac4206c4"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-fast-checks.mjs",
+      "hash": "a7454d8dcbc9f47bcc9b72a037cc0be8d4b4c4abd2462d8f577bbc7338da3a6e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-fast-results.json",
+      "hash": "efa84addfbec7c5d0f28593ea658ed75271b25de7ef3b753b383cfc3e89ca0e8"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-inherited-work.json",
+      "hash": "f5d8fe71a27bf45b6daa5d8386e4b1bda296ac4f77cd148ef3de55490af36b11"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-integration.config.ts",
+      "hash": "4f74463f5442247c55301f30365ed8585d100a722206e2140dd772e5a0149d94"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-guest-1440-dark.png",
+      "hash": "c62a4815c8eecf7bed42d9d2212871337170f23b82ef6bb67823da8111f99b2a"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-guest-1440-light.png",
+      "hash": "62018e4c7c681565d496d6fcdaa29659756876fe6421839b06fdfa33345ebc3c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-guest-390-dark.png",
+      "hash": "8e17d069e275002e998094ba4f5d7f9b50b0ed66919f31af38cc98efbf372a1e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-guest-390-light.png",
+      "hash": "524f2582b617bebae2a20f38a3557672eaf8ae925f2dd570938d6eb38ecd1840"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-owner-1440-dark.png",
+      "hash": "3d4370ecd211a289f92b0c114ff9880c0186198d65a146e077ac4f8fea757618"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-owner-1440-light.png",
+      "hash": "8a52d75eadca867ea6895777589121bb07233e320652d292280c5aae226255c1"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-owner-390-dark.png",
+      "hash": "b48fb17eba2423e4b8b98eb5dcf0a3f200d74b8e88c5829a4b047dae4e777d96"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-owner-390-light.png",
+      "hash": "d7eec8c70afc55227eaa36ea03ff72fc5c9c680a16d1f5a5aa57d7c17aa07d3c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-pending-mobile.png",
+      "hash": "ea4a5fd4c972cb6422ea1521bf6814ea433156fc52e38eb0112512c95554ef54"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-safe-area.png",
+      "hash": "55689a405a9435ce75d83508e199e22ef3827b9172d566278b8b6e474bc6c6cc"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-layout-zoom-layout.png",
+      "hash": "6745b65b110d54eae6b47e56c3ba2ffe394866926d356f39c96f3ceff6f9f75c"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-pending-share-error.png",
+      "hash": "fba1b62f053cc785fb0e1a7173019d3d93546148068b1cb87e7c191a8e0e95ce"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-preservation.json",
+      "hash": "5d183df6581f2830e3d94ff080538e556ce51e0fe51093721927760e42557c05"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-prior-browser-results.json",
+      "hash": "9a9bc654077f224a056930be1be63d3d18201c18f836e56073f0a1440bb659b3"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-regression-browser-results.json",
+      "hash": "41f60ddeca6a3a6e14252f8d3e12ae9e6067e25bf7446e9462722189a3e8fdec"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-regressions.mjs",
+      "hash": "814e8a9829c917d41cb2a607f2ee1fe2e47bac7172429d6fb137165773fcc265"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-settings-1440-dark.png",
+      "hash": "2f400d4cdcf1b3af06ea4e40ef747646d9658e8ec1ed811e00d54047a0fd0254"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-settings-1440-light.png",
+      "hash": "9433f9fab256984e63490e6127aeee328465324014e0b9cc5d2be6adeec4f75e"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-settings-390-dark.png",
+      "hash": "0d27bb09e922e1ef94d7541b74ad6ff3a942687b42bd2896829b5699b2ce280f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-settings-390-light.png",
+      "hash": "f1baa723da4b4edf3b3cf8e7c60869f12a554e965855fe565eb75950b11fad2f"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-shell-drawer-dark.png",
+      "hash": "6b16ce09c18544e1cd3db6e24a0b2aa3fe27bf1d69fd90198cd5c8aa14566db6"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-test-results/.last-run.json",
+      "hash": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903"
+    },
+    {
+      "status": "??",
+      "path": "ui-redesign-evidence/r5-typecheck.json",
+      "hash": "19ad65f68b60afc87e49e1b5b6c0ba0cf0b7b1a2d95a19ff46e3ed8474fe713a"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-database-audit.mjs",
+      "hash": "3ee71946ead16ae3949cab4e0cfe0a4d9b7672cb5182d561c2482edc959e5523"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-database-isolation.json",
+      "hash": "2408a3cf0fa1732a8f3ff40f3ed95fe19a7dc5a0812735349c63cb85c9e011dc"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-1440-dark.png",
+      "hash": "1f022e61de998db550491365d46ae9bd4e3363afe780307381e863d32925c440"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-1440-light.png",
+      "hash": "27a6268e77eac09091bc2403f94d914ed63d247e9a9c6f030d8b4c34d7a4b1e1"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-390-dark.png",
+      "hash": "7344c5d2f940ca5d8b138167fe8df599b3d85a065ff1c7754e3fc8865df2481f"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-guest-390-light.png",
+      "hash": "aae9015112f5fe86bfd1374bd9e1bc0bf74359a07f0427c2c823a4f9d34d6379"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-keyboard-pages.png",
+      "hash": "17c07ccf05337209a737f6a7c4d2baeffb8c27450f1012c36e3e6490e6272e91"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-keyboard-share.png",
+      "hash": "ffa512d6df07404a1ebcb779ec7c5a9bfe33af819bc431112310e8f2d9850e5e"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-live-desktop.png",
+      "hash": "a99418bf95bb21a62bb5329663f2f16744225882079ab3394a44fd25d7d20a9c"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-live-mobile.png",
+      "hash": "20046c1f45d5a44e12badde0e163d5629bf9b30be7bc9e7fc4d170ea2b96ba08"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-mobile-consent.png",
+      "hash": "610974013c67589557a3222ff3243e04ff577659ac0bd555e13e2f1a11ca4b9c"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-offline-pending.png",
+      "hash": "585271ae0494f563c2f92d4eddf88d7f9d750db2683b32e373070a8476613289"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-1440-dark.png",
+      "hash": "836f5d66d77052ea26bd5b8a2b5378f66e133841964bbcf75b320f8075e0dc8e"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-1440-light.png",
+      "hash": "1c46d72483773ab3205885f1be5b96fa8d2b136178bf72786bb40aa11a36eb92"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-390-dark.png",
+      "hash": "7e75faad63d42fc36ed428365de94451aaa3e384f0f941330d952e9d9ef4f01b"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-390-light.png",
+      "hash": "a8f529c4e810a5f250c758f3d64ac3a1a6c4cbd9895f64788af116c104a81429"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-desktop.png",
+      "hash": "47bff7a6f64e53973b507a733d266c42137dc03d2967c3f2be8fba0c92dea222"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-owner-mobile.png",
+      "hash": "b9096a5b8c0605281f4b79ae8aeec8f11afe431b4affd40ac01ceed929522428"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-pending-mobile.png",
+      "hash": "220e39d8c02739003f3fe5ce34010d8d6e9909c4ac45fdab4d2c8a2487c29b4a"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-safe-area.png",
+      "hash": "1154a99c695bbe9afc690d72266a27d736f82b4ef0c51e794fe670e757e80cc7"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-typecheck.json",
+      "hash": "7c612148ef01ceec0217336bc76cea249ec592baa02da94929c6f4c4f863b011"
+    },
+    {
+      "status": "??",
+      "path": "workspace-ux-evidence/m11-zoom-layout.png",
+      "hash": "410f8127c112b380bab617837d1bf1068da29a34738425bcc9d0f070be6e16d3"
+    }
+  ]
+}

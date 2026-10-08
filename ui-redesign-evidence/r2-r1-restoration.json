@@ -1,0 +1,38 @@
+[
+  {
+    "path": "ui-redesign-evidence/r1-menu-dark.png",
+    "expected": "2b0f8a3f7853527b1cfe39f13d8361315845e028d8214625698969bc1d224dbf",
+    "regenerated": "2b0f8a3f7853527b1cfe39f13d8361315845e028d8214625698969bc1d224dbf",
+    "restored": true
+  },
+  {
+    "path": "ui-redesign-evidence/r1-menu-light.png",
+    "expected": "5e6af2869ea2ef03a092f8410f96f6a0686d27fe8ba06c751073b09fedd28586",
+    "regenerated": "5e6af2869ea2ef03a092f8410f96f6a0686d27fe8ba06c751073b09fedd28586",
+    "restored": true
+  },
+  {
+    "path": "ui-redesign-evidence/r1-sharing-dark.png",
+    "expected": "a79a00f06fd4d041046ad74ae77969477e6fed00241a97d815c71d813749f257",
+    "regenerated": "a79a00f06fd4d041046ad74ae77969477e6fed00241a97d815c71d813749f257",
+    "restored": true
+  },
+  {
+    "path": "ui-redesign-evidence/r1-sharing-error-dark.png",
+    "expected": "f115d4941a00eb099d7b48862195b1258934f4343892e3e56c712a7c4c593ddd",
+    "regenerated": "f115d4941a00eb099d7b48862195b1258934f4343892e3e56c712a7c4c593ddd",
+    "restored": true
+  },
+  {
+    "path": "ui-redesign-evidence/r1-sharing-error-light.png",
+    "expected": "b4ab89bae749b2285547671f45c0543bed36782d12f860266e2338442c3d523f",
+    "regenerated": "b4ab89bae749b2285547671f45c0543bed36782d12f860266e2338442c3d523f",
+    "restored": true
+  },
+  {
+    "path": "ui-redesign-evidence/r1-sharing-light.png",
+    "expected": "972e6c74f31f60fa20cf29e2af3332205a97a5120a6f9970b3c5ef1b0f55c4fb",
+    "regenerated": "972e6c74f31f60fa20cf29e2af3332205a97a5120a6f9970b3c5ef1b0f55c4fb",
+    "restored": true
+  }
+]

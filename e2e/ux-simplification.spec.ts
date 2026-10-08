@@ -6,7 +6,8 @@ test("minimal guest UI keeps local saving quiet and consent keyboard actions iso
   const cloud = await mockAccount(page, [savedBoard(firstId, "Fixture page")]); cloud.signedIn = false;
   await page.goto("/scribble/");
   await expect(page.getByRole("button", { name: "Sign in with Google", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Pages|Save to account|New page|Share/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(Pages|Save to account|New page)$/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeVisible();
   await expect(page.locator(".save-status")).toHaveCount(0);
   await createNote(page, "Device note"); const before = await canvasState(page);
   await accountMenu(page); await expect(page.getByRole("checkbox")).not.toBeChecked();
@@ -50,30 +51,27 @@ test("missing images and device failures produce one notice with menus closed", 
   expect(cloud.mutations.filter((mutation) => mutation.path.includes("assets"))).toHaveLength(0);
 });
 
-test("sharing double-submit/lost response is not replayed and a manual invitation link remains reachable", async ({ page }) => {
-  await mockAccount(page, [savedBoard(firstId, "Share fixture")]);
-  const invites: { id: string; email: string; role: string; expiresAt: number }[] = [];
-  let writes = 0;
-  await page.route(`**/api/boards/${firstId}/sharing`, (route) => route.fulfill({ json: { members: [], invitations: invites } }));
-  await page.route(`**/api/boards/${firstId}/invitations`, async (route) => {
-    writes++;
-    invites.push({ id: "44444444-4444-4444-8444-444444444444", ...route.request().postDataJSON(), expiresAt: Date.now() + 86400000 });
-    await route.abort("failed");
-  });
+test("lost Share response reconciles the original request without stealing focus and manual copying remains reachable", async ({ page }) => {
+  const cloud = await mockAccount(page, [savedBoard(firstId, "Share fixture")]);
+  const { mockShareLinks } = await import("./fixtures/shareLinks");
+  const links = await mockShareLinks(page, cloud, firstId); links.loseNextCopyResponse = true;
   await page.addInitScript(() => { Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => { throw new Error("Fixture clipboard refusal"); } } }); });
   await page.goto("/scribble/");
   await openBoard(page, "Share fixture");
-  await page.getByRole("button", { name: "Share", exact: true }).click();
-  await page.getByLabel("Google email", { exact: true }).fill("friend@example.com");
-  await page.locator(".board-sharing form").evaluate((form) => { (form as HTMLFormElement).requestSubmit(); (form as HTMLFormElement).requestSubmit(); });
-  await expect(page.getByText(/request may have reached your account/)).toBeVisible();
-  expect(writes).toBe(1);
-  await expect(page.getByRole("button", { name: "Create invitation", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Copy invitation link", exact: true }).click();
-  await expect(page.getByLabel("Invitation link", { exact: true })).toHaveValue(/\?invite=44444444/);
-  await expect(page.getByText(/No email is sent/)).toBeVisible();
+  const share = page.getByRole("button", { name: "Share", exact: true });
+  await share.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+  await expect(page.getByText(/original request is saved/)).toBeVisible();
+  await page.getByLabel("Page title").focus();
+  await expect(page.getByRole("complementary", { name: "Link sharing", exact: true })).toContainText("request is confirmed");
+  await expect(page.getByLabel("Page title")).toBeFocused();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  expect(links.copyRequests).toHaveLength(2);
+  expect(links.copyRequests[1]).toEqual(links.copyRequests[0]);
+  await page.getByRole("button", { name: "Copy link", exact: true }).click();
+  await expect(page.getByLabel("Shared page link", { exact: true })).toHaveValue(/#share=/);
+  expect(links.copyRequests).toHaveLength(2);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeFocused();
+  await expect(page.getByLabel("Shared page link", { exact: true })).toHaveCount(0);
 });
 
 test("invitation intent survives a Google redirect and acceptance remains explicit", async ({ page }) => {

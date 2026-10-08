@@ -1,0 +1,7 @@
+{
+  "path": "ui-redesign-evidence/r2-drawer-dark.png",
+  "expected": "d70a917e10be8663862d22e0c4b2237779b8dcb4439bc1b50bf17b44b65720d2",
+  "restoredHash": "d70a917e10be8663862d22e0c4b2237779b8dcb4439bc1b50bf17b44b65720d2",
+  "restored": true,
+  "method": "Original PNG bytes recovered from the R2 image-view tool output"
+}

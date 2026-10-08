@@ -1,0 +1,958 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "E:\\PROJECTS\\the-canvas\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "-c",
+      "ui-redesign-evidence/r7-integration.config.ts",
+      "--last-failed"
+    ],
+    "configFile": "E:\\PROJECTS\\the-canvas\\ui-redesign-evidence\\r7-integration.config.ts",
+    "rootDir": "E:/PROJECTS/the-canvas/e2e-integration",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": "E:\\PROJECTS\\the-canvas\\e2e-integration\\teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "E:/PROJECTS/the-canvas/test-results/r7-integration",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "E:/PROJECTS/the-canvas/e2e-integration",
+        "testIgnore": [],
+        "testMatch": [
+          "r7-disposable-*.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "r7-integration-recheck-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "r7-disposable-cloud-images.spec.ts",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "new workspace images save automatically and reload reconciles the original failed upload",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 2173,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n    at provider (E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts:19:111)\n    at E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts:168:3",
+                    "location": {
+                      "file": "E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts",
+                      "column": 111,
+                      "line": 19
+                    },
+                    "snippet": "  17 | }\n  18 | async function provider(request: APIRequestContext, data: Record<string, number | boolean>) {\n> 19 |   expect((await request.post(`${baseURL}/api/__fixture/provider`, { headers: fixtureHeaders(), data })).ok()).toBeTruthy();\n     |                                                                                                               ^\n  20 | }\n  21 | async function state(request: APIRequestContext, boardId: string): Promise<FixtureState> {\n  22 |   const response = await request.get(`${baseURL}/api/__fixture/state/${boardId}`, { headers: fixtureHeaders() });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts",
+                        "column": 111,
+                        "line": 19
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n\n  17 | }\n  18 | async function provider(request: APIRequestContext, data: Record<string, number | boolean>) {\n> 19 |   expect((await request.post(`${baseURL}/api/__fixture/provider`, { headers: fixtureHeaders(), data })).ok()).toBeTruthy();\n     |                                                                                                               ^\n  20 | }\n  21 | async function state(request: APIRequestContext, boardId: string): Promise<FixtureState> {\n  22 |   const response = await request.get(`${baseURL}/api/__fixture/state/${boardId}`, { headers: fixtureHeaders() });\n    at provider (E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts:19:111)\n    at E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts:168:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:42.601Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "E:\\PROJECTS\\the-canvas\\test-results\\r7-integration\\r7-disposable-cloud-images-1cf9e--the-original-failed-upload\\error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "E:\\PROJECTS\\the-canvas\\e2e-integration\\r7-disposable-cloud-images.spec.ts",
+                    "column": 111,
+                    "line": 19
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "b0742d74270f6e9a96b0-62df4834a1bc058cb4bd",
+          "file": "r7-disposable-cloud-images.spec.ts",
+          "line": 160,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "r7-disposable-guest-transfer.spec.ts",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "empty drawing continues directly through controlled Google OAuth and creates one default page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1759,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:45.639Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-e2d280649b59e19b4749",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 50,
+          "column": 1
+        },
+        {
+          "title": "explicit Google transfer includes images, preserves guest IDs/viewport and creates one ready page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4343,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:47.536Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-3930c528acc16b464fee",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 57,
+          "column": 1
+        },
+        {
+          "title": "declining keeps the drawing here; a later account-menu import requires fresh unselected consent",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2329,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:51.895Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-267b42f705b81878b6ce",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 75,
+          "column": 1
+        },
+        {
+          "title": "denied authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2306,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:54.236Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-945632bfb8fa11fa7cd1",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 87,
+          "column": 61
+        },
+        {
+          "title": "failed authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2268,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:56.555Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-05fd26bc5013784577e8",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 87,
+          "column": 61
+        },
+        {
+          "title": "invalid_state authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2442,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:47:58.835Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-2626bef172f9f7437261",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 87,
+          "column": 61
+        },
+        {
+          "title": "a lost creation response resumes the persisted request after reload with one destination",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2772,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:01.288Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-b3cd2045599f3b2bac35",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 97,
+          "column": 1
+        },
+        {
+          "title": "a lost image response reconciles the same reservation after reload without sending bytes again",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3391,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:04.077Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-9162fc451dae308ed30d",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 112,
+          "column": 1
+        },
+        {
+          "title": "a pending guest image retries the original reservation after reload and the provider delay",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8545,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:07.480Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-55727634dade54b38b38",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 124,
+          "column": 1
+        },
+        {
+          "title": "lost document acknowledgement reuses its receipt and opens newer edits without importing the old snapshot",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2530,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:16.038Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-60d858607a8b3884fa0a",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 166,
+          "column": 1
+        },
+        {
+          "title": "invitation and explicit page take priority, retaining the drawing for deliberate resume",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2477,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:18.581Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-a75f4e1710f2de46e35d",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 180,
+          "column": 1
+        },
+        {
+          "title": "account switching pauses an interrupted transfer and cannot import into another account",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2087,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:21.070Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-5016af5deea30fcb6f6b",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 201,
+          "column": 1
+        },
+        {
+          "title": "an account-cookie change immediately before creation cannot transfer into the replacement account",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2066,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:23.169Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-63050a9a7b6d42ea3e20",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 217,
+          "column": 1
+        },
+        {
+          "title": "the final document read also rejects an account change after transfer confirmation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2503,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:25.247Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-f5bf37524bb756bb6839",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 232,
+          "column": 1
+        },
+        {
+          "title": "closing consent while image preparation waits cancels OAuth and leaves the drawing intact",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2543,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:27.764Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-062d970721a493ffe39b",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 246,
+          "column": 1
+        },
+        {
+          "title": "mobile consent supports keyboard navigation, starts unchecked, and stays within the viewport",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1970,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:30.320Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-3c7c60b4c81cea3b7c1c",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 273,
+          "column": 1
+        },
+        {
+          "title": "failed durable consent storage blocks OAuth and preserves the guest drawing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1409,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:32.303Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "4964d6278e97883b8890-1fd814f586bc44fb0584",
+          "file": "r7-disposable-guest-transfer.spec.ts",
+          "line": 283,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "r7-disposable-workspace-navigation.spec.ts",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "sign-in preserves the guest original and sign-out journals active text before restoring it",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1773,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:33.747Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f104cea807758f0937d-e8642fb9e73bf7ba5b90",
+          "file": "r7-disposable-workspace-navigation.spec.ts",
+          "line": 62,
+          "column": 1
+        },
+        {
+          "title": "account service failure and slow checks retain the loaded page; confirmed expiry returns to guest",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1149,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:35.531Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f104cea807758f0937d-f9960006920fc6146b6a",
+          "file": "r7-disposable-workspace-navigation.spec.ts",
+          "line": 86,
+          "column": 1
+        },
+        {
+          "title": "page and invitation intent survive a simulated authentication redirect without acceptance",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1107,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:36.691Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0f104cea807758f0937d-96b8f8d6d367f098d7a2",
+          "file": "r7-disposable-workspace-navigation.spec.ts",
+          "line": 153,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "r7-disposable-workspace-ui.spec.ts",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "guest UI stays usable without the API, saves locally, and has one actionable device failure",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1642,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:37.825Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3f9ffe14177cd3b027e9-56d2be83a7f5cdd429c9",
+          "file": "r7-disposable-workspace-ui.spec.ts",
+          "line": 14,
+          "column": 1
+        },
+        {
+          "title": "owners create, rename inline, cancel, share the current page and delete the final page",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3609,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:39.479Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3f9ffe14177cd3b027e9-4a65fe1632d9c16c0b92",
+          "file": "r7-disposable-workspace-ui.spec.ts",
+          "line": 29,
+          "column": 1
+        },
+        {
+          "title": "mobile pages start closed and a direct selection closes the drawer",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1500,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-07T19:48:43.104Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3f9ffe14177cd3b027e9-1c162460aeb7fa11435d",
+          "file": "r7-disposable-workspace-ui.spec.ts",
+          "line": 88,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-07T19:47:36.472Z",
+    "duration": 68783.607,
+    "expected": 23,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

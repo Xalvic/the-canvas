@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from "react";
 import {
   AlignLeft,
   AlignCenter,
@@ -101,7 +101,7 @@ export function ColorPalette({
             key={color.value}
             type="button"
             className="color-swatch"
-            style={{ backgroundColor: color.value }}
+            style={{ "--swatch-color": color.value } as CSSProperties}
             aria-label={color.name}
             title={color.name}
             aria-pressed={value === color.value}
@@ -325,7 +325,7 @@ export function ToolOptions({
             aria-expanded={!collapsed}
             onClick={onToggleCollapsed}
           >
-            {collapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {collapsed ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
           </button>
           <button
             type="button"
@@ -333,7 +333,7 @@ export function ToolOptions({
             aria-label={object ? "Close appearance" : "Close settings"}
             onClick={onClose}
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       </div>

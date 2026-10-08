@@ -43,7 +43,7 @@ test("same-device guest tabs synchronize and automatically hand off the latest I
     return useViewportStore.getState().viewport;
   });
   expect(viewport).toEqual(before!.viewport);
-  await other.getByRole("button", { name: "Reset viewport", exact: true }).click();
+  await other.getByRole("button", { name: "Zoom options", exact: true }).click(); await other.getByRole("menuitem", { name: "Reset viewport", exact: true }).click();
   await createNote(other, "After handoff", 790, 550);
   await flushLocalDraft(other);
   await expect.poll(async () => (await canvasState(page)).objects).toEqual((await canvasState(other)).objects);
@@ -80,7 +80,7 @@ test("same-account tabs edit simultaneously through operations and SSE while dif
   await page.getByRole("button", { name: /^Undo / }).click();
   await expect.poll(async () => titles((await state(context.request, boardId)).document!.content.objects)).toEqual(["Second editor note"]);
   await newAccountBoard(other); await createNote(other, "Different page", 790, 560);
-  await expect(other.locator(".save-status")).toHaveText("Saved to account");
+  await expect(other.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect((await tabState(page)).readOnly).toBe(false);
   await openBoard(other, title);
   await expect(other.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();

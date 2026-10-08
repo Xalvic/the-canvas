@@ -13,11 +13,13 @@ export function BoardIdentity({ location }: { location?: string }) {
   const [draft, setDraft] = useState<string | null>(null);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
     if (event.key === "Escape") {
+      event.preventDefault();
       setDraft(null);
       event.currentTarget.value = title;
       event.currentTarget.blur();
-    } else if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+    } else if (event.key === "Enter") {
       event.currentTarget.blur();
     }
   };
@@ -37,6 +39,7 @@ export function BoardIdentity({ location }: { location?: string }) {
         <input
           className="board-title-input"
           aria-label={account ? "Page title" : "Drawing title"}
+          title={title}
           value={draft ?? title}
           disabled={!isHydrated || readOnly}
           maxLength={120}

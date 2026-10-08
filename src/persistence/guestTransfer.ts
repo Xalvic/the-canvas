@@ -178,15 +178,18 @@ export class GuestTransfer {
         if (image.assetId) continue;
         progress(`Bringing images… ${index + 1}/${intent.images.length}`);
         let upload;
-        if (image.dispatched) {
+        if (image.pendingConfirmed && Date.now() < image.nextAttemptAt) throw new Error("Image upload is still being checked. Retry the transfer shortly; its original request is retained.");
+        // Confirmed pending work retries after its delay. Unknown outcomes use
+        // GET first; its reconciliation lease must settle before another POST.
+        if (image.dispatched && (!image.pendingConfirmed || !image.canRetry)) {
           try { upload = await getBoardAssetUpload(destinationId, image.requestId, signal, accountId); }
           catch (error) { if (!(error instanceof BoardApiError && error.code === "ASSET_UPLOAD_NOT_FOUND")) throw error; }
         }
-        if (!upload || upload.state === "pending" && upload.canRetry && image.pendingConfirmed && Date.now() >= image.nextAttemptAt) {
+        if (!upload) {
           if (!image.canRetry || Date.now() < image.nextAttemptAt) throw new Error("Image upload is still being checked. Retry the transfer shortly; its original request is retained.");
           await refresh();
           await save((current) => ({ ...current, images: current.images.map((value, i) => i === index
-            ? { ...value, dispatched: true, nextAttemptAt: Date.now() + 5_000 } : value) }));
+            ? { ...value, dispatched: true, pendingConfirmed: false, nextAttemptAt: Date.now() + 5_000 } : value) }));
           try { upload = await uploadBoardAssetRequest(destinationId, image.blob, image.requestId, signal, accountId); }
           catch (error) {
             if (error instanceof BoardApiError && error.retryAfterMs) await save((current) => ({ ...current,

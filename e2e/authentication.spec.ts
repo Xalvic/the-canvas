@@ -1,82 +1,68 @@
 import { accountMenu, closeDialogs } from "./fixtures/ui";
-import { test, expect, type Page } from "@playwright/test";
+import { canvasState, createNote, localBoard, mockAccount } from "./fixtures/account";
+import { test, expect } from "@playwright/test";
 
-const user = { id: "550e8400-e29b-41d4-a716-446655440000", email: "artist@example.com", displayName: "Artist" };
-const guest = (enabled = true) => ({ error: { code: "UNAUTHENTICATED", details: { googleSignInEnabled: enabled } } });
-async function canvasState(page: Page) {
-  return page.evaluate(async () => {
-    const { useDocumentStore } = await import(/* @vite-ignore */ "/scribble/src/store/documentStore.ts");
-    const state = useDocumentStore.getState();
-    return { objects: state.objects, past: state.past, future: state.future };
-  });
-}
-
-test("optional Google account state, logout and retry preserve the guest drawing/history across reload", async ({ page }) => {
-  let signedIn = false, offline = false, logoutFailure = false;
+test("Google account state, logout failure and retry preserve the retained guest drawing", async ({ page }) => {
+  const cloud = await mockAccount(page); cloud.signedIn = false;
+  let offline = false, logoutFailure = false;
   await page.route("**/api/auth/me", async (route) => {
-    if (offline) { await route.abort("failed"); return; }
-    await route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? { user } : guest() });
+    if (offline) await route.abort("failed"); else await route.fallback();
   });
   await page.route("**/api/auth/logout", async (route) => {
     expect(route.request().headers()["x-scribble-request"]).toBe("1");
-    if (logoutFailure) { await route.fulfill({ status: 500, json: { error: {} } }); return; }
-    signedIn = false; await route.fulfill({ status: 204 });
+    if (logoutFailure) await route.fulfill({ status: 500, json: { error: {} } }); else await route.fallback();
   });
-  await page.route("**/api/boards", (route) => route.fulfill({ json: { boards: [] } }));
   await page.goto("/scribble/");
+  await createNote(page, "Retained guest drawing");
   await accountMenu(page);
-  const account = page.getByRole("region", { name: "Your account" });
+  const account = page.getByRole("region", { name: "Your account", exact: true });
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toHaveAttribute("href", "/api/auth/google");
-  await closeDialogs(page);
-  await page.getByRole("button", { name: "Note tool", exact: true }).click();
-  await page.mouse.click(240, 420);
-  await page.keyboard.press("Escape");
-  const drawing = (await canvasState(page)).objects;
+  await expect(account.getByRole("checkbox")).not.toBeChecked();
   const before = await canvasState(page);
-  await accountMenu(page);
   await account.getByRole("link").focus(); await page.keyboard.press("Backspace");
   expect(await canvasState(page)).toEqual(before);
-  await page.waitForTimeout(800); // Allow the existing guest autosave debounce.
-  signedIn = true; await page.reload(); await accountMenu(page);
-  await expect(account).toContainText("artist@example.com");
-  expect((await canvasState(page)).objects).toEqual(drawing);
-  const authenticated = await canvasState(page);
+  await closeDialogs(page);
+  await expect.poll(async () => (await localBoard(page))?.objects).toEqual(before.objects);
+  cloud.signedIn = true; await page.reload();
+  await expect(page.getByRole("region", { name: "Workspace", exact: true })).toContainText("Your workspace is empty");
+  expect((await localBoard(page))?.objects).toEqual(before.objects);
+  await accountMenu(page);
+  await page.getByRole("menuitem", { name: "Your account and retained drawing", exact: true }).click();
+  await expect(account).toContainText("owner@example.com");
   logoutFailure = true; await account.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(account.getByRole("alert")).toContainText("Couldn’t sign out");
-  await expect(account).toContainText("artist@example.com"); expect(await canvasState(page)).toEqual(authenticated);
+  await expect(account.getByRole("alert")).toContainText("Could not sign out");
+  await expect(account).toContainText("owner@example.com");
   logoutFailure = false; await account.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(account.getByRole("link", { name: "Sign in with Google" })).toBeVisible();
-  expect(await canvasState(page)).toEqual(authenticated);
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
+  expect((await canvasState(page)).objects).toEqual(before.objects);
   offline = true; await page.reload(); await accountMenu(page);
-  await expect(account.getByRole("alert")).toContainText("Couldn’t check sign-in");
+  await expect(account.getByRole("alert")).toBeVisible();
   offline = false; await account.getByRole("button", { name: "Retry sign-in check" }).click();
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toBeVisible();
-  expect((await canvasState(page)).objects).toEqual(drawing);
+  expect((await canvasState(page)).objects).toEqual(before.objects);
 });
 
-test("cancelled Google sign-in is clear in Strict Mode, strips its query and keeps the mobile guest canvas available", async ({ page }) => {
+test("cancelled Google sign-in strips its query and keeps the mobile guest canvas available", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: guest(false) }));
-  await page.route("**/api/boards", (route) => route.fulfill({ json: { boards: [] } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: { error: { code: "UNAUTHENTICATED", details: { googleSignInEnabled: false } } } }));
   await page.goto("/scribble/?authError=denied");
-  await accountMenu(page);
-  const account = page.getByRole("region", { name: "Your account" });
+  const account = page.getByRole("region", { name: "Your account", exact: true });
   await expect(account.getByRole("alert")).toContainText("Google sign-in was cancelled");
   await expect(account).toContainText("Google sign-in isn’t available");
   await expect(account.getByRole("link", { name: "Sign in with Google" })).toHaveCount(0);
   expect(page.url()).not.toContain("authError");
-  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByLabel("Drawing title")).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("Google navigation waits for a just-edited guest board to finish IndexedDB autosave", async ({ page }) => {
-  await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: guest() }));
-  await page.route("**/api/boards", (route) => route.fulfill({ json: { boards: [] } }));
+test("direct Google entry flushes a just-committed guest title before navigation", async ({ page }) => {
+  const cloud = await mockAccount(page); cloud.signedIn = false;
   await page.route("**/api/auth/google", (route) => route.fulfill({ status: 302, headers: { location: "/scribble/?authError=denied" } }));
   await page.goto("/scribble/");
-  await page.getByLabel("Board title").fill("Fresh edit before Google");
-  await accountMenu(page);
-  await page.getByRole("link", { name: "Sign in with Google" }).click();
+  await page.getByLabel("Drawing title").fill("Fresh edit before Google");
+  // Clicking outside commits the header title before the direct auth action.
+  await page.getByRole("button", { name: "Sign in with Google", exact: true }).click();
   await expect(page.getByRole("region", { name: "Your account" }).getByRole("alert")).toContainText("Google sign-in was cancelled");
-  await expect(page.getByLabel("Board title")).toHaveValue("Fresh edit before Google");
+  await expect(page.getByLabel("Drawing title")).toHaveValue("Fresh edit before Google");
+  expect((await localBoard(page))?.title).toBe("Fresh edit before Google");
 });

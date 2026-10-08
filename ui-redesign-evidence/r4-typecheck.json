@@ -1,0 +1,25 @@
+{
+  "extends": "../server/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "noEmit": true
+  },
+  "include": [
+    "../server/shareLinks.test.ts",
+    "../server/postgresShareLinks.test.ts",
+    "../server/testFixtures/shareLinkServer.ts",
+    "../server/migrations.test.ts",
+    "../server/postgresAuth.test.ts",
+    "../server/postgresBoards.test.ts",
+    "../server/postgresSharing.test.ts",
+    "../server/postgresAssets.test.ts",
+    "../server/postgresCollaboration.test.ts",
+    "../src/api/shareLinks.test.ts",
+    "../src/api/auth.test.ts"
+  ],
+  "exclude": []
+}

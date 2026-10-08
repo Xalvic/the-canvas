@@ -238,7 +238,7 @@ export class AccountBoardSession {
     } catch (error) {
       if (this.state.userId === link.ownerId && useBoardStore.getState().sessionVersion === session) {
         if (error instanceof BoardApiError && error.code === "BOARD_NOT_FOUND") this.access("none");
-        else this.fail(error);
+        else { this.fail(error); this.scheduleRetry(error); }
       }
     } finally { clearTimeout(timeout); this.liveReading = false;
       if (this.liveRefreshPending) void this.refreshLive(); }

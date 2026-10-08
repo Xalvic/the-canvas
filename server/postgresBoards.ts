@@ -43,7 +43,7 @@ export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
       const rows = await prisma.$queryRaw<BoardRow[]>`
         SELECT b.id, b.title, b.created_at AS "createdAt", b.updated_at AS "updatedAt", ${boardRoleSql(ownerId)} AS role
         FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${ownerId}::uuid
-        WHERE b.owner_id IS NOT NULL AND (b.owner_id = ${ownerId}::uuid OR m.role IN ('editor', 'viewer'))
+        WHERE b.owner_id IS NOT NULL AND (${boardRoleSql(ownerId)}) IS NOT NULL
         ORDER BY b.created_at, b.id
       `;
       return rows.map(toMetadata);
@@ -53,7 +53,7 @@ export function createPostgresBoardStore(prisma: PrismaClient): BoardStore {
         SELECT b.id, b.title, b.created_at AS "createdAt", b.updated_at AS "updatedAt", ${boardRoleSql(ownerId)} AS role
         FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${ownerId}::uuid
         WHERE b.id = ${id}::uuid AND b.owner_id IS NOT NULL
-          AND (b.owner_id = ${ownerId}::uuid OR m.role IN ('editor', 'viewer'))
+          AND (${boardRoleSql(ownerId)}) IS NOT NULL
       `;
       return rows[0] ? toMetadata(rows[0]) : undefined;
     },

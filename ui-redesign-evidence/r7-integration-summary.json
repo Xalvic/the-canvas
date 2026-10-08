@@ -1,0 +1,562 @@
+{
+  "method": "Full run plus focused recheck after fixture corrections; application unchanged between these runs",
+  "uniqueCases": 87,
+  "passed": 87,
+  "failedOrUnrun": 0,
+  "runs": [
+    {
+      "file": "r7-integration-results.json",
+      "startTime": "2026-10-07T19:38:11.327Z",
+      "duration": 505319.594,
+      "expected": 63,
+      "skipped": 0,
+      "unexpected": 24,
+      "flaky": 0,
+      "errors": []
+    },
+    {
+      "file": "r7-integration-recheck-results.json",
+      "startTime": "2026-10-07T19:47:36.472Z",
+      "duration": 68783.607,
+      "expected": 23,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0,
+      "errors": []
+    },
+    {
+      "file": "r7-integration-final-results.json",
+      "startTime": "2026-10-07T19:51:36.232Z",
+      "duration": 18868.574,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0,
+      "errors": []
+    }
+  ],
+  "cases": [
+    {
+      "title": "stopping a consented legacy upload preserves its request and retry creates no second page",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "guest image stays local through login; later consent transfers once and fresh-device reopen renders signed bytes",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "new workspace images save automatically and reload reconciles the original failed upload",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-final-results.json"
+    },
+    {
+      "title": "cross-board copy uploads a new asset instead of saving the source reference",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "save-as-new copies cloud image bytes into the new board and leaves the original asset retained",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "editor uploads persist, viewer reads are signed, and revoked membership blocks fresh image access",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "signed image expiry refreshes through the actual authorized API and provider failures support retry",
+      "file": "r7-disposable-cloud-images.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "two actual browsers retain simultaneous creates and different-object edits; undo preserves the collaborator's changes",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "same-object concurrent conflict preserves the offline draft and save-as-new creates a separate recovery board",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "remote presence carries world coordinates and selections across independent pan and zoom",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "offline independent edits reconnect through fresh reads and compare-and-swap without overwriting the other browser",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a committed operation with a lost response survives reload and replays exactly once",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "live downgrade and revocation block new writes and fresh reads while retaining the editor's draft",
+      "file": "r7-disposable-collaboration.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "same-device guest tabs synchronize and automatically hand off the latest IndexedDB objects and viewport",
+      "file": "r7-disposable-cross-tab.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "same-account tabs edit simultaneously through operations and SSE while different pages keep isolated journals",
+      "file": "r7-disposable-cross-tab.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a stale writer loses mutations and history; its interrupted draft stays under a unique recovery key",
+      "file": "r7-disposable-cross-tab.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "empty drawing continues directly through controlled Google OAuth and creates one default page",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "explicit Google transfer includes images, preserves guest IDs/viewport and creates one ready page",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "declining keeps the drawing here; a later account-menu import requires fresh unselected consent",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "denied authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "failed authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "invalid_state authentication preserves the source and cannot trigger a stale transfer on subsequent login",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "a lost creation response resumes the persisted request after reload with one destination",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "a lost image response reconciles the same reservation after reload without sending bytes again",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "a pending guest image retries the original reservation after reload and the provider delay",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "lost document acknowledgement reuses its receipt and opens newer edits without importing the old snapshot",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "invitation and explicit page take priority, retaining the drawing for deliberate resume",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "account switching pauses an interrupted transfer and cannot import into another account",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "an account-cookie change immediately before creation cannot transfer into the replacement account",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "the final document read also rejects an account change after transfer confirmation",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "closing consent while image preparation waits cancels OAuth and leaves the drawing intact",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "mobile consent supports keyboard navigation, starts unchecked, and stays within the viewport",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "failed durable consent storage blocks OAuth and preserves the guest drawing",
+      "file": "r7-disposable-guest-transfer.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "one-click reusable Share, two recipients, server-enforced viewer/editor roles and live revocation",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "signed-out recipient keeps guest work, survives cancelled Google sign-in and opens without an incidental page",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "clipboard failure offers selectable fallback and a fresh copy click without a second link mutation",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "lost committed response and reload retry the original intent, while a later Stop supersedes it",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "navigation fences a delayed Share response and preserves edited work",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "guest Share requires explicit transfer consent and resumes on its sole exact destination",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "legacy invitation acceptance and independent invited membership survive Stop",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "light/dark desktop/mobile Link settings stay bounded with keyboard focus and no email form",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a transient recipient failure offers Retry, while invalid/stopped links reveal no document",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "unsupported capability makes Share recoverable without copying a nonfunctional URL",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "blocked tab storage keeps the recipient link and provides explicit Google redirect recovery",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "opening a link preserves a pending consented transfer and resumes its recorded destination",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "session expiry clears the recipient canvas and restores the retained guest drawing",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "share errors reserve space below recovery notices and above appearance controls without moving the canvas",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "another tab's settings change requires review before Stop and never silently rebases",
+      "file": "r7-disposable-share-links.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "actual invitation and acceptance grant editing; owner downgrade/removal preserve the editor's local recovery draft",
+      "file": "r7-disposable-sharing.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a lost same-account operation response survives reload while the other editor advances the document",
+      "file": "r7-disposable-workspace-journals.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "two crashed pending journals remain recoverable and replay distinct operation IDs without losing either edit",
+      "file": "r7-disposable-workspace-journals.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "duplicated account tabs without Web Locks or BroadcastChannel keep separate journals and collaborate",
+      "file": "r7-disposable-workspace-journals.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "same-object contention retains both journals and never overwrites the confirmed winning edit",
+      "file": "r7-disposable-workspace-journals.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "legacy account drafts migrate by copying while pending operations, saved mappings and image bytes remain intact",
+      "file": "r7-disposable-workspace-journals.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "first account entry in two tabs creates one blank page and reload reopens it",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "explicit page, last-opened restore, Back/Forward and per-page history/viewport",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "sign-in preserves the guest original and sign-out journals active text before restoring it",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "account service failure and slow checks retain the loaded page; confirmed expiry returns to guest",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "lost initialization response is recovered without creating a second page",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "list failure never initializes and an initialized empty workspace never recreates defaults",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "current viewer roles are respected and a revoked explicit page falls back",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "page and invitation intent survive a simulated authentication redirect without acceptance",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "a lost account save remains journaled while switching pages and navigating Back",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "account switching clears the old visible page and cache while preserving its journal",
+      "file": "r7-disposable-workspace-navigation.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "drawing and page title save automatically and preserve zoom, pan and atomic undo",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "drop image/png uploads and saves automatically; undo and redo reuse the asset",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "paste image/jpeg uploads and saves automatically; undo and redo reuse the asset",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "drop image/webp uploads and saves automatically; undo and redo reuse the asset",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "offline image and title changes stay local and save on reconnect without a button",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "lost upload response and reload recover the original asset and request",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a lost document response retries its durable operation receipt automatically",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "lost title response reconciles without another PATCH",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "legacy unconsented files show one review and upload only after consent",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "repeated service failure stops after three automatic retries and exposes one Retry",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "rate limiting honors Retry-After and replays one document operation identity",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "revoked editing access stops automatic image requests and preserves the file",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "dispatch-time account switching fences an authorized upload",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "pasting a cloud image into another page automatically uploads a distinct destination asset",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "a dispatch-time account switch also fences document autosave",
+      "file": "r7-disposable-workspace-saving.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "guest UI stays usable without the API, saves locally, and has one actionable device failure",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "owners create, rename inline, cancel, share the current page and delete the final page",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "lost New page responses reuse their request after reload without replacing the current drawing",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "desktop sidebar visibility survives reload and leaves the world viewport unchanged",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "mobile pages start closed and a direct selection closes the drawer",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-recheck-results.json"
+    },
+    {
+      "title": "shared editors rename and save while viewers have no editing or sharing controls",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "an invitation is an explicit inbox choice and opens through workspace navigation",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    },
+    {
+      "title": "avatar sign-out preserves account work and reveals the retained guest drawing",
+      "file": "r7-disposable-workspace-ui.spec.ts",
+      "status": "passed",
+      "source": "r7-integration-results.json"
+    }
+  ]
+}

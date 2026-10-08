@@ -15,8 +15,11 @@ import { useSelectionStore } from "../store/selectionStore";
 import { createCardObject } from "../canvas/objects/objectFactories";
 import { serializeDocumentSnapshot } from "./canvasDocumentAdapters";
 import { pageFromUrl, rememberPageIntent } from "./workspaceNavigation";
+import { openShareLink } from "../api/shareLinks";
+import { shareLinkIntent } from "./shareLinkIntent";
 
 vi.mock("../api/auth", () => ({ getAccount: vi.fn(), signOut: vi.fn() }));
+vi.mock("../api/shareLinks", () => ({ openShareLink: vi.fn() }));
 vi.mock("../api/workspace", () => ({ getServerWorkspace: vi.fn(), initializeServerWorkspace: vi.fn(), updateServerWorkspace: vi.fn() }));
 vi.mock("../api/boards", async (original) => ({ ...await original<typeof import("../api/boards")>(),
   createServerPage: vi.fn(), getServerBoard: vi.fn(), getServerBoardDocument: vi.fn(), listServerBoards: vi.fn(), deleteServerBoard: vi.fn() }));
@@ -72,6 +75,41 @@ beforeEach(() => {
 afterEach(() => { stop(); client.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); useBoardStore.setState(initialBoard); useDocumentStore.getState().loadDocument({}); useInteractionStore.getState().endInteraction(); });
 
 describe("workspace lifecycle and navigation", () => {
+  it("opens an authenticated link with no incidental first page and preserves the guest drawing", async () => {
+    browser.location.href += `#share=${"A".repeat(43)}`;
+    vi.mocked(getAccount).mockResolvedValue({ status: "signed-in", user, shareLinksEnabled: true });
+    vi.mocked(getServerWorkspace).mockResolvedValue({ initialized: false, lastOpenedBoardId: null });
+    vi.mocked(openShareLink).mockResolvedValue({ ...second, role: "viewer" });
+    vi.mocked(getServerBoardDocument).mockImplementation(async (boardId) => ({ ...empty, boardId, revision: 1, updatedAt: 1, role: "viewer" }));
+    await start();
+    expect(initializeServerWorkspace).toHaveBeenCalledWith(expect.objectContaining({ createInitialPage: false }), expect.any(AbortSignal));
+    expect(useBoardStore.getState().account?.boardId).toBe(second.id); expect(useBoardStore.getState().readOnly).toBe(true);
+    expect(shareLinkIntent()).toBeNull(); expect(pageFromUrl()).toBe(second.id); expect(new URL(browser.location.href).hash).toBe("");
+    expect(records.get(CURRENT_BOARD_ID)?.objects["guest-note"]).toBeDefined(); expect(createServerPage).not.toHaveBeenCalled();
+  });
+  it("does not read protected content or initialize a workspace for signed-out recipients", async () => {
+    browser.location.href += `#share=${"A".repeat(43)}`;
+    vi.mocked(getAccount).mockResolvedValue({ status: "guest", googleSignInEnabled: true, shareLinksEnabled: true });
+    stop = controller.start(); await vi.waitFor(() => expect(controller.getState().status).toBe("guest"));
+    expect(controller.getState().sharedPage).toBe("sign-in"); expect(openShareLink).not.toHaveBeenCalled();
+    expect(getServerBoardDocument).not.toHaveBeenCalled(); expect(getServerWorkspace).not.toHaveBeenCalled();
+    expect(useDocumentStore.getState().objects["guest-note"]).toBeDefined();
+  });
+  it("retains a link after transient failure and retries without calling it revoked", async () => {
+    browser.location.href += `#share=${"A".repeat(43)}`;
+    vi.mocked(openShareLink).mockRejectedValueOnce(new TypeError("Network unavailable"));
+    stop = controller.start(); await vi.waitFor(() => expect(controller.getState().sharedPage).toBe("error"));
+    expect(shareLinkIntent()).not.toBeNull(); expect(getServerBoardDocument).not.toHaveBeenCalled();
+    vi.mocked(openShareLink).mockResolvedValue(second); await controller.retry(); await ready();
+    expect(useBoardStore.getState().account?.boardId).toBe(second.id); expect(shareLinkIntent()).toBeNull();
+  });
+  it("reports invalid/revoked links without falling back to another protected document", async () => {
+    browser.location.href += `#share=${"A".repeat(43)}`;
+    vi.mocked(openShareLink).mockRejectedValue(new BoardApiError(404, "SHARE_LINK_UNAVAILABLE", "Unavailable"));
+    stop = controller.start(); await vi.waitFor(() => expect(controller.getState().sharedPage).toBe("unavailable"));
+    expect(getServerBoardDocument).not.toHaveBeenCalled(); expect(initializeServerWorkspace).not.toHaveBeenCalled();
+    expect(controller.getState().error).not.toContain(first.title);
+  });
   it("retains a new page request through lost responses/reload and opens its confirmed destination", async () => {
     await start();
     vi.mocked(createServerPage).mockRejectedValueOnce(new TypeError("Lost create response"));

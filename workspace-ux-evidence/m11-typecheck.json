@@ -1,0 +1,10 @@
+{
+  "extends": "../e2e-integration/tsconfig.json",
+  "include": [
+    "../e2e/**/*.ts",
+    "../e2e-integration/**/*.ts",
+    "../scripts/e2e-api-fixture.ts",
+    "../playwright.config.ts",
+    "../playwright.integration.config.ts"
+  ]
+}

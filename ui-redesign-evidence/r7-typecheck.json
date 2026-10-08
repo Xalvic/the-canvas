@@ -1,0 +1,9 @@
+{
+  "extends": "../workspace-ux-evidence/m11-typecheck.json",
+  "include": [
+    "../e2e/**/*.ts", "../e2e-integration/**/*.ts", "../scripts/e2e-api-fixture.ts",
+    "../playwright.config.ts", "../playwright.integration.config.ts",
+    "r7-standard.config.ts", "r7-integration.config.ts"
+  ],
+  "exclude": ["../e2e/r7-disposable-*.ts", "../e2e-integration/r7-disposable-*.ts"]
+}

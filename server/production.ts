@@ -18,6 +18,7 @@ function routeClass(path: string) {
   if (/^\/api\/boards(?:\/|$)/.test(path)) return "boards";
   if (/^\/api\/workspace(?:\/|$)/.test(path)) return "workspace";
   if (/^\/api\/invitations(?:\/|$)/.test(path)) return "invitations";
+  if (/^\/api\/share-links(?:\/|$)/.test(path)) return "share-links";
   return "unknown";
 }
 
@@ -73,6 +74,10 @@ export function productionUserBudget(deps: ProductionDependencies): RequestHandl
 
 export async function enforceUserBudget(deps: ProductionDependencies, res: Parameters<RequestHandler>[1], userId: string, read: boolean) {
   await enforceBudget(deps.budgets, res, read ? "user-read" : "user-write", userId, read ? 1200 : 900, 60);
+}
+
+export async function enforceShareLinkBudget(deps: ProductionDependencies, res: Parameters<RequestHandler>[1], userId: string) {
+  await enforceBudget(deps.budgets, res, "share-links", userId, 60, 60);
 }
 
 export async function checkReady(ready: () => Promise<void>, timeoutMs = 2000) {

@@ -148,12 +148,29 @@ describe("collaboration API", () => {
     value.collaboration.state.mockResolvedValue(undefined);
     await request(value.app).get(`/api/boards/${boardId}/events?clientId=${randomUUID()}`).set("Cookie", cookie).expect(404);
     value.collaboration.state.mockResolvedValue({ revision: 2, role: "owner" });
-    const { url } = await streamApp(value);
-    for (let index = 0; index < 7; index++) {
-      const controller = new AbortController(); controllers.push(controller);
-      expect((await fetch(`${url}?clientId=${randomUUID()}`, { headers: { Cookie: cookie }, signal: controller.signal })).status).toBe(200);
+    const { url, response, controller: firstController } = await streamApp(value);
+    const activeControllers = [firstController];
+    const consumers: Promise<void>[] = [];
+    const consume = async (response: globalThis.Response) => {
+      const reader = response.body!.getReader();
+      await readUntil(reader, "event: presence");
+      consumers.push((async () => {
+        try { while (!(await reader.read()).done) { /* Keep each active client draining. */ } }
+        catch (error) { if (!(error instanceof Error && error.name === "AbortError")) throw error; }
+      })());
+    };
+    try {
+      await consume(response);
+      for (let index = 0; index < 7; index++) {
+        const controller = new AbortController(); controllers.push(controller); activeControllers.push(controller);
+        const next = await fetch(`${url}?clientId=${randomUUID()}`, { headers: { Cookie: cookie }, signal: controller.signal });
+        expect(next.status).toBe(200); await consume(next);
+      }
+      expect((await fetch(`${url}?clientId=${randomUUID()}`, { headers: { Cookie: cookie } })).status).toBe(429);
+    } finally {
+      activeControllers.forEach((controller) => controller.abort());
+      await Promise.all(consumers);
     }
-    expect((await fetch(`${url}?clientId=${randomUUID()}`, { headers: { Cookie: cookie } })).status).toBe(429);
   });
 
   it("sends authorized heartbeats while an unchanged stream stays open", async () => {

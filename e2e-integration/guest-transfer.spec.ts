@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { accountMenu, closeDialogs } from "../e2e/fixtures/ui";
-import { BASE_URL, canvasState, createNote, flushLocalDraft, mutationHeaders, network, signIn, state } from "./fixture";
+import { BASE_URL, canvasState, createNote, fixtureHeaders, flushLocalDraft, mutationHeaders, network, signIn, state } from "./fixture";
 
 async function pages(request: APIRequestContext) {
   const response = await request.get(`${BASE_URL}/api/boards`); expect(response.ok()).toBeTruthy();
   return (await response.json()).boards as { id: string; title: string }[];
 }
 async function guest(page: Page, path = "/scribble/") {
-  await page.goto(path); await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
+  await page.goto(path); await expect(page.locator(".account-trigger")).toHaveAccessibleName("Sign in with Google");
   await closeDialogs(page);
   await createNote(page, "Guest original", 340, 510); await page.getByLabel("Drawing title").fill("Guest drawing"); await page.getByLabel("Drawing title").press("Enter");
   await flushLocalDraft(page);
@@ -48,7 +48,7 @@ async function image(page: Page) {
 }
 
 test("empty drawing continues directly through controlled Google OAuth and creates one default page", async ({ page, context }) => {
-  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveText("Sign in with Google");
+  await page.goto("/scribble/"); await expect(page.locator(".account-trigger")).toHaveAccessibleName("Sign in with Google");
   await page.getByRole("button", { name: "Sign in with Google", exact: true }).click(); const id = await opened(page);
   expect(await pages(context.request)).toHaveLength(1); expect((await canvasState(page)).objects).toHaveLength(0);
   await page.reload(); expect(await opened(page)).toBe(id);
@@ -119,6 +119,48 @@ test("a lost image response reconciles the same reservation after reload without
   const [created] = await pages(context.request); expect((await state(context.request, created.id)).assets).toHaveLength(1);
   await page.reload(); expect(await opened(page)).toBe(created.id); expect(writes).toBe(1);
   expect((await state(context.request, created.id)).assets).toHaveLength(1); expect(await pages(context.request)).toHaveLength(1);
+});
+
+test("a pending guest image retries the original reservation after reload and the provider delay", async ({ page, context }) => {
+  await guest(page); await image(page);
+  const original = await deviceOriginal(page), uploads: string[] = [];
+  await page.route("**/api/boards/*/assets", async (route) => {
+    uploads.push(route.request().headers()["x-scribble-upload-request"]);
+    await route.continue();
+  });
+  expect((await context.request.post(`${BASE_URL}/api/__fixture/provider`, {
+    headers: fixtureHeaders(), data: { failUploads: 1 },
+  })).ok()).toBeTruthy();
+  try {
+    await google(page);
+    await expect(page.getByRole("button", { name: "Retry transfer", exact: true })).toBeVisible();
+    const [created] = await pages(context.request);
+    const pending = await state(context.request, created.id);
+    expect(pending.assets).toHaveLength(1); expect(pending.assets[0].status).toBe("pending");
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Retry transfer", exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(async () => {
+      const { openCanvasDatabase, BOARD_STORE_NAME } = await import(/* @vite-ignore */ "/scribble/src/persistence/database.ts");
+      const database = await openCanvasDatabase();
+      const records = await new Promise<{ images: { nextAttemptAt: number }[] }[]>((resolve, reject) => {
+        const request = database.transaction(BOARD_STORE_NAME).objectStore(BOARD_STORE_NAME)
+          .getAll(IDBKeyRange.bound("guest-transfer:", "guest-transfer:\uffff"));
+        request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+      });
+      const intent = records[0];
+      return intent && Date.now() >= intent.images[0].nextAttemptAt;
+    }), { timeout: 10_000 }).toBeTruthy();
+    await page.getByRole("button", { name: "Retry transfer", exact: true }).click();
+    expect(await opened(page)).toBe(created.id);
+    const saved = await state(context.request, created.id);
+    expect(saved.assets).toHaveLength(1);
+    expect(saved.assets[0]).toMatchObject({ id: pending.assets[0].id, status: "ready" });
+    expect(saved.document?.content.objects).toHaveLength(2); expect(saved.receipts).toHaveLength(1);
+    expect(uploads).toHaveLength(2); expect(uploads[1]).toBe(uploads[0]);
+    expect(await pages(context.request)).toHaveLength(1); expect(await deviceOriginal(page)).toEqual(original);
+  } finally {
+    await context.request.post(`${BASE_URL}/api/__fixture/provider`, { headers: fixtureHeaders(), data: {} });
+  }
 });
 
 test("lost document acknowledgement reuses its receipt and opens newer edits without importing the old snapshot", async ({ page, context }) => {
@@ -233,7 +275,7 @@ test("mobile consent supports keyboard navigation, starts unchecked, and stays w
   const choice = page.getByRole("checkbox", { name: "Bring this drawing into my workspace", exact: true });
   await expect(choice).not.toBeChecked(); await choice.focus(); await page.keyboard.press("Space"); await expect(choice).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: "workspace-ux-evidence/m7-mobile-consent.png" });
+  await page.screenshot({ path: "workspace-ux-evidence/m11-mobile-consent.png" });
   await continueGoogle(page); await opened(page);
   expect(await pages(context.request)).toHaveLength(1); await expect(page.getByText("Guest original", { exact: true })).toBeVisible();
 });

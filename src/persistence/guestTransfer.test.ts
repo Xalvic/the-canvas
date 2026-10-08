@@ -40,7 +40,7 @@ beforeEach(async () => {
   vi.mocked(uploadBoardAssetRequest).mockImplementation(async (_board, _blob, requestId) => readyUpload(requestId));
   vi.mocked(getBoardAssetUpload).mockImplementation(async (_board, requestId) => readyUpload(requestId));
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 async function addImage() {
   const localId = await saveAsset(new Blob(["png"], { type: "image/png" }));
@@ -119,6 +119,24 @@ describe("deliberate guest transfer", () => {
     await reload(); await expect(transfer.resume(account, signal(), () => {})).rejects.toThrow("still being checked");
     expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(2); expect(applyBoardOperation).not.toHaveBeenCalled();
     expect(transfer.intent?.images[0].assetId).toBe(asset);
+  });
+  it("retries a confirmed pending image after its deadline without renewing the status lease", async () => {
+    await addImage(); await transfer.stage(source, account, signal());
+    const requestId = transfer.intent!.images[0].requestId;
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    vi.mocked(uploadBoardAssetRequest).mockResolvedValueOnce({ requestId, boardId: destination, assetId: asset,
+      state: "pending", canRetry: true, retryAfterMs: 5_000, asset: null });
+    await expect(transfer.resume(account, signal(), () => {})).rejects.toThrow("still being checked");
+    await reload();
+    clock.mockReturnValue(now + 4_999);
+    await expect(transfer.resume(account, signal(), () => {})).rejects.toThrow("still being checked");
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(now + 5_000);
+    expect(await transfer.resume(account, signal(), () => {})).toBe(destination);
+    expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(2);
+    expect(getBoardAssetUpload).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadBoardAssetRequest).mock.calls[1][2]).toBe(requestId);
   });
   it("stops bytes after retry exhaustion or failed upload status", async () => {
     await addImage(); await transfer.stage(source, account, signal());

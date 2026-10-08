@@ -1,12 +1,13 @@
 import { browse, closeDialogs, details, accountMenu, backToDevice, newAccountBoard, explicitSave, rowActions } from "./fixtures/ui";
 import { expect, test } from "@playwright/test";
 import { user, firstId, secondId, savedBoard, mockAccount, canvasState, localBoard, createNote, editNote, openBoard, restoreAccount, documentWrites } from "./fixtures/account";
+import { linkSettings, mockShareLinks } from "./fixtures/shareLinks";
 
 test("viewers can navigate and copy but cannot change the canvas, title or history", async ({ page }) => {
   const board = savedBoard(firstId, "Viewer drawing"); board.role = "viewer"; board.document!.role = "viewer";
   const cloud = await mockAccount(page, [board]);
   await page.goto("/scribble/"); await backToDevice(page); await openBoard(page, board.title, cloud);
-  await expect(page.locator(".save-status")).toHaveText("Can view · account board");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Can view · account board");
   await expect(page.getByLabel(/^(Page|Drawing) title$/)).toBeDisabled();
   await expect(page.getByRole("button", { name: "Actions for Viewer drawing", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
@@ -57,9 +58,10 @@ test("editors save changes and a later downgrade stops edits while retaining the
   await expect(page.locator(".board-notice")).toContainText(/Access (was )?removed/);
 });
 
-test("owners create link invitations, change roles and remove members", async ({ page }) => {
+test("owners manage retained invitations and independent member access without an email form", async ({ page }) => {
   const cloud = await mockAccount(page, [savedBoard(firstId, "Owner drawing")]);
-  const sharing = { members: [{ userId: secondId, email: "member@example.com", displayName: "Member", role: "viewer" }], invitations: [] as { id: string; email: string; role: string; expiresAt: number }[] };
+  await mockShareLinks(page, cloud, firstId);
+  const sharing = { members: [{ userId: secondId, email: "member@example.com", displayName: "Member", role: "viewer" }], invitations: [{ id: "44444444-4444-4444-8444-444444444444", email: "friend@example.com", role: "editor", expiresAt: Date.now() + 86400000 }] };
   await page.route(/\/api\/boards\/[^/]+\/(sharing|invitations|members)(\/[^/]+)?$/, async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname;
     if (req.method() === "GET") { await route.fulfill({ json: sharing }); return; }
@@ -73,10 +75,10 @@ test("owners create link invitations, change roles and remove members", async ({
     else sharing.invitations = [];
     await route.fulfill({ status: 204 });
   });
-  await page.goto("/scribble/"); await openBoard(page, "Owner drawing", cloud); await page.getByRole("button", { name: "Share", exact: true }).click();
-  await page.getByLabel("Google email").fill("friend@example.com");
-  await page.getByLabel("Invite role").selectOption("editor");
-  await page.getByRole("button", { name: "Create invitation", exact: true }).click();
+  await page.goto("/scribble/"); await openBoard(page, "Owner drawing", cloud);
+  const dialog = await linkSettings(page);
+  await dialog.getByText("Existing invited access", { exact: true }).click();
+  await expect(dialog.locator('input[type="email"]')).toHaveCount(0);
   await expect(page.getByText(/friend@example.com · editor/)).toBeVisible();
   await page.getByRole("button", { name: "Copy invitation link", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: /Invitation link copied|Clipboard unavailable/ })).toBeVisible();
@@ -137,7 +139,7 @@ test("deliberate retained drawing transfer creates a copy and committed edits sa
   await page.getByRole("menuitem", { name: "Your account and retained drawing", exact: true }).click();
   await page.getByRole("checkbox", { name: "Bring this drawing into my workspace", exact: true }).check();
   await page.getByRole("button", { name: "Bring drawing", exact: true }).click();
-  await expect(page.getByLabel("Page title")).toHaveValue("My local board"); await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.getByLabel("Page title")).toHaveValue("My local board"); await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)[0].body).toMatchObject({ baseRevision: 1, changes: expect.any(Array) });
   const guestBoard = await localBoard(page);
@@ -147,7 +149,7 @@ test("deliberate retained drawing transfer creates a copy and committed edits sa
   expect(documentWrites(cloud)).toHaveLength(1);
   await page.keyboard.press("Escape");
   await expect.poll(() => documentWrites(cloud).length).toBe(2);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(documentWrites(cloud)[1].body).toMatchObject({ baseRevision: 2, changes: [{ after: expect.objectContaining({ title: "Uncommitted note edit" }) }] });
   expect(await localBoard(page)).toEqual(guestBoard);
   await backToDevice(page);
@@ -214,7 +216,7 @@ test("a conflict keeps a durable draft across reload and saves recovery only to 
   await page.screenshot({ path: "test-results/account-boards-mobile.png" });
   await page.setViewportSize({ width: 1360, height: 900 });
   await explicitSave(page, "Save a copy");
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(cloud.mutations.filter((mutation) => mutation.method === "POST" && mutation.path === "/api/boards")).toHaveLength(1);
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(documentWrites(cloud)[1]).toMatchObject({ body: { expectedRevision: 0, content: { objects: Object.values(draftObjects) } } });
@@ -235,7 +237,7 @@ test("reloading a conflicting account version preserves the previous draft for e
   await page.getByRole("dialog", { name: "Use account version", exact: true }).getByRole("button", { name: "Use account version", exact: true }).click();
   await closeDialogs(page);
   await expect(page.getByText("Changed on another device", { exact: true })).toBeVisible();
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   await details(page);
   await page.getByRole("button", { name: "Restore previous draft", exact: true }).click();
   await closeDialogs(page);
@@ -296,11 +298,11 @@ test("a transient account save failure retains edits and automatically retries t
   await openBoard(page, "Retry board", cloud);
   cloud.failSaves = true;
   await editNote(page, "Retry board", "Retry this draft");
-  await expect(page.locator(".save-status")).toContainText("Changes pending");
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/);
   const draftObjects = (await canvasState(page)).objects;
   expect(documentWrites(cloud)).toHaveLength(1);
   cloud.failSaves = false;
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(documentWrites(cloud).map((mutation) => mutation.body.baseRevision)).toEqual([1, 1]);
   expect(documentWrites(cloud)[0].body.operationId).toBe(documentWrites(cloud)[1].body.operationId);
@@ -326,7 +328,7 @@ test("session expiry during save returns to the guest board and keeps the privat
   await expect(page.getByText("Expired-session board", { exact: true })).toBeVisible();
   await openBoard(page, "Expired-session board", cloud);
   await expect(page.getByText("Private draft before expiry", { exact: true })).toBeVisible();
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(cloud.boards.get(firstId)?.document?.content.objects[0]).toMatchObject({ title: "Private draft before expiry" });
 });
 
@@ -392,7 +394,7 @@ test("new account boards and explicit rename/delete leave the guest board intact
   await createNote(page, "Guest stays too");
   const guestObjects = (await canvasState(page)).objects;
   await restoreAccount(page, cloud); await newAccountBoard(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect((await canvasState(page)).objects).toEqual({});
   const created = [...cloud.boards.values()][0];
   expect(created.document?.content.objects).toEqual([]);
@@ -415,6 +417,7 @@ test("new account boards and explicit rename/delete leave the guest board intact
 });
 
 test("cached board titles stay visible during refresh failure and recover on retry", async ({ page }) => {
+  await page.clock.install();
   const cloud = await mockAccount(page, [savedBoard(firstId, "Cached board"), savedBoard(secondId, "Active page")]);
   await page.goto("/scribble/"); await backToDevice(page);
   await openBoard(page, "Active page", cloud); await browse(page);
@@ -422,13 +425,13 @@ test("cached board titles stay visible during refresh failure and recover on ret
   let release!: () => void;
   cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
   cloud.failLists = true;
-  await page.getByRole("button", { name: "Refresh pages", exact: true }).click();
-  await expect(page.getByText("Refresh pages", { exact: true })).toBeVisible();
-  await restoreAccount(page, cloud); await browse(page);
+  await page.clock.fastForward(31_000);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("button", { name: "Refresh pages", exact: true })).toHaveCount(0);
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   release();
   await expect(page.getByRole("alert").filter({ hasText: "Showing the last loaded list" })).toBeVisible();
-  await restoreAccount(page, cloud); await browse(page);
+  await expect(page.getByRole("button", { name: "Retry pages", exact: true })).toBeEnabled();
   await expect(page.getByText("Cached board", { exact: true })).toBeVisible();
   cloud.failLists = false;
   cloud.listGate = null;
@@ -483,11 +486,12 @@ test("reconnect refreshes the page list while automatically saving the active lo
   await page.context().setOffline(false);
   await expect(page.getByText("After reconnect", { exact: true })).toBeVisible();
   await expect(page.getByLabel(/^(Page|Drawing) title$/)).toHaveValue("Local reconnect draft");
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(cloud.mutations.map((mutation) => mutation.method)).toEqual(["PATCH"]);
 });
 
 test("an older list refresh cannot roll back an acknowledged rename", async ({ page }) => {
+  await page.clock.install();
   const cloud = await mockAccount(page, [savedBoard(firstId, "Before rename")]);
   await page.goto("/scribble/"); await backToDevice(page);
   await restoreAccount(page, cloud); await browse(page);
@@ -497,7 +501,8 @@ test("an older list refresh cannot roll back an acknowledged rename", async ({ p
   cloud.listGate = new Promise<void>((resolve) => { release = resolve; });
   const requestStarted = new Promise<void>((resolve) => { started = resolve; });
   cloud.listStarted = started;
-  await page.getByRole("button", { name: "Refresh pages", exact: true }).click();
+  await page.clock.fastForward(31_000);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await requestStarted;
   cloud.listGate = null;
   await restoreAccount(page, cloud); await rowActions(page, "Before rename");
@@ -518,10 +523,10 @@ test("a lost save acknowledgement reconciles a fresh revision without duplicatin
   await openBoard(page, "Lost response board", cloud);
   cloud.loseNextSaveResponse = true;
   await editNote(page, "Lost response board", "Accepted before response loss");
-  await expect(page.locator(".save-status")).toContainText("Changes pending");
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/);
   expect(documentWrites(cloud)).toHaveLength(1);
   expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
   expect(documentWrites(cloud)).toHaveLength(2);
   expect(new Set(documentWrites(cloud).map((mutation) => mutation.body.operationId)).size).toBe(1);
   expect(cloud.boards.get(firstId)?.document?.revision).toBe(2);

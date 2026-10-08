@@ -64,11 +64,14 @@ export async function uploadAccountImage(localId: string, original: ImageUploadI
     await persist(intent);
   }
   let upload;
-  if (intent.dispatched) {
+  // A confirmed pending response already permits retry after its deadline.
+  // GET takes a reconciliation lease; immediately following it with POST would
+  // renew that cooldown instead of retrying. Unknown outcomes still use GET.
+  if (intent.dispatched && (!intent.pendingConfirmed || !intent.canRetry)) {
     try { upload = await getBoardAssetUpload(link.boardId, intent.requestId, signal, link.ownerId); }
     catch (error) { if (!(error instanceof BoardApiError && error.code === "ASSET_UPLOAD_NOT_FOUND")) throw error; }
   }
-  if (!upload || upload.state === "pending" && upload.canRetry && intent.pendingConfirmed) {
+  if (!upload) {
     if (!intent.canRetry) throw new PendingImageUpload(0, false);
     intent = { ...intent, dispatched: true, pendingConfirmed: false, nextAttemptAt: Date.now() + 5_000 };
     await persist(intent);

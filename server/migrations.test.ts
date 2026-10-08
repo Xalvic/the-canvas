@@ -51,7 +51,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
   }
 
   async function expectVersions() {
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }, { version: 10 }, { version: 11 }, { version: 12 }]);
   }
 
   it("installs all versions on a fresh schema even with concurrent runners", async () => {
@@ -125,7 +125,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL document migration", () => {
     await migrateDatabase(pool);
     // In this disposable schema only, remove the unused additive table/ledger
     // row to reproduce the actual version-eight upgrade boundary.
-    await pool.query("DROP TABLE workspace_initialization_receipts, workspace_states, board_creation_receipts; DELETE FROM schema_migrations WHERE version>=9");
+    await pool.query("DROP TABLE board_share_link_grants, board_share_link_receipts, board_share_links, workspace_initialization_receipts, workspace_states, board_creation_receipts; DELETE FROM schema_migrations WHERE version>=9");
     await pool.query("ALTER TABLE board_assets DROP COLUMN upload_request_id, DROP COLUMN upload_content_hash, DROP COLUMN upload_lease_token, DROP COLUMN upload_lease_until, DROP COLUMN upload_attempts");
     const owner = randomUUID(), member = randomUUID(), board = randomUUID(), asset = randomUUID();
     await pool.query("INSERT INTO users(id,google_subject,email) VALUES($1,'migration-owner','owner@example.com'),($2,'migration-member','member@example.com')", [owner, member]);

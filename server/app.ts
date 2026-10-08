@@ -12,8 +12,10 @@ import type { CollaborationStore } from "./collaboration.js";
 import { createCollaborationRouter } from "./collaborationRoutes.js";
 import { checkReady, productionRequestGuard, productionUserBudget, verifyProductionOrigin, type ProductionDependencies } from "./production.js";
 import { initializeWorkspaceSchema, updateWorkspaceSchema, type WorkspaceStore } from "./workspace.js";
+import type { ShareLinkStore } from "./shareLinks.js";
+import { createShareLinkRouter } from "./shareLinkRoutes.js";
 
-export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService, collaboration?: CollaborationStore, production?: ProductionDependencies, workspace?: WorkspaceStore) {
+export function createApp(boards: BoardStore, documents?: BoardDocumentStore, auth?: AuthDependencies, sharing?: SharingStore, assets?: ImageAssetService, collaboration?: CollaborationStore, production?: ProductionDependencies, workspace?: WorkspaceStore, shareLinks?: ShareLinkStore) {
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -32,13 +34,15 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
     });
     app.use("/api", productionRequestGuard(production));
   }
-  app.use("/api/auth", createAuthRouter(auth, production));
+  app.use("/api/auth", createAuthRouter(auth, production, Boolean(shareLinks)));
   app.use("/api/boards", requireBoardSession(auth));
   app.use("/api/workspace", requireBoardSession(auth));
+  app.use("/api/share-links", requireBoardSession(auth));
   if (sharing) app.use("/api/invitations", requireBoardSession(auth));
   if (production) {
     app.use("/api/boards", productionUserBudget(production));
     app.use("/api/workspace", productionUserBudget(production));
+    app.use("/api/share-links", productionUserBudget(production));
     if (sharing) app.use("/api/invitations", productionUserBudget(production));
   }
 
@@ -114,6 +118,7 @@ export function createApp(boards: BoardStore, documents?: BoardDocumentStore, au
 
   if (collaboration) app.use("/api/boards/:id", createCollaborationRouter(collaboration, auth));
   app.use(express.json({ limit: "16kb" }));
+  app.use("/api", createShareLinkRouter(shareLinks, production));
 
   function requireWorkspace() {
     if (!workspace) throw new HttpError(503, "WORKSPACE_UNAVAILABLE", "Workspace state is unavailable");

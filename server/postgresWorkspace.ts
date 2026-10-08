@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient, WorkspaceState as WorkspaceRow } from "./generated/prisma/client.js";
 import type { BoardMetadata } from "./boards.js";
-import { lockBoardAccess } from "./boardPermissions.js";
+import { boardRoleSql, lockBoardAccess } from "./boardPermissions.js";
 import { createBlankPage, lockBoardActor } from "./postgresBoards.js";
 import { HttpError } from "./errors.js";
 import type { WorkspaceState, WorkspaceStore } from "./workspace.js";
@@ -28,7 +28,7 @@ async function openingCandidate(tx: Prisma.TransactionClient, userId: string, la
   for (;;) {
     const candidates = await tx.$queryRaw<{ id: string }[]>`
       SELECT b.id FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ${userId}::uuid
-      WHERE b.owner_id IS NOT NULL AND (b.owner_id = ${userId}::uuid OR m.role IN ('editor', 'viewer'))
+      WHERE b.owner_id IS NOT NULL AND (${boardRoleSql(userId)}) IS NOT NULL
       ORDER BY (b.owner_id = ${userId}::uuid) DESC, b.created_at, b.id LIMIT 1 FOR SHARE OF b
     `;
     const candidate = candidates[0];

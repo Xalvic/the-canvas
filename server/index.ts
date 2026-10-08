@@ -16,11 +16,14 @@ import { createPostgresCollaborationStore } from "./postgresCollaboration.js";
 import { loadProductionConfig } from "./productionConfig.js";
 import { createPostgresRequestBudgets } from "./productionBudgets.js";
 import { createPostgresWorkspaceStore } from "./postgresWorkspace.js";
+import { createPostgresShareLinkStore } from "./postgresShareLinks.js";
+import { loadShareLinkKey } from "./shareLinkCrypto.js";
 
 const config = loadServerConfig();
 const production = loadProductionConfig();
 const authConfig = loadAuthConfig();
 const imageConfig = loadImageKitConfig();
+const shareLinkKey = loadShareLinkKey();
 const pool = createDatabasePool(loadDatabaseUrl());
 const prisma = createPrismaClient(pool);
 async function closeDatabase() {
@@ -38,6 +41,9 @@ try {
   await prisma.$queryRaw`SELECT upload_request_id, upload_content_hash, upload_lease_token, upload_lease_until, upload_attempts FROM board_assets LIMIT 0`;
   await prisma.$queryRaw`SELECT bucket FROM asset_request_budgets LIMIT 0`;
   await prisma.$queryRaw`SELECT operation_id FROM board_operation_receipts LIMIT 0`;
+  await prisma.$queryRaw`SELECT board_id FROM board_share_links LIMIT 0`;
+  await prisma.$queryRaw`SELECT board_id FROM board_share_link_grants LIMIT 0`;
+  await prisma.$queryRaw`SELECT request_id FROM board_share_link_receipts LIMIT 0`;
   if (production) await prisma.$queryRaw`SELECT bucket FROM api_request_budgets LIMIT 0`;
 } catch {
   console.error("Could not connect to the board database. Check DATABASE_URL and run npm run db:migrate.");
@@ -54,10 +60,11 @@ const server = createApp(createPostgresBoardStore(prisma), createPostgresDocumen
     const probe = { text: "SELECT 1", query_timeout: 1800 };
     await pool.query(probe);
   },
-} : undefined, createPostgresWorkspaceStore(prisma)).listen(config.port, config.host, () => {
+} : undefined, createPostgresWorkspaceStore(prisma), shareLinkKey ? createPostgresShareLinkStore(prisma, shareLinkKey) : undefined).listen(config.port, config.host, () => {
   console.log(`Scribble API listening on ${config.host}:${config.port} (${production ? "production origin guard enabled" : "development"})`);
   if (!authConfig.google) console.log("Google sign-in is disabled until its environment settings are configured");
   if (!imageConfig) console.log("Cloud images are disabled until backend ImageKit settings are configured");
+  if (!shareLinkKey) console.log("Reusable link sharing is disabled until SHARE_LINK_KEY is configured");
 });
 
 server.on("error", (error) => {

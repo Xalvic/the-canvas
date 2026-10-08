@@ -135,8 +135,8 @@ export function expectedAccountHeaders(accountId?: string) {
   return accountId ? { headers: { "X-Scribble-Account": z.uuid().parse(accountId) } } : {};
 }
 
-export async function listServerBoards(signal?: AbortSignal): Promise<ServerBoard[]> {
-  const response = await boardRequest("/api/boards", { signal }, "Could not load server boards");
+export async function listServerBoards(signal?: AbortSignal, accountId?: string): Promise<ServerBoard[]> {
+  const response = await boardRequest("/api/boards", { signal, ...expectedAccountHeaders(accountId) }, "Could not load server boards");
   return (await parseResponse(response, boardListSchema)).boards;
 }
 

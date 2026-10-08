@@ -1,0 +1,11 @@
+{
+  "authenticatedDecryption": true,
+  "postgresArchiveReadable": true,
+  "format": "postgres-custom",
+  "bytes": 306692,
+  "sha256": "e153d5c21deda9f3cea1cbb6cca76b66dcba449f86a1830f119186f4b35a5278",
+  "tagPosition": "prefix",
+  "authenticatedHeader": false,
+  "tableEntries": 15,
+  "restorePerformed": false
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "../e2e-integration/tsconfig.json",
+  "include": ["../e2e/ui-primitives.spec.ts", "../e2e/ux-layout.spec.ts", "../e2e/workspace-shell.spec.ts"]
+}

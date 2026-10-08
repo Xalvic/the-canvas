@@ -1,6 +1,6 @@
 // Standalone integration-test server. It never imports production credentials or
 // connects to ImageKit; all durable app state lives in one disposable DB schema.
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import express from "express";
 import pg from "pg";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { createPostgresCollaborationStore } from "../server/postgresCollaboratio
 import { createPostgresDocumentStore } from "../server/postgresDocuments.js";
 import { createPostgresSharingStore } from "../server/postgresSharing.js";
 import { createPostgresWorkspaceStore } from "../server/postgresWorkspace.js";
+import { createPostgresShareLinkStore } from "../server/postgresShareLinks.js";
 import { createPrismaClient } from "../server/prisma.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -181,7 +182,8 @@ try {
       authorizationUrl: ({ state }) => `${frontendUrl.replace("/scribble/", "/api/auth/google/callback")}?state=${state}&code=${randomUUID()}`,
       verifyCode: async (code) => ({ subject: `fixture-oauth-${code}`, email: `oauth-${code}@example.com`, displayName: "OAuth fixture" }),
     }, frontendUrl, secureCookies: false,
-  }, createPostgresSharingStore(prisma), assets, createPostgresCollaborationStore(prisma), undefined, createPostgresWorkspaceStore(prisma)));
+  }, createPostgresSharingStore(prisma), assets, createPostgresCollaborationStore(prisma), undefined, createPostgresWorkspaceStore(prisma),
+    process.env.SCRIBBLE_E2E_SHARE_LINKS === "1" ? createPostgresShareLinkStore(prisma, randomBytes(32)) : undefined));
   fixture.use(errorHandler);
   server = fixture.listen(port, "127.0.0.1", () => console.log(`Isolated browser API ready on ${port}; schema ${schema}`));
   server.on("error", (error) => { console.error(error); void stop().then(() => process.exit(1)); });

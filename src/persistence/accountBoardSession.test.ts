@@ -7,6 +7,7 @@ import {
 import { createCardObject, createImageObject } from "../canvas/objects/objectFactories";
 import { getAsset } from "../assets/assetStore";
 import { uploadBoardAssetRequest, getBoardAssetUpload, downloadBoardAsset } from "../api/assets";
+import { applyBoardOperation } from "../api/collaboration";
 import { useBoardStore } from "../store/boardStore";
 import { useDocumentStore } from "../store/documentStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -39,6 +40,7 @@ vi.mock("./localBoardStorage", async (importOriginal) => ({
 vi.mock("./waitForLocalBoardSave", () => ({ waitForLocalBoardSave: vi.fn() }));
 vi.mock("../assets/assetStore", () => ({ getAsset: vi.fn() }));
 vi.mock("../api/assets", () => ({ uploadBoardAssetRequest: vi.fn(), getBoardAssetUpload: vi.fn(), downloadBoardAsset: vi.fn(), MAX_CLOUD_IMAGE_BYTES: 5 * 1024 * 1024 }));
+vi.mock("../api/collaboration", () => ({ applyBoardOperation: vi.fn(), sendBoardPresence: vi.fn() }));
 
 const ownerId = "owner-1";
 const metadata = { id: "board-1", title: "Account board", createdAt: 10, updatedAt: 20 };
@@ -336,6 +338,8 @@ describe("workspace saving recovery", () => {
     expect(getBoardAssetUpload).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(2);
+    // A status read would renew the server reconciliation lease and block POST.
+    expect(getBoardAssetUpload).not.toHaveBeenCalled();
     expect(vi.mocked(uploadBoardAssetRequest).mock.calls[1].slice(0, 3)).toEqual(vi.mocked(uploadBoardAssetRequest).mock.calls[0].slice(0, 3));
     expect(session.getState().status).toBe("saved");
   });
@@ -408,6 +412,31 @@ describe("workspace saving recovery", () => {
     expect(session.getState().status).toBe("saved");
     expect(renameServerBoard).toHaveBeenCalled();
     expect(uploadBoardAssetRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes saving edits after a live read fails while the browser goes offline", async () => {
+    stop(); vi.stubGlobal("window", new EventTarget()); vi.stubGlobal("navigator", { onLine: true });
+    const streams: { onopen: (() => void) | null }[] = [];
+    vi.stubGlobal("EventSource", class extends EventTarget {
+      onopen: (() => void) | null = null;
+      constructor() { super(); streams.push(this); }
+      close() {}
+    });
+    session = new AccountBoardSession(queryClient, true); session.setUser(ownerId);
+    hydrate(accountRecord(document("Saved"))); stop = session.start();
+    vi.mocked(getServerBoardDocument).mockRejectedValueOnce(new TypeError("Live read interrupted"));
+    vi.mocked(applyBoardOperation).mockResolvedValue(remote(document("Edited offline"), 3));
+    vi.stubGlobal("navigator", { onLine: false }); streams[0].onopen!(); await drain();
+    expect(session.getState()).toMatchObject({ status: "pending", error: null });
+    useDocumentStore.getState().updateObject("card-1", { body: "Edited offline" });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(applyBoardOperation).not.toHaveBeenCalled();
+    vi.stubGlobal("navigator", { onLine: true }); window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(1);
+    expect(session.getState().status).toBe("saved");
+    expect(applyBoardOperation).toHaveBeenCalledExactlyOnceWith(metadata.id, expect.objectContaining({ baseRevision: 2,
+      changes: [expect.objectContaining({ id: "card-1", after: expect.objectContaining({ body: "Edited offline" }) })] }),
+      expect.any(AbortSignal), ownerId);
   });
 });
 

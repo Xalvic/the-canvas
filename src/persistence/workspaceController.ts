@@ -13,6 +13,8 @@ import type { AccountBoardSession } from "./accountBoardSession";
 import { invitationIntent } from "../components/ServerBoards/invitationIntent";
 import { GuestTransfer, type GuestTransferSummary } from "./guestTransfer";
 import { loadLocalBoard } from "./localBoardStorage";
+import { openShareLink } from "../api/shareLinks";
+import { shareLinkIntent, invalidShareLink, rememberShareLinkIntent, clearShareLinkIntent, rememberGuestShare, guestShareMatches, clearGuestShare } from "./shareLinkIntent";
 import {
   pageFromUrl, pendingPageIntent, clearPageIntent, writePageUrl,
   workspaceInitializationIntent, clearWorkspaceInitializationIntent,
@@ -28,6 +30,8 @@ export type WorkspaceState = {
   transferProgress?: string | null;
   creatingPage?: boolean;
   creationError?: string | null;
+  sharedPage?: "sign-in" | "opening" | "error" | "unavailable" | null;
+  shareDestination?: { userId: string; boardId: string } | null;
 };
 export type WorkspaceEntryIntent = { pendingTransfer: boolean };
 
@@ -109,10 +113,16 @@ export class WorkspaceController {
     const composing = () => { this.composing = true; };
     const composed = () => { this.composing = false; };
     const pop = () => { if (this.userId()) void this.enter("replace", true); };
+    const shared = () => {
+      if (!shareLinkIntent() && !invalidShareLink()) return;
+      if (this.userId()) void this.enter("replace");
+      else this.update({ sharedPage: invalidShareLink() ? "unavailable" : "sign-in" });
+    };
     const focus = () => { if (!this.request && this.state.status !== "signing-out") void this.checkAccount(); };
     window.addEventListener("popstate", pop);
     window.addEventListener("focus", focus);
     window.addEventListener("online", focus);
+    window.addEventListener("hashchange", shared);
     document.addEventListener("compositionstart", composing);
     document.addEventListener("compositionend", composed);
     const stopBoard = useBoardStore.subscribe((board, previous) => {
@@ -132,6 +142,7 @@ export class WorkspaceController {
       this.session.onPageDeleted = null;
       stopBoard(); stopSession();
       window.removeEventListener("popstate", pop); window.removeEventListener("focus", focus); window.removeEventListener("online", focus);
+      window.removeEventListener("hashchange", shared);
       document.removeEventListener("compositionstart", composing); document.removeEventListener("compositionend", composed);
     };
   }
@@ -155,15 +166,17 @@ export class WorkspaceController {
           this.session.setUser(null);
           await this.guest(controller.signal);
         }
-        this.update({ account, status: "guest", phase: "device", error: null, creationError: null });
+        this.update({ account, status: "guest", phase: "device", error: null, creationError: null,
+          sharedPage: invalidShareLink() ? "unavailable" : shareLinkIntent() ? "sign-in" : null });
         return;
       }
       if (oldUser === account.user.id && this.session.getState().userId === oldUser) {
         this.update({ account, status: "workspace", error: null });
+        if (shareLinkIntent() || invalidShareLink()) await this.enter("replace");
         return; // Another device's last-opened preference never drives this editor.
       }
       this.accountEpoch++; this.preferenceRequest?.abort();
-      this.update({ account, status: "workspace", phase: "loading", error: null, creationError: null });
+      this.update({ account, status: "workspace", phase: "loading", error: null, creationError: null, shareDestination: null });
       useBoardStore.setState({ navigationPending: true });
       await this.prepare(controller.signal);
       if (!this.current(generation)) return;
@@ -202,7 +215,9 @@ export class WorkspaceController {
   }
 
   openPage = async (pageId: string) => {
+    const linked = shareLinkIntent();
     await this.enter("push", false, false, pageId);
+    if (linked && this.state.phase === "ready" && useBoardStore.getState().account?.boardId === pageId) clearShareLinkIntent(linked);
     return this.state.phase === "ready" && useBoardStore.getState().account?.boardId === pageId;
   };
   newPage = async () => {
@@ -210,6 +225,7 @@ export class WorkspaceController {
     if (!userId || this.request || this.session.getState().busy || this.state.status !== "workspace") return false;
     const { controller, generation } = this.begin();
     const timeout = setTimeout(() => controller.abort(new Error("New page request timed out. Retry the same page.")), 20_000);
+    const linked = shareLinkIntent();
     this.navigating = true; useBoardStore.setState({ navigationPending: true });
     this.update({ creatingPage: true, creationError: null });
     try {
@@ -229,6 +245,8 @@ export class WorkspaceController {
       if (!await this.session.open(metadata, controller.signal, false, undefined, userId)) throw this.session.getFailure() ?? new Error(this.session.getState().error ?? "Couldn’t open the new page.");
       if (!this.current(generation) || controller.signal.aborted || this.userId() !== userId) return false;
       clearNewPageIntent(userId);
+      if (linked) clearShareLinkIntent(linked);
+      this.update({ sharedPage: null });
       this.opened(id, "push");
       return true;
     } catch (error) {
@@ -263,13 +281,41 @@ export class WorkspaceController {
     const userId = this.userId();
     if (!userId) return;
     const previousPage = useBoardStore.getState().account?.ownerId === userId ? useBoardStore.getState().account?.boardId : null;
+    const linked = requestedPageId || afterDeletion ? null : shareLinkIntent();
     const { controller, generation } = this.begin();
     const timeout = setTimeout(() => controller.abort(new Error("Workspace request timed out. Try again.")), this.transfer?.intent?.status === "active" ? 10 * 60_000 : 20_000);
     this.navigating = true;
     useBoardStore.setState({ navigationPending: true });
-    this.update({ status: "workspace", phase: "loading", error: null });
+    this.update({ status: "workspace", phase: "loading", error: null, sharedPage: linked ? "opening" : null, shareDestination: null });
     try {
       await this.prepare(controller.signal);
+      if (!requestedPageId && invalidShareLink()) {
+        this.update({ phase: previousPage ? "ready" : "error", sharedPage: "unavailable", error: "This shared page is unavailable. Check the original link." });
+        return;
+      }
+      if (linked) {
+        const account = this.state.account;
+        if (!account) throw new BoardSignInRequired();
+        const board = await openShareLink(linked, account, controller.signal);
+        if (!this.current(generation) || controller.signal.aborted || this.userId() !== userId) return;
+        const existing = await getServerWorkspace(controller.signal);
+        if (!existing.initialized) {
+          // A recipient needs an empty workspace, not an incidental first page.
+          const intent = workspaceInitializationIntent(userId, false);
+          if (intent.createInitialPage) throw new Error("Finish your pending workspace setup before reopening this shared link.");
+          await initializeServerWorkspace(intent, controller.signal);
+        }
+        if (!this.current(generation) || controller.signal.aborted || this.userId() !== userId) return;
+        clearWorkspaceInitializationIntent(userId);
+        if (!await this.session.open(board, controller.signal, useBoardStore.getState().accessRole !== board.role, undefined, userId))
+          throw this.session.getFailure() ?? new Error("Couldn’t open this shared page. Retry to continue.");
+        if (!this.current(generation) || controller.signal.aborted || this.userId() !== userId) return;
+        clearShareLinkIntent(linked);
+        this.update({ sharedPage: null });
+        this.opened(board.id, "replace");
+        void this.client.invalidateQueries({ queryKey: accountBoardKeys.list(userId), exact: true });
+        return;
+      }
       const workspace = await getServerWorkspace(controller.signal);
       if (!this.current(generation) || controller.signal.aborted) return;
       // Read the list after state: another tab can initialize between these reads.
@@ -333,7 +379,10 @@ export class WorkspaceController {
       if (this.current(generation)) {
         if (error instanceof BoardSignInRequired || !this.session.getState().userId) { await this.expired(); return; }
         if (fromHistory && previousPage) writePageUrl(previousPage, "replace");
-        this.update({ phase: afterDeletion ? "error" : previousPage ? "ready" : "error", error: this.errorMessage(error) });
+        const unavailable = error instanceof BoardApiError && ["SHARE_LINK_UNAVAILABLE", "BOARD_NOT_FOUND"].includes(error.code);
+        this.update({ phase: afterDeletion ? "error" : previousPage ? "ready" : "error",
+          sharedPage: linked ? unavailable ? "unavailable" : "error" : null,
+          error: linked && unavailable ? "This shared page is unavailable. Ask its owner for a current link." : this.errorMessage(error) });
       }
     } finally {
       clearTimeout(timeout);
@@ -351,8 +400,11 @@ export class WorkspaceController {
     this.update({ transfer: intent && intent.status !== "complete" ? { id: intent.id, status: intent.status, destinationId: intent.destinationId } : null });
   }
   // The same explicit consent flow is used before OAuth and later in Account.
-  prepareGoogleSignIn = async (bringDrawing: boolean, signal: AbortSignal) => {
+  prepareShare = async (signal: AbortSignal) => { await this.prepare(signal); };
+  prepareGoogleSignIn = async (bringDrawing: boolean, signal: AbortSignal, shareDrawing = false) => {
     await this.prepare(signal);
+    rememberShareLinkIntent();
+    if (shareDrawing && !bringDrawing) throw new Error("Confirm bringing this drawing into your account before sharing it.");
     if (!this.transfer) return "/api/auth/google";
     await this.transfer.declineAuthentication();
     if (!bringDrawing) return "/api/auth/google";
@@ -361,9 +413,10 @@ export class WorkspaceController {
     signal.throwIfAborted();
     if (!source) throw new Error("Your device drawing could not be read. It remains on this device.");
     const flowId = await this.transfer.stage(source, null, signal);
+    if (shareDrawing) rememberGuestShare(flowId);
     return `/api/auth/google?clientFlow=${encodeURIComponent(flowId)}`;
   };
-  bringGuestDrawing = async () => {
+  bringGuestDrawing = async (shareDrawing = false) => {
     const userId = this.userId();
     if (!userId || !this.transfer) return;
     const { controller, generation } = this.begin();
@@ -375,7 +428,8 @@ export class WorkspaceController {
       controller.signal.throwIfAborted();
       if (!source) throw new Error("Your device drawing could not be read.");
       if (this.transfer.intent && this.transfer.intent.status !== "complete") throw new Error("Resume the existing drawing transfer first.");
-      await this.transfer.stage(source, userId, controller.signal);
+      const flowId = await this.transfer.stage(source, userId, controller.signal);
+      if (shareDrawing) rememberGuestShare(flowId);
       this.transferState();
     } catch (error) { if (this.current(generation)) this.update({ error: this.errorMessage(error) }); }
     finally { clearTimeout(timeout); if (this.request === controller) this.request = null; }
@@ -400,6 +454,9 @@ export class WorkspaceController {
         await this.transfer.opened(); this.transferState();
         if (!this.current(generation) || signal.aborted) return;
         this.opened(destinationId, mode);
+        if (this.transfer.intent && guestShareMatches(this.transfer.intent.flowId)) {
+          clearGuestShare(); this.update({ shareDestination: { userId, boardId: destinationId } });
+        }
       }
     } catch (error) {
       if (this.current(generation)) {
@@ -436,6 +493,7 @@ export class WorkspaceController {
     await this.transfer?.pause(); this.transferState();
     await this.enter();
   };
+  sharedDestinationHandled = () => { this.update({ shareDestination: null }); };
   private expired = async (guestAccount?: AccountState) => {
     const { controller, generation } = this.begin();
     const timeout = setTimeout(() => controller.abort(), 20_000);
@@ -443,7 +501,8 @@ export class WorkspaceController {
     this.accountEpoch++;
     useBoardStore.setState({ navigationPending: true });
     this.preferenceRequest?.abort();
-    this.update({ status: "expired", account: guestAccount ?? null, phase: "loading", creationError: null, error: "Your session ended. Sign in to return to your workspace." });
+    this.update({ status: "expired", account: guestAccount ?? null, phase: "loading", creationError: null, shareDestination: null,
+      sharedPage: shareLinkIntent() ? "sign-in" : null, error: "Your session ended. Sign in to return to your workspace." });
     try {
       await this.prepare(controller.signal);
       await this.transfer?.pause(); this.transferState();
@@ -461,7 +520,7 @@ export class WorkspaceController {
     const timeout = setTimeout(() => controller.abort(new Error("Sign-out timed out. Try again.")), 20_000);
     const account = this.state.account;
     let signedOut = false;
-    this.update({ status: "signing-out", error: null, creationError: null });
+    this.update({ status: "signing-out", error: null, creationError: null, shareDestination: null });
     useBoardStore.setState({ navigationPending: true });
     try {
       await this.prepare(controller.signal);

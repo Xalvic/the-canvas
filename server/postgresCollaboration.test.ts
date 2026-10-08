@@ -205,7 +205,7 @@ describe.skipIf(!databaseUrl)("real PostgreSQL collaboration", () => {
     const original = await state();
     await pool.query("DROP TABLE board_operation_receipts; DELETE FROM schema_migrations WHERE version=7; CREATE TABLE board_operation_receipts(marker text)");
     await expect(migrateDatabase(pool)).rejects.toMatchObject({ code: "42P07" });
-    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11]);
+    expect((await pool.query("SELECT version FROM schema_migrations ORDER BY version")).rows.map(({ version }) => version)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12]);
     await pool.query("DROP TABLE board_operation_receipts"); await migrateDatabase(pool); await migrateDatabase(pool);
     expect(await state()).toEqual(original);
     const sql = "INSERT INTO board_operation_receipts(board_id,actor_id,operation_id,payload_hash,applied_revision) VALUES($1,$2,$3,$4,$5)";

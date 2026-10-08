@@ -52,7 +52,7 @@ for (const fallback of [false, true]) {
       const cloud = await mockAccount(page, account ? [board] : []);
       cloud.signedIn = account;
       await page.goto("/scribble/");
-      await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+      await expect(page.getByLabel(account ? "Page title" : "Drawing title", { exact: true })).toBeEnabled();
       if (account) await openBoard(page, board.title);
       await createNote(page, "Keep this drawing");
       await page.evaluate(async () => {
@@ -60,7 +60,7 @@ for (const fallback of [false, true]) {
         useViewportStore.getState().setViewport({ x: 120, y: -70, zoom: .8 });
       });
       await flush(page);
-      if (account) await expect(page.locator(".save-status")).toHaveText("Saved to account");
+      if (account) await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
       const before = await snapshot(page);
       // Leave a real pen draft active when backgrounding; blur commits it once.
       await page.getByRole("button", { name: "Pen tool", exact: true }).click();
@@ -74,7 +74,7 @@ for (const fallback of [false, true]) {
       });
       await page.mouse.up();
       await flush(page);
-      if (account) await expect(page.locator(".save-status")).toHaveText("Saved to account");
+      if (account) await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
       const background = await snapshot(page);
       expect(Object.values(background.objects)).toHaveLength(2);
       expect(background.past).toHaveLength(before.past.length + 1);
@@ -99,7 +99,8 @@ for (const fallback of [false, true]) {
       expect(expired).toBe(true);
       await expect(page.getByRole("button", { name: "Note tool", exact: true })).toBeEnabled();
       await flush(page);
-      await expect(page.locator(".save-status")).toHaveText(account ? "Saved to account" : "Saved on this device");
+      if (account) await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account");
+      else await expect(page.locator(".save-status")).toHaveCount(0);
       const after = await snapshot(page);
       expect(after).toEqual(background);
       expect(after.ownership).toBe("owned");
@@ -115,7 +116,7 @@ for (const fallback of [false, true]) {
       if (fallback) await page.clock.setFixedTime(clock + 2 * (BOARD_LEASE_DURATION_MS + 1));
       await page.reload();
       if (account) await openBoard(page, board.title);
-      await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+      await expect(page.getByLabel(account ? "Page title" : "Drawing title", { exact: true })).toBeEnabled();
       expect((await snapshot(page)).objects).toEqual(background.objects);
       expect((await snapshot(page)).viewport).toEqual(background.viewport);
     });
@@ -134,12 +135,12 @@ test("initial acquisition shows loading without flashing another-tab warnings", 
     } });
   });
   await page.goto("/scribble/");
-  await expect(page.locator(".save-status")).toHaveText("Opening device draft…");
+  await expect.poll(() => page.evaluate(async () => (await import(/* @vite-ignore */ "/scribble/src/store/boardStore.ts")).useBoardStore.getState().isHydrated)).toBe(false);
   await expect(page.getByText("Editing in another tab", { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel("Board title", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Drawing title", { exact: true })).toBeDisabled();
   await page.evaluate(() => (window as unknown as { releaseAcquisition: () => void }).releaseAcquisition());
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
-  await expect(page.getByLabel("Board title", { exact: true })).toBeEnabled();
+  await expect(page.locator(".save-status")).toHaveCount(0);
+  await expect(page.getByLabel("Drawing title", { exact: true })).toBeEnabled();
 });
 
 test("storage outage preserves unsaved content and history, then retries the same writer", async ({ page }) => {
@@ -156,7 +157,7 @@ test("storage outage preserves unsaved content and history, then retries the sam
     const document = useDocumentStore.getState();
     document.updateObject(Object.keys(document.objects)[0], { title: "Pending during outage" });
   });
-  await expect(page.locator(".save-status")).toHaveText("Couldn’t save on this device");
+  await expect(page.locator(".board-notice")).toContainText("Couldn’t save on this device");
   await expect(page.getByText("Editing in another tab", { exact: true })).toHaveCount(0);
   await details(page);
   await expect(page.getByRole("button", { name: "Retry device save", exact: true })).toBeVisible();
@@ -167,7 +168,7 @@ test("storage outage preserves unsaved content and history, then retries the sam
   expect(pending.recoveryRecords).toEqual([]);
   await page.getByRole("button", { name: "Retry device save", exact: true }).click();
   await closeDialogs(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
+  await expect(page.locator(".save-status")).toHaveCount(0);
   const after = await snapshot(page);
   expect(after.objects).toEqual(pending.objects);
   expect(after.past).toEqual(pending.past);
@@ -178,7 +179,7 @@ test("storage outage preserves unsaved content and history, then retries the sam
   await page.getByRole("button", { name: "Select tool", exact: true }).click();
   await page.mouse.click(1000, 650);
   await page.keyboard.press("Control+z");
-  expect((await snapshot(page)).objects).toEqual(before.objects);
+  await expect.poll(async () => (await snapshot(page)).objects).toEqual(before.objects);
 });
 
 test("initial IndexedDB failure offers storage retry and loads the retained guest drawing", async ({ page }) => {
@@ -191,12 +192,12 @@ test("initial IndexedDB failure offers storage retry and loads the retained gues
     indexedDB.open = () => { throw new DOMException("Device storage temporarily unavailable", "UnknownError"); };
   });
   await page.reload();
-  await expect(page.locator(".save-status")).toHaveText("Couldn’t save on this device");
+  await expect(page.locator(".board-notice")).toContainText("Couldn’t save on this device");
   await expect(page.getByText("Editing in another tab", { exact: true })).toHaveCount(0);
   await details(page);
   await page.evaluate(() => (window as unknown as { restoreDeviceStorage: () => void }).restoreDeviceStorage());
   await page.getByRole("button", { name: "Retry device save", exact: true }).click();
   await closeDialogs(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved on this device");
-  expect((await snapshot(page)).objects).toEqual(before.objects);
+  await expect(page.locator(".save-status")).toHaveCount(0);
+  await expect.poll(async () => (await snapshot(page)).objects).toEqual(before.objects);
 });

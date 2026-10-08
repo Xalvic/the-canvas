@@ -1,0 +1,6 @@
+{
+  "extends": "../e2e-integration/tsconfig.json",
+  "compilerOptions": { "rootDir": "..", "noUnusedLocals": true, "noUnusedParameters": true },
+  "include": ["../e2e-integration/share-links.spec.ts", "../scripts/e2e-api-fixture.ts", "../src/persistence/shareLinkActions.test.ts", "../src/persistence/shareLinkIntent.test.ts", "../src/persistence/workspaceController.test.ts", "../src/components/ServerBoards/ShareControls.tsx"],
+  "exclude": []
+}

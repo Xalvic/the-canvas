@@ -67,15 +67,11 @@ test("same-object concurrent conflict preserves the offline draft and save-as-ne
   await editNote(page, "Owner baseline", "Owner remote update");
   await expect.poll(() => savedTitles(context.request, boardId), { timeout: 12_000 }).toEqual(["Editor baseline", "Owner remote update"].sort());
   await editorContext.setOffline(false);
-  await expect(editor.locator(".save-status")).toContainText("Account save failed");
-  await details(editor);
-  await editor.getByRole("button", { name: "Retry account save", exact: true }).click();
-  await closeDialogs(editor);
-  await expect(editor.locator(".save-status")).toHaveText("This board changed elsewhere");
+  await expect(editor.locator(".board-notice")).toContainText("changed", { timeout: 12_000 });
   expect(titles((await canvasState(editor)).objects)).toContain("My conflicting draft");
   await explicitSave(editor, "Save a copy");
   await expect.poll(async () => (await canvasState(editor)).account?.boardId).not.toBe(boardId);
-  await expect(editor.locator(".save-status")).toHaveText("Saved to account");
+  await expect(editor.locator(".save-status")).toHaveAccessibleName("Saved to account");
   const copyId = (await canvasState(editor)).account!.boardId;
   expect(await savedTitles(context.request, copyId)).toEqual(["Editor baseline", "My conflicting draft"].sort());
   expect(await savedTitles(context.request, boardId)).toEqual(["Editor baseline", "Owner remote update"].sort());
@@ -118,10 +114,6 @@ test("offline independent edits reconnect through fresh reads and compare-and-sw
   await editNote(page, "Owner baseline", "Owner while offline");
   await expect.poll(() => savedTitles(context.request, boardId), { timeout: 12_000 }).toEqual(["Editor baseline", "Owner while offline"].sort());
   await editorContext.setOffline(false);
-  await expect(editor.locator(".save-status")).toContainText("Account save failed");
-  await details(editor);
-  await editor.getByRole("button", { name: "Retry account save", exact: true }).click();
-  await closeDialogs(editor);
   const merged = ["Editor offline edit", "Owner while offline"].sort();
   await expect.poll(() => savedTitles(context.request, boardId), { timeout: 12_000 }).toEqual(merged);
   await expect.poll(async () => titles((await canvasState(editor)).objects)).toEqual(merged);
@@ -135,7 +127,7 @@ test("a committed operation with a lost response survives reload and replays exa
   await network(context.request, 1);
   await editNote(page, "Owner baseline", "Committed despite lost response");
   await expect.poll(() => savedTitles(context.request, boardId), { timeout: 12_000 }).toContain("Committed despite lost response");
-  await expect(page.locator(".save-status")).toContainText("Account save failed");
+  await expect(page.locator(".save-status")).toHaveAccessibleName(/Changes pending/);
   await flushLocalDraft(page);
   expect((await state(context.request, boardId)).receipts.filter((receipt) => receipt.actor_id === ownerId)).toHaveLength(1);
   await page.reload(); await openBoard(page, title);
@@ -143,7 +135,7 @@ test("a committed operation with a lost response survives reload and replays exa
   const retry = page.getByRole("button", { name: "Retry account save", exact: true });
   if (await retry.isVisible()) await retry.click();
   await closeDialogs(page);
-  await expect(page.locator(".save-status")).toHaveText("Saved to account");
+  await expect(page.locator(".save-status")).toHaveAccessibleName("Saved to account", { timeout: 12_000 });
   const after = await state(context.request, boardId);
   expect(after.document!.revision).toBe(before + 1);
   expect(after.receipts.filter((receipt) => receipt.actor_id === ownerId)).toHaveLength(1);
@@ -157,7 +149,7 @@ test("live downgrade and revocation block new writes and fresh reads while retai
   await flushLocalDraft(editor);
   await membership(context.request, boardId, editorId, "viewer");
   await editorContext.setOffline(false);
-  await expect(editor.locator(".save-status")).toHaveText("Can view · account board", { timeout: 10_000 });
+  await expect(editor.locator(".save-status")).toHaveAccessibleName("Can view · account board", { timeout: 10_000 });
   expect(titles((await canvasState(editor)).objects)).toContain("Private recoverable draft");
   await expect(editor.getByRole("button", { name: "Note tool", exact: true })).toBeDisabled();
   const snapshot = await state(context.request, boardId);
@@ -167,7 +159,7 @@ test("live downgrade and revocation block new writes and fresh reads while retai
   })).status()).toBe(403);
   expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(200);
   await membership(context.request, boardId, editorId, null);
-  await expect(editor.locator(".save-status")).toHaveText("Access removed", { timeout: 10_000 });
+  await expect(editor.getByText("Access removed", { exact: true })).toBeVisible({ timeout: 10_000 });
   expect((await editorContext.request.get(`${BASE_URL}/api/boards/${boardId}/document`)).status()).toBe(404);
   expect(titles((await canvasState(editor)).objects)).toContain("Private recoverable draft");
   expect((await state(context.request, boardId)).document!.revision).toBe(snapshot.document!.revision);
