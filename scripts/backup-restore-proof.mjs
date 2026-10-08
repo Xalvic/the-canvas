@@ -94,6 +94,11 @@ try {
         await client.query("INSERT INTO workspace_initialization_receipts(actor_id,request_id,create_initial_page) VALUES ($1,$2,true)", [ids[0], ids[6]]);
       }
       if (migrations.some((name) => name.startsWith("011_"))) await client.query("INSERT INTO board_assets(id,board_id,scope_board_id,uploader_id,status,byte_size,mime_type,width,height,provider_file_path,upload_request_id,upload_content_hash,upload_lease_token,upload_lease_until,upload_attempts) VALUES ($1,$2,$2,$3,'pending',64,'image/png',4,4,'/scribble/dev/pending-proof.png',$4,$5,$6,clock_timestamp()+interval '5 seconds',1)", [randomUUID(), ids[2], ids[0], ids[6], "f".repeat(64), randomUUID()]);
+      if (migrations.some((name) => name.startsWith("012_"))) {
+        await client.query("INSERT INTO board_share_links(board_id,enabled,role,generation,settings_version,token_hash,token_ciphertext) VALUES ($1,true,'viewer',1,0,$2,$3)", [ids[2], "a".repeat(64), "b".repeat(142)]);
+        await client.query("INSERT INTO board_share_link_grants(board_id,user_id,generation) VALUES ($1,$2,1)", [ids[2], ids[1]]);
+        await client.query("INSERT INTO board_share_link_receipts(board_id,actor_id,request_id,payload_hash,settings_version) VALUES ($1,$2,$3,$4,0)", [ids[2], ids[0], ids[6], "c".repeat(64)]);
+      }
       await client.query("COMMIT");
     } catch (error) { await client.query("ROLLBACK"); throw error; }
   });
